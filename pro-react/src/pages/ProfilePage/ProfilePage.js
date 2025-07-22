@@ -316,10 +316,10 @@ const ProfilePage = () => {
                   
                   <Form.Item
                     name="major"
-                    label="专业/部门"
-                    rules={[{ required: true, message: '请输入专业或部门' }]}
+                    label="专业"
+                    rules={[{ required: true, message: '请输入专业' }]}
                   >
-                    <Input placeholder="请输入专业或部门" />
+                    <Input placeholder="请输入专业" />
                   </Form.Item>
                   
                   {currentUser.role === 'student' && (

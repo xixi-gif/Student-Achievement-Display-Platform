@@ -2,19 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { 
   Layout, Form, Input, Button, Card, Select, 
   Upload, Space, Divider, message, Spin, DatePicker,
-  InputNumber, Tag
+  Badge
 } from 'antd';
 import { 
   UploadOutlined, FileTextOutlined, UserOutlined,
   CheckCircleOutlined, CalendarOutlined, VideoCameraOutlined,
-  DollarOutlined
+  DollarOutlined, PlusOutlined, CloseOutlined
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
 import moment from 'moment';
 
 const { Content } = Layout;
-const { TextArea } = Input;
+const { TextArea } = Input; // 从 Input 中获取 TextArea
 
 const categories = [
   { value: 'thesis', label: '毕业论文' },
@@ -43,6 +43,8 @@ const AchievementCreationPage = () => {
   const [previewImage, setPreviewImage] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
   const [videoFiles, setVideoFiles] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [newParticipant, setNewParticipant] = useState('');
 
   const uploadImageProps = {
     name: 'achievementImages',
@@ -100,17 +102,17 @@ const AchievementCreationPage = () => {
           level: "school",
           description: "基于React Native开发的校园导航应用，支持POI搜索、路径规划和校园活动推荐功能...",
           date: moment("2023-09-28"),
-          participants: "张明, 李华, 王芳",
           instructor: "陈老师",
           keywords: "校园导航, React Native, 路径规划",
           price: "99.99"
         };
         form.setFieldsValue(mockAchievement);
+        setParticipants(["张明", "李华", "王芳"]);
       } else {
         form.setFieldsValue({
-          date: moment(),
-          participants: userInfo.realName || username
+          date: moment()
         });
+        setParticipants([userInfo.realName || username]);
       }
       
       setLoading(false);
@@ -119,8 +121,29 @@ const AchievementCreationPage = () => {
     return () => clearTimeout(timer);
   }, [form, id]);
 
+  const handleAddParticipant = () => {
+    if (!newParticipant.trim()) {
+      message.warning('请输入参与人员姓名');
+      return;
+    }
+    
+    if (participants.includes(newParticipant.trim())) {
+      message.warning('该人员已在列表中');
+      return;
+    }
+    
+    setParticipants([...participants, newParticipant.trim()]);
+    setNewParticipant('');
+  };
+
+  const handleRemoveParticipant = (name) => {
+    setParticipants(participants.filter(item => item !== name));
+  };
+
   const handleSubmit = () => {
     setSubmitting(true);
+    
+    form.setFieldsValue({ participants: participants.join(',') });
     
     form.validateFields()
       .then(values => {
@@ -131,6 +154,7 @@ const AchievementCreationPage = () => {
           status: 'pending',
           creator: currentUser.username,
           createTime: moment().format('YYYY-MM-DD HH:mm:ss'),
+          participants: participants,
           videos: videoFiles.map(file => ({
             name: file.name,
             url: file.response?.url || file.url
@@ -144,7 +168,6 @@ const AchievementCreationPage = () => {
       })
       .catch(info => {
         message.error('表单填写有误，请检查后重试');
-        console.log(info);
       })
       .finally(() => {
         setSubmitting(false);
@@ -210,7 +233,7 @@ const AchievementCreationPage = () => {
                   ]}
                 >
                   <Input 
-                    placeholder="请输入成果的标题（如：基于深度学习的校园垃圾分类系统研究）" 
+                    placeholder="请输入成果的标题" 
                     prefix={<FileTextOutlined />}
                   />
                 </Form.Item>
@@ -282,14 +305,51 @@ const AchievementCreationPage = () => {
                 </Form.Item>
                 
                 <Form.Item
-                  name="participants"
-                  label="参与人员"
-                  rules={[{ required: true, message: '请输入参与人员' }]}
+                  label="参与人员（可选）"
                 >
-                  <Input 
-                    placeholder="请输入参与人员，多个人员用逗号分隔" 
-                    prefix={<UserOutlined />}
-                  />
+                  <div>
+                    <Space size="small" wrap style={{ marginBottom: 12 }}>
+                      {participants.map((name, index) => (
+                        <Badge 
+                          key={index}
+                          color="#1890ff"
+                          text={
+                            <span style={{ display: 'flex', alignItems: 'center' }}>
+                              {name}
+                              <CloseOutlined 
+                                style={{ 
+                                  marginLeft: 5, 
+                                  cursor: 'pointer', 
+                                  fontSize: 12 
+                                }} 
+                                onClick={() => handleRemoveParticipant(name)} 
+                              />
+                            </span>
+                          }
+                        />
+                      ))}
+                    </Space>
+                    
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Input 
+                        placeholder="请输入参与人员姓名" 
+                        value={newParticipant}
+                        onChange={(e) => setNewParticipant(e.target.value)}
+                        onPressEnter={handleAddParticipant}
+                      />
+                      <Button 
+                        type="primary" 
+                        icon={<PlusOutlined />}
+                        onClick={handleAddParticipant}
+                      >
+                        添加
+                      </Button>
+                    </Space.Compact>
+                    
+                    <p style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
+                      可添加多位参与人员，也可全部删除（个人项目）
+                    </p>
+                  </div>
                 </Form.Item>
                 
                 <Form.Item
@@ -310,7 +370,7 @@ const AchievementCreationPage = () => {
                   ]}
                 >
                   <Input 
-                    placeholder="请输入关键词，多个关键词用逗号分隔（如：深度学习, 垃圾分类, 校园应用）" 
+                    placeholder="请输入关键词，多个关键词用逗号分隔" 
                   />
                 </Form.Item>
               </div>
@@ -331,11 +391,8 @@ const AchievementCreationPage = () => {
                           return Promise.reject('请输入价格信息');
                         }
                         
-                        // 验证固定价格格式
                         const fixedPriceRegex = /^\d+(\.\d{1,2})?$/;
-                        // 验证价格区间格式
                         const rangePriceRegex = /^\d+(\.\d{1,2})?\s*-\s*\d+(\.\d{1,2})?$/;
-                        // 验证面议格式
                         const negotiableRegex = /^面议$/i;
                         
                         if (

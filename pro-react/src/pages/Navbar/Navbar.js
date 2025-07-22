@@ -14,9 +14,9 @@ const { Search } = Input;
 
 const getNavMenu = (role) => {
   const baseMenu = [
-    { key: '/dashboard', icon: <HomeOutlined />, label: '首页' },
+    { key: '/home', icon: <HomeOutlined />, label: '首页' },
     { key: '/achievements', icon: <TrophyOutlined />, label: '成果展示' },
-    { key: '/announcements', icon: <BellOutlined />, label: '公告' },
+    { key: '/annoucementlist', icon: <BellOutlined />, label: '公告' },
     { key: '/about', icon: <InfoOutlined />, label: '关于我们' }
   ];
 

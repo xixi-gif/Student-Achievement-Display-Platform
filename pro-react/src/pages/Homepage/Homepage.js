@@ -273,7 +273,7 @@ const HomePage = () => {
                               <Button 
                                 type="primary" 
                                 size="small"
-                                onClick={() => navigate(`/achievement/${achievement.id}`)}
+                                onClick={() => navigate(`/achievement/detail`)}
                               >
                                 查看详情
                               </Button>
