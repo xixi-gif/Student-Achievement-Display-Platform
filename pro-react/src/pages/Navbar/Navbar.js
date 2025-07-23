@@ -4,7 +4,8 @@ import {
   HomeOutlined, TrophyOutlined, UserOutlined, 
   SettingOutlined, LogoutOutlined, BookOutlined,
   UsergroupAddOutlined, EyeOutlined, SearchOutlined,
-  BellOutlined, InfoOutlined, MenuOutlined
+  BellOutlined, InfoOutlined, MenuOutlined,
+  StarOutlined, CheckCircleOutlined,BarChartOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
@@ -24,11 +25,15 @@ const getNavMenu = (role) => {
     case 'student':
       return [...baseMenu, { key: '/my-achievements', icon: <UserOutlined />, label: '我的成果' }];
     case 'teacher':
-      return [...baseMenu, { key: '/manage-students', icon: <BookOutlined />, label: '学生管理' }];
+      return [...baseMenu, { key: '/manage-students', icon: <BookOutlined />, label: '学生管理' },
+        { key: '/achievement/recommend', icon:<StarOutlined />, label: '成果推荐' },
+        { key: '/achievement/review', icon:<CheckCircleOutlined />, label: '成果审核' }
+      ];
     case 'admin':
       return [...baseMenu, 
         { key: '/system-settings', icon: <SettingOutlined />, label: '系统设置' },
-        { key: '/user-management', icon: <UsergroupAddOutlined />, label: '用户管理' }
+        { key: '/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
+        {key: '/data-statistics', icon:<BarChartOutlined />, label: '数据统计' },
       ];
     case 'visitor':
     default:

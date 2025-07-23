@@ -10,6 +10,12 @@ import AchievementsPage from './pages/AchievementsPage/AchievementsPage';
 import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage';
 import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage';
 import ForgotPasswordPage from './pages/Forgotpasswordpage/ForgotPasswordPage';
+import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage';
+import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage';
+import StudentManage from'./pages/StudentManagePage/StudentManagePage';
+import UserManagementPage from './pages/UserManagePage/UserManagePage';
+import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
+import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
@@ -31,6 +37,12 @@ function App() {
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/achievement/detail" element={<AchievementDetailPage />} />
             <Route path="/achievement/create" element={<AchievementCreationPage />} />
+            <Route path="/achievement/review" element={<AchievementReviewPage />} />
+            <Route path="/achievement/recommend" element={<AchievementRecommendPage />} />
+            <Route path="/manage-students" element={<StudentManage/>} />
+            <Route path='/manage-users' element={<UserManagementPage/>} />
+            <Route path="/system-settings" element={<SystemSettingsPage />} />
+            <Route path="/data-statistics" element={<DataStatisticsPage />} />
           </Routes>
         </div>
       </Router>
