@@ -89,7 +89,7 @@ const ProfilePage = () => {
       dataIndex: 'title',
       key: 'title',
       render: (text, record) => (
-        <a onClick={() => navigate(`/achievement/${record.id}`)}>{text}</a>
+        <a onClick={() => navigate(`/achievement/detail`)}>{text}</a>
       )
     },
     {
@@ -128,7 +128,7 @@ const ProfilePage = () => {
             type="text" 
             icon={<EditOutlined />} 
             size="small"
-            onClick={() => navigate(`/achievement/edit/${record.id}`)}
+            onClick={() => navigate(`/student/achievement/edit`)}
           >
             编辑
           </Button>
@@ -383,7 +383,7 @@ const ProfilePage = () => {
                   <Button 
                     type="primary" 
                     icon={<UploadOutlined />}
-                    onClick={() => navigate('/achievement/create')}
+                    onClick={() => navigate('/student/achievement/create')}
                   >
                     发布新成果
                   </Button>
@@ -431,9 +431,7 @@ const ProfilePage = () => {
                     <Button type="primary" style={{ marginRight: 16 }}>
                       修改密码
                     </Button>
-                    <Button type="default">
-                      找回密码
-                    </Button>
+
                   </Form.Item>
                   
                   <Divider />

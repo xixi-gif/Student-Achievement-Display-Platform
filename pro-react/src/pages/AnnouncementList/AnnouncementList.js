@@ -95,7 +95,7 @@ const AnnouncementList = () => {
       render: (_, record) => (
         <Button 
           type="link" 
-          onClick={() => navigate(`/announcements/${record.id}`)}
+          onClick={() => navigate(`/annoucementdetail`)}
           style={{ color: '#1890ff' }}
         >
           查看详情

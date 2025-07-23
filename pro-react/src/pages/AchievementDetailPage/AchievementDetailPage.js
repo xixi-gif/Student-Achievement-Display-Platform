@@ -278,13 +278,14 @@ const AchievementDetailPage = () => {
                   <h3 style={{ margin: 0, fontSize: 18, color: '#222' }}>
                     <UserOutlined /> 项目成员 & 指导教师
                   </h3>
+                  
                   <Space size="small">
                     {(isCreator() || isAdminOrTeacher()) && (
                       <Button 
                         type="primary" 
                         icon={<EditOutlined />} 
                         size="small"
-                        onClick={() => navigate(`/achievement/edit/${achievement.id}`)}
+                        onClick={() => navigate(`/author`)}
                       >
                         编辑
                       </Button>
@@ -307,7 +308,7 @@ const AchievementDetailPage = () => {
                           borderRadius: 4,
                           transition: 'all 0.3s'
                         }}
-                        onClick={() => navigate(`/user/${member.id}`)}
+                        onClick={() => navigate(`/author`)}
                       >
                         <Avatar 
                           src={member.avatar} 
@@ -337,7 +338,7 @@ const AchievementDetailPage = () => {
                         border: '1px solid #f0f0f0',
                         borderRadius: 4
                       }}
-                      onClick={() => navigate(`/user/${achievement.instructor.id}`)}
+                      onClick={() => navigate(`/author`)}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px' }}>
                         <Avatar 

@@ -23,7 +23,7 @@ const getNavMenu = (role) => {
 
   switch(role) {
     case 'student':
-      return [...baseMenu, { key: '/my-achievements', icon: <UserOutlined />, label: '我的成果' }];
+      return [...baseMenu, { key: '/student/my-achievements', icon: <UserOutlined />, label: '我的成果' }];
     case 'teacher':
       return [...baseMenu, { key: '/manage-students', icon: <BookOutlined />, label: '学生管理' },
         { key: '/achievement/recommend', icon:<StarOutlined />, label: '成果推荐' },
@@ -80,7 +80,7 @@ const Navbar = ({ currentUser }) => {
 
   const userMenu = (
     <Menu>
-      <Menu.Item key="profile" icon={<UserOutlined />} onClick={() => navigate('/profile')}>
+      <Menu.Item key="profile" icon={<UserOutlined />} onClick={() => navigate('/student/profile')}>
         个人中心
       </Menu.Item>
       {role !== 'visitor' && (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Layout, Card, Tag, Space, Input, Button, Typography, Divider, Spin, Row, Col, Pagination, Empty } from 'antd';
 import { SearchOutlined, CalendarOutlined, UserOutlined, StarOutlined, FilterOutlined, FileTextOutlined, ExperimentOutlined, TrophyOutlined, InboxOutlined, BookOutlined, FolderOpenOutlined } from '@ant-design/icons'; // 替换 PatentOutlined 为 InboxOutlined
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import Navbar from '../Navbar/Navbar';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -105,10 +106,7 @@ const AchievementsPage = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f7f8fa' }}>
-      <Layout.Header style={{ background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', padding: '0 24px' }}>
-        <Title level={3} style={{ margin: '16px 0', color: '#1677ff', textAlign: 'center' }}>成果展示平台</Title>
-      </Layout.Header>
-
+      <Navbar />
       <Content style={{ padding: '24px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.04)', padding: '24px 32px' }}>
@@ -220,7 +218,7 @@ const AchievementsPage = () => {
                           <Button 
                             type="link" 
                             size="small"
-                            onClick={() => navigate(`/achievement/${achievement.id}`)}
+                            onClick={() => navigate(`/achievement/detail`)}
                             style={{ padding: 0, height: 'auto', color: '#1677ff' }}
                           >
                             查看详情 →
