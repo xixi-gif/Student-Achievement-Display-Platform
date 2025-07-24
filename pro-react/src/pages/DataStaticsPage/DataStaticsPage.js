@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, DatePicker, Select, Spin, Divider, Statistic, Tabs, Table, Tag, Space} from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Card, Row, Col, DatePicker, Select, Spin, Divider, Statistic, Tabs, Table, Tag, Space, Layout} from 'antd';
 import { BarChartOutlined, PieChartOutlined,  LineChartOutlined, UserOutlined, BookOutlined,  StarOutlined} from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
+import Navbar from '../Navbar/Navbar';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { TabPane } = Tabs;
+const { Footer } = Layout;
+
 
 // 模拟学生数据
 const mockStudents = [
@@ -52,6 +56,7 @@ const mockStudents = [
 
 const DataStatisticsPage = () => {
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [timeRange, setTimeRange] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({
@@ -65,6 +70,9 @@ const DataStatisticsPage = () => {
   useEffect(() => {
     setLoading(true);
     setTimeout(() => {
+      const role = localStorage.getItem('user_role') || 'visitor';
+      const username = localStorage.getItem('username') || '访客';
+      setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
       setStats({
         summary: {
           totalStudents: 12,
@@ -156,6 +164,7 @@ const DataStatisticsPage = () => {
     }]
   });
 
+  const navigate = useNavigate();
   // 用户活跃度图表
   const getUserActivityChartOption = () => ({
     title: {
@@ -261,7 +270,7 @@ const DataStatisticsPage = () => {
       title: '学生姓名',
       dataIndex: 'name',
       key: 'name',
-      render: (text) => <a>{text}</a>
+      render: (text) => <a onClick={() => navigate(`/student/profile`)}>{text}</a>
     },
     {
       title: '登录次数',
@@ -293,6 +302,8 @@ const DataStatisticsPage = () => {
   ];
 
   return (
+    <Layout>
+      <Navbar currentUser={currentUser} />
     <div style={{ padding: 24 }}>
       <Card
         title="数据统计中心"
@@ -448,6 +459,10 @@ const DataStatisticsPage = () => {
         </Spin>
       </Card>
     </div>
+    <Footer style={{ textAlign: 'center' }}>
+            学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+          </Footer>
+    </Layout>
   );
 };
 

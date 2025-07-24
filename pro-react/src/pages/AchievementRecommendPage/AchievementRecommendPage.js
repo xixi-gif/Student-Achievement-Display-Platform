@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import {Table,  Button,  Tag,  Card,  Input,  Select,  Modal,  Space,  Popover,  Badge, Descriptions, Divider,  message,  Switch} from 'antd';
+import { useNavigate } from 'react-router-dom';
+import {Table,  Button,  Tag,  Card,  Input,  Select,  Modal,  Space,  Popover,  
+  Badge, Descriptions, Divider,  message,  Switch, Layout} from 'antd';
 import {StarOutlined,  SearchOutlined,  FilterOutlined,  InfoCircleOutlined} from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { Search } = Input;
 const {Option} = Select;
+const { Footer } = Layout;
 
 const mockAchievements = [
   {
@@ -44,6 +48,7 @@ const mockAchievements = [
 const AchievementRecommendPage = () => {
   // 状态管理
   const [data, setData] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -63,8 +68,17 @@ const AchievementRecommendPage = () => {
 
   // 模拟数据获取
   useEffect(() => {
+  // 初始化用户数据
+  const loadUserAndData = async () => {
     setLoading(true);
-    setTimeout(() => {
+    
+    try {
+      // 1. 加载用户信息
+      const role = localStorage.getItem('user_role') || 'visitor';
+      const username = localStorage.getItem('username') || '访客';
+      setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
+        
+      // 2. 加载成果数据（基于用户角色）
       const filtered = mockAchievements.filter(item => {
         const matchesSearch = searchParams.keyword
           ? item.title.includes(searchParams.keyword) ||
@@ -84,13 +98,21 @@ const AchievementRecommendPage = () => {
       });
       
       setData(filtered);
-      setPagination({
-        ...pagination,
+      setPagination(prev => ({
+        ...prev,
         total: filtered.length
-      });
+      }));
+      
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      message.error('数据加载失败');
+    } finally {
       setLoading(false);
-    }, 500);
-  }, [pagination.current, searchParams]);
+    }
+  };
+
+  loadUserAndData();
+}, [pagination.current, searchParams]); // 依赖项保持不变
 
   // 处理推荐状态切换
   const handleToggleRecommend = (id, recommended) => {
@@ -122,7 +144,7 @@ const AchievementRecommendPage = () => {
     setCommentModal({ ...commentModal, visible: false });
     message.success('推荐说明已保存');
   };
-
+const navigate = useNavigate(); 
   // 表格列配置
   const columns = [
     {
@@ -143,7 +165,9 @@ const AchievementRecommendPage = () => {
             </div>
           }
         >
-          <a>{text}</a>
+          {/* navigate(`/achievement/detail/${record.id}` */}
+          <a onClick={() => navigate(`/achievement/detail`)}>
+            {text}</a>
         </Popover>
       )
     },
@@ -215,6 +239,8 @@ const AchievementRecommendPage = () => {
   ];
 
   return (
+    <Layout>
+    <Navbar currentUser={currentUser} />
     <Card
       title={
         <Space>
@@ -324,6 +350,10 @@ const AchievementRecommendPage = () => {
         </div>
       </Modal>
     </Card>
+      <Footer style={{ textAlign: 'center' }}>
+        学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+      </Footer>
+    </Layout>
   );
 };
 

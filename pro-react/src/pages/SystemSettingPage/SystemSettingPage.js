@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Form, Input, Button, message, Table, Upload, Card, Select, Tag, Space, Popconfirm, Image, Row, Col} from 'antd';
+import { Tabs, Form, Input, Button, message, Table, Upload, Card, Select,
+   Tag, Space, Popconfirm, Image, Row, Col, Layout} from 'antd';
 import { UploadOutlined,  PlusOutlined, DeleteOutlined, EditOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
+const { Footer } = Layout;
 
 // 分类数据
 const mockCategories = [
@@ -46,6 +49,7 @@ const mockCarouselItems = [
 ];
 
 const SystemSettingsPage = () => {
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
@@ -59,6 +63,9 @@ const SystemSettingsPage = () => {
   useEffect(() => {
     setLoading(true);
     setTimeout(() => {
+      const role = localStorage.getItem('user_role') || 'visitor';
+      const username = localStorage.getItem('username') || '访客';
+      setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
       setCategories(mockCategories);
       setTags(mockTags);
       setCarouselItems(mockCarouselItems);
@@ -166,6 +173,8 @@ const SystemSettingsPage = () => {
   };
 
   return (
+    <Layout>
+      <Navbar currentUser={currentUser} />
     <Card 
       title="系统设置" 
       bordered={false}
@@ -452,6 +461,10 @@ const SystemSettingsPage = () => {
 
       </Tabs>
     </Card>
+    <Footer style={{ textAlign: 'center' }}>
+            学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+          </Footer>
+    </Layout>
   );
 };
 

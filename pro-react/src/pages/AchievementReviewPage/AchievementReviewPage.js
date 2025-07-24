@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {Table,  Button, Modal, message, Tag, Space,Card, Input, Select,  Divider,Descriptions,Badge,  Tooltip} from 'antd';
+import {Table,  Button, Modal, message, Tag, Space,Card, Input, Select,  
+  Divider,Descriptions,Badge,  Tooltip, Layout} from 'antd';
 import { 
   CheckOutlined, 
   CloseOutlined, 
@@ -8,9 +9,11 @@ import {
   FilterOutlined 
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import Navbar from '../Navbar/Navbar';
 
 const { Search } = Input;
 const { Option } = Select;
+const { Footer } = Layout;
 
 // 模拟数据（基于成果详情页结构提取关键字段）
 const mockData = [
@@ -52,6 +55,7 @@ const mockData = [
 
 const AchievementReviewPage = () => {
   const [data, setData] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -110,8 +114,36 @@ const AchievementReviewPage = () => {
   };
 
   useEffect(() => {
-    fetchData({ status: filterStatus, search: searchText });
-  }, [pagination.current, filterStatus, searchText]);
+  // 1. 同步加载用户数据
+  const role = localStorage.getItem('user_role') || 'visitor';
+  const username = localStorage.getItem('username') || '访客';
+  const avatar = `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200`; 
+  setCurrentUser({ role, username, avatar });
+
+  // 2. 异步加载审核数据
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const filtered = mockData.filter(item => {
+        const matchesStatus = filterStatus ? item.status === filterStatus : true;
+        const matchesSearch = searchText 
+          ? item.title.includes(searchText) || item.studentName.includes(searchText)
+          : true;
+        return matchesStatus && matchesSearch;
+      });
+
+      setData(filtered);
+      setPagination(prev => ({
+        ...prev,
+        total: filtered.length
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, [pagination.current, filterStatus, searchText]);
 
   // 处理分页变化
   const handleTableChange = (pag) => {
@@ -193,7 +225,9 @@ const AchievementReviewPage = () => {
       dataIndex: 'title',
       key: 'title',
       render: (text, record) => (
-        <a onClick={() => viewDetail(record)}>{text}</a>
+        <a onClick={() => navigate(`/achievement/detail`)}>
+          {text}
+        </a>
       ),
     },
     {
@@ -257,6 +291,8 @@ const AchievementReviewPage = () => {
   ];
 
   return (
+    <Layout>
+    <Navbar currentUser={currentUser}/>
     <Card 
       title={
         <Space>
@@ -330,6 +366,10 @@ const AchievementReviewPage = () => {
         />
       </Modal>
     </Card>
+    <Footer style={{ textAlign: 'center' }}>
+            学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+          </Footer>
+    </Layout>
   );
 };
 

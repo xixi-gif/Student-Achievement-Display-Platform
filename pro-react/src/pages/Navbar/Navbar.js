@@ -4,7 +4,7 @@ import {
   HomeOutlined, TrophyOutlined, UserOutlined, 
   SettingOutlined, LogoutOutlined, BookOutlined,
   UsergroupAddOutlined, EyeOutlined, SearchOutlined,
-  BellOutlined, InfoOutlined, MenuOutlined,
+  BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,CrownOutlined,
   StarOutlined, CheckCircleOutlined,BarChartOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -25,15 +25,16 @@ const getNavMenu = (role) => {
     case 'student':
       return [...baseMenu, { key: '/student/my-achievements', icon: <UserOutlined />, label: '我的成果' }];
     case 'teacher':
-      return [...baseMenu, { key: '/manage-students', icon: <BookOutlined />, label: '学生管理' },
-        { key: '/achievement/recommend', icon:<StarOutlined />, label: '成果推荐' },
-        { key: '/achievement/review', icon:<CheckCircleOutlined />, label: '成果审核' }
+      return [...baseMenu, 
+        { key: '/teacher/achievements/recommend', icon:<StarOutlined />, label: '成果推荐' },
+        { key: '/teacher/achievements/review', icon:<CheckCircleOutlined />, label: '成果审核' },
+        // { key: '/teacher/manage-students', icon: <BookOutlined />, label: '学生管理' },
       ];
     case 'admin':
-      return [...baseMenu, 
-        { key: '/system-settings', icon: <SettingOutlined />, label: '系统设置' },
-        { key: '/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
-        {key: '/data-statistics', icon:<BarChartOutlined />, label: '数据统计' },
+      return [...baseMenu,
+        { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
+        {key: '/admin/data-statistics', icon:<BarChartOutlined />, label: '数据统计' }, 
+        { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' }
       ];
     case 'visitor':
     default:
@@ -80,9 +81,23 @@ const Navbar = ({ currentUser }) => {
 
   const userMenu = (
     <Menu>
-      <Menu.Item key="profile" icon={<UserOutlined />} onClick={() => navigate('/student/profile')}>
+{/* 根据角色显示不同的个人中心入口 */}
+    {role === 'student' && (
+      <Menu.Item key="student-profile" icon={<UserOutlined />} onClick={() => navigate('/student/profile')}>
         个人中心
       </Menu.Item>
+    )}
+    {role === 'teacher' && (
+      <Menu.Item key="teacher-profile" icon={<SolutionOutlined />}  onClick={() => navigate('/teacher/profile')}>
+        个人中心
+      </Menu.Item>
+    )}
+    {role === 'admin' && (
+      <Menu.Item  key="admin-profile"  icon={<CrownOutlined />} onClick={() => navigate('/admin/profile')}>
+        个人中心
+      </Menu.Item>
+    )}
+    
       {role !== 'visitor' && (
         <Menu.Item key="settings" icon={<SettingOutlined />} onClick={() => navigate('/settings')}>
           账号设置

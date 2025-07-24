@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Badge, Row, Col, Divider,  Popconfirm,  Descriptions,  Tabs} from 'antd';
+import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Badge, Row, Col, Divider,  
+  Popconfirm,  Descriptions,  Tabs, Layout,Form,Radio} from 'antd';
 import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined, UserOutlined, TeamOutlined, PlusOutlined} from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { Search } = Input;
 const { TabPane } = Tabs;
+const { Footer } = Layout;
 
-// 模拟3条学生和3条教师数据
+// 模拟学生和教师数据
 const mockUsers = {
   students: [
     {
@@ -122,17 +125,25 @@ const UserCard = ({ user, onEdit, onDelete, onToggleStatus, onResetPassword }) =
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState({ students: [], teachers: [] });
+  const [currentUser, setCurrentUser]=useState(null);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [resetPwdModalVisible, setResetPwdModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('students');
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [newUserType, setNewUserType] = useState('student');
+  const [newUserForm] = Form.useForm();
+  const [adding, setAdding] = useState(false);
 
   // 模拟数据加载
   useEffect(() => {
     setLoading(true);
     setTimeout(() => {
+      const role = localStorage.getItem('user_role') || 'visitor';
+      const username = localStorage.getItem('username') || '访客';
+      setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
       setUsers(mockUsers);
       setLoading(false);
     }, 500);
@@ -175,6 +186,39 @@ const UserManagementPage = () => {
       message.success(`已${user.status === 'active' ? '禁用' : '启用'} ${user.name}`);
     }
   };
+  
+  // 处理添加用户
+  const handleAddUser = () => {
+    setAdding(true);
+    newUserForm.validateFields()
+      .then(values => {
+        // 模拟API延迟
+        setTimeout(() => {
+          const newUser = {
+            id: `u${Date.now()}`,
+            ...values,
+            role: newUserType,
+            status: 'active',
+            avatar: generateRandomAvatar(newUserType),
+            lastLogin: new Date().toISOString()
+          };
+          
+          if (newUserType === 'student') {
+            newUser.achievementCount = 0;
+          }
+          
+          const updatedUsers = { ...users };
+          updatedUsers[`${newUserType}s`].unshift(newUser);
+          setUsers(updatedUsers);
+          
+          message.success(`成功添加${newUserType === 'student' ? '学生' : '教师'}`);
+          setAddModalVisible(false);
+          newUserForm.resetFields();
+          setAdding(false);
+        }, 800);
+      })
+      .catch(() => setAdding(false));
+  };
 
   // 处理删除用户
   const handleDelete = (id) => {
@@ -183,6 +227,21 @@ const UserManagementPage = () => {
     updatedUsers[group] = updatedUsers[group].filter(u => u.id !== id);
     setUsers(updatedUsers);
     message.success('用户已删除');
+  };
+
+  // 生成随机头像
+  const generateRandomAvatar = (role) => {
+    const gender = role === 'student' ? 'men' : 'women';
+    const randomId = Math.floor(Math.random() * 50);
+    return `https://randomuser.me/api/portraits/${gender}/${randomId}.jpg`;
+  };
+
+  // 学号唯一性验证
+  const validateStudentId = (_, value) => {
+    if (value && users.students.some(s => s.studentId === value)) {
+      return Promise.reject('该学号已存在');
+    }
+    return Promise.resolve();
   };
 
   // 处理重置密码
@@ -206,6 +265,8 @@ const UserManagementPage = () => {
   const { students, teachers } = getFilteredUsers();
 
   return (
+    <Layout>
+      <Navbar currentUser={currentUser} />
     <div style={{ padding: 24 }}>
       <Card
         title="用户管理"
@@ -219,7 +280,8 @@ const UserManagementPage = () => {
               style={{ width: 300 }}
               onSearch={handleSearch}
             />
-            <Button type="primary" icon={<PlusOutlined />}>
+            <Button type="primary" icon={<PlusOutlined />} 
+            onClick={() => setAddModalVisible(true)} loading={adding}>
               添加用户
             </Button>
           </Space>
@@ -296,6 +358,193 @@ const UserManagementPage = () => {
         </Tabs>
       </Card>
 
+      {/* 添加用户弹窗 */}
+      <Modal
+        title={`添加${newUserType === 'student' ? '学生' : '教师'}`}
+        visible={addModalVisible}
+        width={700}
+        onOk={handleAddUser}
+        onCancel={() => {
+          setAddModalVisible(false);
+          newUserForm.resetFields();
+        }}
+        confirmLoading={adding}
+        okText="提交"
+        cancelText="取消"
+      >
+        <Form form={newUserForm} layout="vertical">
+          <Form.Item>
+            <Radio.Group 
+              value={newUserType} 
+              onChange={e => setNewUserType(e.target.value)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="student">学生</Radio.Button>
+              <Radio.Button value="teacher">教师</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+          
+          {/* 动态表单内容 */}
+          {newUserType === 'student' ? (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="name"
+                    label="学生姓名"
+                    rules={[{ required: true, message: '请输入学生姓名' }]}
+                  >
+                    <Input placeholder="如：张三" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="studentId"
+                    label="学号"
+                    rules={[
+                      { required: true, message: '请输入学号' },
+                      { pattern: /^\d{10}$/, message: '学号必须为10位数字' },
+                      { validator: validateStudentId }
+                    ]}
+                  >
+                    <Input placeholder="如：2023611001" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="major"
+                    label="专业"
+                    rules={[{ required: true, message: '请输入学生专业' }]}
+                  >
+                    <Input placeholder="如：计算机科学与技术" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="classId"
+                    label="班级"
+                    rules={[
+                      { required: true, message: '请输入班级' },
+                      { pattern:/^[\u4e00-\u9fa5]{2,4}\d{2}班?$/, message: '班级格式：专业+年级+班号' },
+                      { validator: validateStudentId }
+                    ]}
+                  >
+                    <Input placeholder="如：计算机2101班" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="Email"
+                    label="邮箱"
+                    rules={[
+                      { required: true, message: '请输入学生邮箱' },
+                      { pattern: /^[a-zA-Z0-9._%+-]+@(stu\.)?edu\.cn$/,  message: '邮箱（@edu.cn或@stu.edu.cn）'}
+                    ]}
+                  >
+                    <Input placeholder="如：25zhangsan@stu.edu.cn" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="phone"
+                    label="电话"
+                    rules={[
+                      { required: true, message: '请输入学生电话' },
+                      {pattern: /^1[3-9]\d{9}$/,  message: '请输入11位有效手机号' }
+                    ]}
+                  >
+                    <Input placeholder="如：13800138000" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              
+            </>
+          ) : (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="name"
+                    label="教师姓名"
+                    rules={[{ required: true, message: '请输入教师姓名' }]}
+                  >
+                    <Input placeholder="如：李教授" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="teacherId"
+                    label="工号"
+                    rules={[
+                      { required: true, message: '请输入工号' },
+                      { pattern: /^T\d{4}$/, message: '工号格式为T+4位数字' }
+                    ]}
+                  >
+                    <Input placeholder="如：T1001" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="department"
+                    label="部门"
+                    rules={[{ required: true, message: '请输入教师所属学院' }]}
+                  >
+                    <Input placeholder="如：计算机系" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="title"
+                    label="职称"
+                    rules={[
+                      { required: true, message: '请输入职称' }
+                    ]}
+                  >
+                    <Input placeholder="如：教授" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="Email"
+                    label="邮箱"
+                    rules={[
+                      { required: true, message: '请输入学生邮箱' },
+                      { pattern: /^[a-zA-Z0-9._%+-]+@(stu\.)?edu\.cn$/,  message: '邮箱（@edu.cn或@stu.edu.cn）'}
+                    ]}
+                  >
+                    <Input placeholder="如：25zhangsan@stu.edu.cn" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="phone"
+                    label="电话"
+                    rules={[
+                      { required: true, message: '请输入学生电话' },
+                      {pattern: /^1[3-9]\d{9}$/,  message: '请输入11位有效手机号' }
+                    ]}
+                  >
+                    <Input placeholder="如：13800138000" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+        </Form>
+      </Modal>
+      
       {/* 重置密码确认弹窗 */}
       <Modal
         title="确认重置密码"
@@ -361,6 +610,10 @@ const UserManagementPage = () => {
         )}
       </Modal>
     </div>
+    <Footer style={{ textAlign: 'center' }}>
+            学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+          </Footer>
+    </Layout>
   );
 };
 

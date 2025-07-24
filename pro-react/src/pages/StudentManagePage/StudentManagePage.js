@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Input, Button, Modal, message, Tag, Space,  Avatar, Badge, Row, Col,  Descriptions} from 'antd';
-import { 
-  SearchOutlined, EditOutlined,   UnlockOutlined,   StopOutlined,  InfoCircleOutlined} from '@ant-design/icons';
+import { Card, Input, Button, Modal, message, Tag, Space,  Avatar, Badge, Row, Col,  Descriptions, Layout} from 'antd';
+import { SearchOutlined, EditOutlined,   UnlockOutlined,   StopOutlined,  InfoCircleOutlined} from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { Search } = Input;
 const { Meta } = Card;
-
+const { Footer } = Layout;
 const mockStudents = [
   {
     id: '1001',
@@ -50,6 +50,7 @@ const mockStudents = [
 
 const StudentManagementPage = () => {
   const [students, setStudents] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -61,6 +62,9 @@ const StudentManagementPage = () => {
   useEffect(() => {
     setLoading(true);
     setTimeout(() => {
+      const role = localStorage.getItem('user_role') || 'visitor';
+      const username = localStorage.getItem('username') || '访客';
+      setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
       setStudents(mockStudents);
       setFilteredStudents(mockStudents);
       setLoading(false);
@@ -177,6 +181,8 @@ const StudentManagementPage = () => {
   );
 
   return (
+    <Layout>
+    <Navbar currentUser={currentUser}/>
     <div style={{ padding: 24 }}>
       <Card
         title="学生管理"
@@ -257,6 +263,10 @@ const StudentManagementPage = () => {
         )}
       </Modal>
     </div>
+    <Footer style={{ textAlign: 'center' }}>
+            学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+          </Footer>
+    </Layout>
   );
 };
 
