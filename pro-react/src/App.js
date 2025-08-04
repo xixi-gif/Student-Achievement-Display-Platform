@@ -31,6 +31,7 @@ import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPu
 import RequirementListPage from './pages/RequirementListPage/RequirementListPage';
 import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDetailPage';
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
+import ChatPage from './pages/ChatPage/ChatPage';
 
 
 
@@ -41,7 +42,7 @@ function App() {
       <Router>
         <div className="app-container">
           <Routes>
-            <Route path="/" element={<LoginPage />} />
+            <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -55,6 +56,9 @@ function App() {
             <Route path="/achievement/detail" element={<AchievementDetailPage />} />
             <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
             <Route path="/student/achievements/edit" element={<AchievementForm />} />
+
+            <Route path="/chat" element={<ChatPage />} />
+
 
             {/* 教师的个人中心、审核成果、推荐成果页面 */}
             <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />

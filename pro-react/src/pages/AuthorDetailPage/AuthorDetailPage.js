@@ -143,6 +143,7 @@ const AuthorDetailPage = () => {
                   type="primary" 
                   style={{ marginTop: 20 }}
                   size="small"
+                  onClick={() => navigate(`/chat`)}
                 >
                   联系作者
                 </Button>

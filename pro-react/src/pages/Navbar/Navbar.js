@@ -5,10 +5,11 @@ import {
   SettingOutlined, LogoutOutlined, BookOutlined,
   UsergroupAddOutlined, EyeOutlined, SearchOutlined,
   BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,CrownOutlined,
-  StarOutlined, CheckCircleOutlined,BarChartOutlined,ReadOutlined,ReconciliationOutlined
+  StarOutlined, CheckCircleOutlined,BarChartOutlined,ReadOutlined,ReconciliationOutlined, NotificationOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
+
 
 const { Header } = Layout;
 const { Search } = Input;
@@ -18,6 +19,7 @@ const getNavMenu = (role) => {
     { key: '/home', icon: <HomeOutlined />, label: '首页' },
     { key: '/achievements', icon: <TrophyOutlined />, label: '成果展示' },
     { key: '/annoucementlist', icon: <BellOutlined />, label: '公告' },
+    { key: '/requirements', icon: < NotificationOutlined />, label: '需求公告' },
     { key: '/about', icon: <InfoOutlined />, label: '关于我们' }
   ];
 
