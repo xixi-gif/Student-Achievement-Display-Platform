@@ -5,7 +5,7 @@ import {
   SettingOutlined, LogoutOutlined, BookOutlined,
   UsergroupAddOutlined, EyeOutlined, SearchOutlined,
   BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,CrownOutlined,
-  StarOutlined, CheckCircleOutlined,BarChartOutlined
+  StarOutlined, CheckCircleOutlined,BarChartOutlined,ReadOutlined,ReconciliationOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
@@ -37,6 +37,7 @@ const getNavMenu = (role) => {
         { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' }
       ];
     case 'visitor':
+      return baseMenu;
     default:
       return baseMenu;
   }
@@ -104,6 +105,12 @@ const Navbar = ({ currentUser }) => {
         </Menu.Item>
       )}
       <Menu.Divider />
+      <Menu.Item key="requirement" icon={<ReadOutlined />} onClick={() => navigate('/publish-requirement')}>
+        发布需求
+      </Menu.Item>
+      <Menu.Item key="requirement" icon={<ReconciliationOutlined />} onClick={() => navigate('/requirements')}>
+        需求列表
+      </Menu.Item>
       <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
         退出登录
       </Menu.Item>

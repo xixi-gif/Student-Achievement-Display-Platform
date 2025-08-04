@@ -51,7 +51,8 @@ const LoginPage = () => {
         message.success(`${role === 'visitor' ? '欢迎访问' : '登录成功'}，正在跳转...`);
         
         setTimeout(() => {
-          navigate(role === 'visitor' ? '/visitor' : '/home');
+          // navigate(role === 'visitor' ? '/visitor' : '/home');
+          navigate('/home');
         }, 800);
       } else {
         message.error(response.message || '登录失败，请重试');

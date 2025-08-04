@@ -26,6 +26,13 @@ import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
 import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage';
 
+//发布需求、需求列表、需求详情、为需求沟通
+import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
+import RequirementListPage from './pages/RequirementListPage/RequirementListPage';
+import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDetailPage';
+import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
+
+
 
 
 function App() {
@@ -47,15 +54,26 @@ function App() {
             <Route path="/student/my-achievements" element={<MyAchievements />} />
             <Route path="/achievement/detail" element={<AchievementDetailPage />} />
             <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
-            <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />
             <Route path="/student/achievements/edit" element={<AchievementForm />} />
+
+            {/* 教师的个人中心、审核成果、推荐成果页面 */}
+            <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />
             <Route path="/teacher/achievements/recommend" element={<AchievementRecommendPage />} />
             <Route path="/teacher/profile" element={<TeacherProfilePage/>} />
             {/* <Route path="/teacher/manage-students" element={<StudentManage/>} /> */}
+
+            {/* 管理员的个人中心、用户管理、系统设置、数据统计页面 */}
             <Route path='/admin/profile' element={<AdminProfilePage/>} />
             <Route path='/admin/manage-users' element={<UserManagementPage/>} />
             <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
             <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
+
+            {/* 需求发布、需求列表、需求详情、需求沟通中心 */}
+            <Route path="/publish-requirement" element={<RequirementPublishPage />} />
+            <Route path="/requirements" element={<RequirementListPage />} />
+            <Route path="/requirements/:id" element={<RequirementDetailPage />} />
+            <Route path="/messages" element={<MessageCenterPage />} />
+
           </Routes>
         </div>
       </Router>
