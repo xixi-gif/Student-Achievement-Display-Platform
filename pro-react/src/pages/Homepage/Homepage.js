@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
+import { useAuthNavigate } from '../../utils/Auth';
 
 const carouselData = [
   {
@@ -88,15 +89,17 @@ const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 
 const HomePage = () => {
-  const navigate = useNavigate();
+  const navigate = useAuthNavigate();
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const role = localStorage.getItem('user_role') || 'visitor';
-      const username = localStorage.getItem('username') || '访客';
-      setCurrentUser({ role, username });
+      const token = localStorage.getItem('token');
+      const role = token ? localStorage.getItem('user_role') : 'visitor';
+      const username = token ? localStorage.getItem('username') : '访客';
+      // setCurrentUser({ role: role || 'visitor', username });
+      setCurrentUser({ role , username });
       setLoading(false);
     }, 800);
 

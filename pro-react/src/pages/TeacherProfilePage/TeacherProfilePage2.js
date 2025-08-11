@@ -12,7 +12,7 @@ import {
   IdcardOutlined, SafetyOutlined, TeamOutlined
 } from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
-import { teacherApi, authApi, achievementApi } from '../../service/api';
+import { teacherApi, authApi } from '../../service/api';
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
@@ -26,91 +26,65 @@ const TeacherProfile = () => {
   const [editMode, setEditMode] = useState(false);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('review');
+  const [reviewData, setReviewData] = useState([]);
+  const [recommendData, setRecommendData] = useState([]);
 
-  // 模拟教师审核数据
-  const reviewData = [
-    {
-      id: 1,
-      title: "智能校园导航系统",
-      student: "张明",
-      studentId: "20230001",
-      category: "软件开发",
-      status: "已通过",
-      date: "2023-11-15",
-      comment: "创新性强，具有实用价值"
-    }
-  ];
-  
-  // 模拟推荐成果数据
-  const recommendData = [
-    {
-      id: 1,
-      title: "区块链学历认证系统",
-      student: "王芳",
-      recommendLevel: 3,
-      views: 156,
-      date: "2023-11-10"
-    }
-  ];
-
-  // 初始化数据
+  // 加载教师信息和相关数据
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const defaultData = {
-        role: 'teacher',
-        username: '王教授',
-        realName: '',
-        teacherId: '',
-        department: '计算机学院',
-        title: '副教授',
-        researchField: '人工智能',
-        email: '',
-        phone: '',
-        bio: '',
-        avatar: null
-      };
-      
-      const savedData = JSON.parse(localStorage.getItem('teacher_profile') || '{}');
-      const mergedData = { ...defaultData, ...savedData };
-      
-      setCurrentUser(mergedData);
-      form.setFieldsValue(mergedData);
-      setLoading(false);
-    }, 500);
+    const loadData = async () => {
+      try {
+        // 获取教师基本信息
+        const profileRes = await teacherApi.getProfile();
+        setCurrentUser(profileRes);
+        form.setFieldsValue(profileRes);
 
-    return () => clearTimeout(timer);
+        // 获取审核数据
+        const reviewRes = await teacherApi.listReviewAchievements();
+        setReviewData(reviewRes);
+
+        // 获取推荐数据
+        const recommendRes = await teacherApi.listRecommendations();
+        setRecommendData(recommendRes);
+      } catch (error) {
+        message.error('数据加载失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [form]);
 
   // 保存表单数据
-  const handleSave = () => {
-    form.validateFields()
-      .then(values => {
-        const updatedUser = { ...currentUser, ...values };
-        localStorage.setItem('teacher_profile', JSON.stringify(updatedUser));
-        setCurrentUser(updatedUser);
-        message.success('个人信息已保存');
-        setEditMode(false);
-      })
-      .catch(err => {
-        console.error('验证失败:', err);
-      });
-  };
-
-  // 头像上传处理
-  const handleAvatarChange = (info) => {
-    if (info.file.status === 'done') {
-      const avatarUrl = info.file.response?.url || 
-        `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 100)}.jpg`;
-      
-      const updatedUser = { ...currentUser, avatar: avatarUrl };
-      setCurrentUser(updatedUser);
-      form.setFieldsValue({ avatar: avatarUrl });
-      localStorage.setItem('teacher_profile', JSON.stringify(updatedUser));
-      message.success('头像上传成功');
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      await teacherApi.updateProfile(values);
+      message.success('个人信息已保存');
+      setEditMode(false);
+      // 重新加载数据
+      const profileRes = await teacherApi.getProfile();
+      setCurrentUser(profileRes);
+    } catch (error) {
+      console.error('保存失败:', error);
     }
   };
 
-  
+  // 头像上传处理
+  const handleAvatarChange = async (info) => {
+    if (info.file.status === 'done') {
+      try {
+        const avatarUrl = info.file.response?.url;
+        await teacherApi.updateProfile({ avatar: avatarUrl });
+        message.success('头像上传成功');
+        // 重新加载数据
+        const profileRes = await teacherApi.getProfile();
+        setCurrentUser(profileRes);
+      } catch (error) {
+        message.error('头像更新失败');
+      }
+    }
+  };
 
   // 上传前校验
   const beforeAvatarUpload = (file) => {
@@ -134,12 +108,12 @@ const TeacherProfile = () => {
     {
       title: '成果名称',
       dataIndex: 'title',
-      render: (text) => <a onClick={() => navigate(`/achievement/detail`)}>{text}</a>,
+      render: (text, record) => <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>{text}</a>,
       width: 200
     },
     {
       title: '学生',
-      dataIndex: 'student',
+      dataIndex: 'userName',
       render: (text, record) => `${text} (${record.studentId})`
     },
     {
@@ -153,13 +127,15 @@ const TeacherProfile = () => {
       title: '状态',
       dataIndex: 'status',
       render: (status) => (
-        <Tag color={status === '已通过' ? 'green' : 'red'}>{status}</Tag>
+        <Tag color={status === 2 ? 'green' : 'red'}>
+          {status === 2 ? '已通过' : status === 3 ? '已驳回' : '待审核'}
+        </Tag>
       )
     },
     {
       title: '操作',
       render: (_, record) => (
-        <Button size="small" onClick={() => navigate(`/teacher/achievements/review`)}>
+        <Button size="small" onClick={() => navigate(`/teacher/review`)}>
           审核
         </Button>
       )
@@ -172,7 +148,7 @@ const TeacherProfile = () => {
       dataIndex: 'title',
       render: (text, record) => (
         <Space>
-          <a onClick={() => navigate(`/achievement/detail`)}>{text}</a>
+          <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>{text}</a>
           <Tag color="gold">{'★'.repeat(record.recommendLevel)}</Tag>
         </Space>
       )
@@ -272,8 +248,8 @@ const TeacherProfile = () => {
                   onChange={handleAvatarChange}
                   disabled={!editMode}
                 >
-                  {currentUser.avatar ? (
-                    <Avatar size={160} src={currentUser.avatar} />
+                  {currentUser.userAvatar ? (
+                    <Avatar size={160} src={currentUser.userAvatar} />
                   ) : (
                     <div>
                       <UserOutlined style={{ fontSize: 48 }} />
@@ -281,7 +257,7 @@ const TeacherProfile = () => {
                     </div>
                   )}
                 </Upload>
-                <h3 style={{ marginTop: 16 }}>{currentUser.username}</h3>
+                <h3 style={{ marginTop: 16 }}>{currentUser.userName}</h3>
                 <Tag color="purple" icon={<UserOutlined />}>
                   教师
                 </Tag>
@@ -341,105 +317,121 @@ const TeacherProfile = () => {
                   
                   <Form.Item
                     name="email"
-                        label="邮箱"
-                        rules={[
-                          { required: true },
-                          { type: 'email' },
-                          { pattern: /@(edu\.cn|school\.edu)$/, message: '请使用学校邮箱' }
-                        ]}
-                      >
-                        <Input prefix={<MailOutlined />} />
-                      </Form.Item>
-                      
-                      <Form.Item
-                        name="phone"
-                        label="联系电话"
-                        rules={[
-                          { required: true },
-                          { 
-                            pattern: /(^1[3-9]\d{9}$)|(^\d{3,4}-\d{7,8}$)/,
-                            message: '请输入手机号或固话（区号-号码）'
-                          }
-                        ]}
-                      >
-                        <Input prefix={<PhoneOutlined />} />
-                      </Form.Item>
-                      
-                      <Form.Item name="bio" label="个人简介">
-                        <TextArea rows={4} maxLength={200} />
-                      </Form.Item>
-                    </Form>
-                  </div>
-                </div>
-              </Card>
+                    label="邮箱"
+                    rules={[
+                      { required: true },
+                      { type: 'email' },
+                      { pattern: /@(edu\.cn|school\.edu)$/, message: '请使用学校邮箱' }
+                    ]}
+                  >
+                    <Input prefix={<MailOutlined />} />
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="phone"
+                    label="联系电话"
+                    rules={[
+                      { required: true },
+                      { 
+                        pattern: /(^1[3-9]\d{9}$)|(^\d{3,4}-\d{7,8}$)/,
+                        message: '请输入手机号或固话（区号-号码）'
+                      }
+                    ]}
+                  >
+                    <Input prefix={<PhoneOutlined />} />
+                  </Form.Item>
+                  
+                  <Form.Item name="bio" label="个人简介">
+                    <TextArea rows={4} maxLength={200} />
+                  </Form.Item>
+                </Form>
+              </div>
+            </div>
+          </Card>
+          
+          {/* 工作台标签页 */}
+          <Card bordered={false}>
+            <Tabs activeKey={activeTab} onChange={setActiveTab}>
+              <TabPane
+                tab={<span><CheckCircleOutlined /> 成果审核</span>}
+                key="review"
+              >
+                <Table
+                  columns={reviewColumns}
+                  dataSource={reviewData}
+                  rowKey="id"
+                  pagination={{ pageSize: 5 }}
+                  loading={loading}
+                />
+              </TabPane>
               
-              {/* 工作台标签页 */}
-              <Card bordered={false}>
-                <Tabs activeKey={activeTab} onChange={setActiveTab}>
-                  <TabPane
-                    tab={<span><CheckCircleOutlined /> 成果审核</span>}
-                    key="review"
-                  >
-                    <Table
-                      columns={reviewColumns}
-                      dataSource={reviewData}
-                      rowKey="id"
-                      pagination={{ pageSize: 5 }}
-                    />
-                  </TabPane>
-                  
-                  <TabPane
-                    tab={<span><StarOutlined /> 推荐成果</span>}
-                    key="recommend"
-                  >
-                    <Table
-                      columns={recommendColumns}
-                      dataSource={recommendData}
-                      rowKey="id"
-                      pagination={{ pageSize: 5 }}
-                    />
-                  </TabPane>
-                  
-                  <TabPane
-                    tab={<span><LockOutlined /> 账号安全</span>}
-                    key="security"
-                  >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <Card title="修改密码" bordered={false}>
-                        <Form layout="vertical" style={{ maxWidth: 600 }}>
-                          <Form.Item label="原密码" name="oldPassword">
-                            <Input.Password />
-                          </Form.Item>
-                          <Form.Item label="新密码" name="newPassword">
-                            <Input.Password />
-                          </Form.Item>
-                          <Form.Item>
-                            <Button type="primary">确认修改</Button>
-                          </Form.Item>
-                        </Form>
-                      </Card>
-                      
-                      <div style={{ textAlign: 'center', marginTop: 24 }}>
-                        <Popconfirm
-                          title="确定要退出登录吗？"
-                          onConfirm={() => {
-                            localStorage.clear();
-                            navigate('/login');
+              <TabPane
+                tab={<span><StarOutlined /> 推荐成果</span>}
+                key="recommend"
+              >
+                <Table
+                  columns={recommendColumns}
+                  dataSource={recommendData}
+                  rowKey="id"
+                  pagination={{ pageSize: 5 }}
+                  loading={loading}
+                />
+              </TabPane>
+              
+              <TabPane
+                tab={<span><LockOutlined /> 账号安全</span>}
+                key="security"
+              >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Card title="修改密码" bordered={false}>
+                    <Form layout="vertical" style={{ maxWidth: 600 }}>
+                      <Form.Item label="原密码" name="oldPassword">
+                        <Input.Password />
+                      </Form.Item>
+                      <Form.Item label="新密码" name="newPassword">
+                        <Input.Password />
+                      </Form.Item>
+                      <Form.Item>
+                        <Button 
+                          type="primary"
+                          onClick={async () => {
+                            try {
+                              const values = await form.validateFields();
+                              await authApi.changePassword(values.oldPassword, values.newPassword);
+                              message.success('密码修改成功');
+                            } catch (error) {
+                              message.error('密码修改失败');
+                            }
                           }}
                         >
-                          <Button danger icon={<LogoutOutlined />}>
-                            退出登录
-                          </Button>
-                        </Popconfirm>
-                      </div>
-                    </Space>
-                  </TabPane>
-                </Tabs>
-              </Card>
-            </div>
-          </Content>
-        </Layout>
-      );
-    };
-    
-    export default TeacherProfile;
+                          确认修改
+                        </Button>
+                      </Form.Item>
+                    </Form>
+                  </Card>
+                  
+                  <div style={{ textAlign: 'center', marginTop: 24 }}>
+                    <Popconfirm
+                      title="确定要退出登录吗？"
+                      onConfirm={() => {
+                        authApi.logout();
+                        localStorage.clear();
+                        navigate('/login');
+                      }}
+                    >
+                      <Button danger icon={<LogoutOutlined />}>
+                        退出登录
+                      </Button>
+                    </Popconfirm>
+                  </div>
+                </Space>
+              </TabPane>
+            </Tabs>
+          </Card>
+        </div>
+      </Content>
+    </Layout>
+  );
+};
+
+export default TeacherProfile;

@@ -3,12 +3,14 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Descriptions, Tag, Button, Space, Avatar, Card, message,
-  List, Divider, Tabs, Rate, Timeline 
+  List, Divider, Tabs, Rate, Timeline, 
+  Layout
 } from 'antd';
 import { 
   MessageOutlined, UserOutlined, ClockCircleOutlined, 
   DollarOutlined, CheckOutlined, CloseOutlined 
 } from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { TabPane } = Tabs;
 
@@ -98,6 +100,9 @@ const RequirementDetailPage = () => {
   };
 
   return (
+    <Layout>
+    <Navbar />
+    <div style={{ padding: '24px', background: '#f7f8fa' }}>
     <Card
       title="需求详情"
       extra={
@@ -248,6 +253,8 @@ const RequirementDetailPage = () => {
 </TabPane>
       </Tabs>
     </Card>
+    </div>
+    </Layout>
   );
 };
 

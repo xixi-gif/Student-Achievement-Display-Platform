@@ -1,8 +1,9 @@
 // src/pages/RequirementPublishPage.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Select, DatePicker, Upload, message, Card, Tag, Space, Radio } from 'antd';
+import { Form, Input, Button, Select, DatePicker, Upload, message, Card, Tag, Space, Radio, Layout } from 'antd';
 import { PlusOutlined, PaperClipOutlined } from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -24,6 +25,7 @@ const RequirementPublishPage = () => {
   const handleSubmit = async (values) => {
     setSubmitting(true);
     try {
+    
       // 模拟提交成功
       const mockRequirement = {
         id: `req-${Date.now()}`,
@@ -50,6 +52,9 @@ const RequirementPublishPage = () => {
   };
 
   return (
+    <Layout>
+      <Navbar />
+      <div style={{ padding: '24px', background: '#f7f8fa' }}>
     <Card title="发布新需求" bordered={false}>
       <Form
         form={form}
@@ -117,6 +122,8 @@ const RequirementPublishPage = () => {
         </Form.Item>
       </Form>
     </Card>
+    </div>
+    </Layout>
   );
 };
 

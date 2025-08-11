@@ -19,6 +19,7 @@ import AchievementRecommendPage from './pages/AchievementRecommendPage/Achieveme
 import UserManagementPage from './pages/UserManagePage/UserManagePage';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
 import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
+import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage';
 import AdminProfilePage from './pages/AdminProfilePage/AdminProfilePage';
 import TeacherProfilePage from './pages/TeacherProfilePage/TeacherProfilePage';
 import { ConfigProvider } from 'antd';
@@ -33,7 +34,8 @@ import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDeta
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
 import ChatPage from './pages/ChatPage/ChatPage';
 
-
+//路由保护
+import AuthRoute from './pages/AuthRoute/AuthRoute';
 
 
 function App() {
@@ -42,42 +44,45 @@ function App() {
       <Router>
         <div className="app-container">
           <Routes>
+            {/* 公开路由 */}
             <Route path="/" element={<HomePage />} />
+            <Route path="/home" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/student/profile" element={<ProfilePage />} />
             <Route path="/annoucementlist" element={<AnnouncementList/>} />
             <Route path="/annoucementdetail" element={<AnnouncementDetail/>} />
-            <Route path="/author" element={<AuthorDetailPage/>} />
-            <Route path="/achievements" element={<AchievementsPage />} />
-            <Route path="/student/my-achievements" element={<MyAchievements />} />
-            <Route path="/achievement/detail" element={<AchievementDetailPage />} />
-            <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
-            <Route path="/student/achievements/edit" element={<AchievementForm />} />
-
-            <Route path="/chat" element={<ChatPage />} />
-
-
-            {/* 教师的个人中心、审核成果、推荐成果页面 */}
-            <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />
-            <Route path="/teacher/achievements/recommend" element={<AchievementRecommendPage />} />
-            <Route path="/teacher/profile" element={<TeacherProfilePage/>} />
-            {/* <Route path="/teacher/manage-students" element={<StudentManage/>} /> */}
-
-            {/* 管理员的个人中心、用户管理、系统设置、数据统计页面 */}
-            <Route path='/admin/profile' element={<AdminProfilePage/>} />
-            <Route path='/admin/manage-users' element={<UserManagementPage/>} />
-            <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
-            <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
-
-            {/* 需求发布、需求列表、需求详情、需求沟通中心 */}
-            <Route path="/publish-requirement" element={<RequirementPublishPage />} />
             <Route path="/requirements" element={<RequirementListPage />} />
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
-            <Route path="/messages" element={<MessageCenterPage />} />
 
+            {/* 需要权限验证的路由 */}
+            <Route element={<AuthRoute/>}>
+              <Route path="/student/profile" element={<ProfilePage />} />
+              <Route path="/author" element={<AuthorDetailPage/>} />
+              <Route path="/achievements" element={<AchievementsPage />} />
+              <Route path="/achievement/detail" element={<AchievementDetailPage />} />
+              <Route path="/student/my-achievements" element={<MyAchievements />} />
+              <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
+              <Route path="/student/achievements/edit" element={<AchievementForm />} />
+              <Route path="/chat" element={<ChatPage />} />
+
+              {/* 教师的个人中心、审核成果、推荐成果页面 */}
+              <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />
+              <Route path="/teacher/achievements/recommend" element={<AchievementRecommendPage />} />
+              <Route path="/teacher/profile" element={<TeacherProfilePage/>} />
+              {/* <Route path="/teacher/manage-students" element={<StudentManage/>} /> */}
+
+              {/* 管理员的个人中心、用户管理、系统设置、数据统计、管理成果页面 */}
+              <Route path='/admin/profile' element={<AdminProfilePage/>} />
+              <Route path='/admin/manage-users' element={<UserManagementPage/>} />
+              <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
+              <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
+              <Route path="/admin/achievements-manage" element={<AdminAchievementManagementPage />} />
+
+              {/* 需求发布、需求列表、需求详情、需求沟通中心 */}
+              <Route path="/publish-requirement" element={<RequirementPublishPage />} />
+              <Route path="/messages" element={<MessageCenterPage />} />
+            </Route>
           </Routes>
         </div>
       </Router>

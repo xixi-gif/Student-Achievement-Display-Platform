@@ -1,8 +1,9 @@
 // src/pages/RequirementListPage.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { List, Card, Tag, Avatar, Button, Space, Input, Select, Pagination } from 'antd';
+import { List, Card, Tag, Avatar, Button, Space, Input, Select, Pagination, Layout } from 'antd';
 import { SearchOutlined, MessageOutlined, DollarOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import Navbar from '../Navbar/Navbar'
 
 const { Search } = Input;
 const { Option } = Select;
@@ -111,7 +112,9 @@ const RequirementListPage = () => {
   };
 
   return (
-    <div>
+    <Layout style={{ minHeight: '100vh' }}>
+      <Navbar />
+      <div style={{ padding: '24px', background: '#f7f8fa' }}>
       <div style={{ marginBottom: 16 }}>
         <Space>
           <Search
@@ -200,7 +203,8 @@ const RequirementListPage = () => {
           showTotal={total => `共 ${total} 条需求`}
         />
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

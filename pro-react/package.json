@@ -8,6 +8,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "antd": "^5.26.6",
+    "axios": "^1.11.0",
     "echarts": "^5.6.0",
     "echarts-for-react": "^3.0.2",
     "emoji-picker-react": "^4.13.2",

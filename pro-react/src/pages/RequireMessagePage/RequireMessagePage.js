@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   List, Avatar, Input, Button, Space, Tag,
-  Divider, Badge, Popover, message, Tooltip 
+  Divider, Badge, Popover, message, Tooltip, 
+  Layout
 } from 'antd';
 import { 
   MessageOutlined, UserOutlined, PaperClipOutlined, 
   SmileOutlined, CloseOutlined, CheckOutlined 
 } from '@ant-design/icons';
 import EmojiPicker from 'emoji-picker-react';
+import Navbar from '../Navbar/Navbar';
 
 const { TextArea } = Input;
 
@@ -118,6 +120,9 @@ const MessageCenterPage = () => {
   }, [activeConversation]);
 
   return (
+    <Layout>
+    <Navbar />
+    <div style={{ padding: '24px', background: '#f7f8fa' }}>
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
       {/* 左侧会话列表 */}
       <div style={{ width: 300, borderRight: '1px solid #f0f0f0', overflowY: 'auto' }}>
@@ -317,6 +322,8 @@ const MessageCenterPage = () => {
         </div>
       </div>
     </div>
+    </div>
+    </Layout>
   );
 };
 

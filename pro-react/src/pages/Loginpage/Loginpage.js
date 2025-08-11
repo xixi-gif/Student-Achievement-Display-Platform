@@ -47,12 +47,14 @@ const LoginPage = () => {
       if (response.success) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user_role', role);
+        localStorage.setItem('username', username); // 保存用户名
         
-        message.success(`${role === 'visitor' ? '欢迎访问' : '登录成功'}，正在跳转...`);
+        // message.success(`${role === 'visitor' ? '欢迎访问' : '登录成功'}，正在跳转...`);
+        message.success('登录成功，正在跳转...');
         
         setTimeout(() => {
-          // navigate(role === 'visitor' ? '/visitor' : '/home');
-          navigate('/home');
+        navigate('/home');
+        localStorage.removeItem('redirectFrom'); // 清除缓存的地址
         }, 800);
       } else {
         message.error(response.message || '登录失败，请重试');
@@ -143,7 +145,7 @@ const LoginPage = () => {
           </Form.Item>
 
           {/* 账号密码区域 */}
-          {role !== 'visitor' && (
+          {/* {role !== 'visitor' && ( */}
             <>
               <Form.Item
                 name="username"
@@ -187,7 +189,6 @@ const LoginPage = () => {
                 </a>
               </Form.Item>
             </>
-          )}
 
           {/* 登录按钮 */}
           <Form.Item>
@@ -202,7 +203,8 @@ const LoginPage = () => {
               }}
               loading={loading}
             >
-              {role === 'visitor' ? '进入平台' : '登录'}
+              {/* {role === 'visitor' ? '进入平台' : '登录'} */}
+              登录
             </Button>
           </Form.Item>
 

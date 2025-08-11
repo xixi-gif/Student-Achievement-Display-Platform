@@ -121,28 +121,7 @@ const AchievementReviewPage = () => {
   setCurrentUser({ role, username, avatar });
 
   // 2. 异步加载审核数据
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const filtered = mockData.filter(item => {
-        const matchesStatus = filterStatus ? item.status === filterStatus : true;
-        const matchesSearch = searchText 
-          ? item.title.includes(searchText) || item.studentName.includes(searchText)
-          : true;
-        return matchesStatus && matchesSearch;
-      });
-
-      setData(filtered);
-      setPagination(prev => ({
-        ...prev,
-        total: filtered.length
-      }));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  loadData();
+  fetchData({ status: filterStatus, search: searchText });
 }, [pagination.current, filterStatus, searchText]);
 
   // 处理分页变化
@@ -200,7 +179,8 @@ const AchievementReviewPage = () => {
 
   // 查看成果详情
   const viewDetail = (item) => {
-    navigate(`/achievement/detail/${item.id}`);
+    // navigate(`/achievement/detail/${item.id}`);
+    navigate(`/achievement/detail`);
   };
 
   // 状态标签渲染

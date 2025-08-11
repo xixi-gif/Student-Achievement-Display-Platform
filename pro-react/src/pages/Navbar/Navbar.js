@@ -36,10 +36,10 @@ const getNavMenu = (role) => {
       return [...baseMenu,
         { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
         {key: '/admin/data-statistics', icon:<BarChartOutlined />, label: '数据统计' }, 
-        { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' }
+        { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },
+        { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' },
       ];
     case 'visitor':
-      return baseMenu;
     default:
       return baseMenu;
   }
@@ -63,7 +63,13 @@ const Navbar = ({ currentUser }) => {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const { role, username } = currentUser || { role: 'visitor', username: '访客' };
+  // 从本地存储获取用户信息，而不是使用默认值
+  const storedToken = localStorage.getItem('token');
+  const storedRole = localStorage.getItem('user_role');
+  const storedUsername = localStorage.getItem('username');
+  // 如果有存储的用户信息则使用，否则使用访客默认值
+  const role = storedToken ? (storedRole || 'visitor') : 'visitor';
+  const username = storedToken ? (storedUsername || '访客') : '访客';
   const menuItemsCount = getNavMenu(role).length;
 
   const calculateMinWidth = () => {
@@ -78,8 +84,11 @@ const Navbar = ({ currentUser }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user_role');
     localStorage.removeItem('username');
+  
     message.success('退出登录成功');
     navigate('/login');
+    // 强制刷新页面或更新全局状态
+    window.location.reload();
   };
 
   const userMenu = (
@@ -110,9 +119,7 @@ const Navbar = ({ currentUser }) => {
       <Menu.Item key="requirement" icon={<ReadOutlined />} onClick={() => navigate('/publish-requirement')}>
         发布需求
       </Menu.Item>
-      <Menu.Item key="requirement" icon={<ReconciliationOutlined />} onClick={() => navigate('/requirements')}>
-        需求列表
-      </Menu.Item>
+      <Menu.Divider />
       <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
         退出登录
       </Menu.Item>
