@@ -2,7 +2,7 @@ import axios from 'axios';
 
 
 const service = axios.create({
-  baseURL: 'http://localhost:8090/api', // 后端 API 地址
+  baseURL: 'http://localhost:8090', // 后端 API 地址
   timeout: 5000
 });
 
@@ -46,7 +46,7 @@ export const authApi = {
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('avatar', file);
-    return axios.post(`/teacher/profile/avatar`, formData, {
+    return axios.post(`/user/upload/avatar`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -81,9 +81,9 @@ export const achievementApi = {
   // 获取待审核成果列表
   getPendingList: (params) => service.get(`/teacher/review`, { params }),
   // 审核通过
-  approve: (id) => service.post(`/teacher/review/approve`),
+  approve: (id) => service.post(`/teacher/review/approve`,{id}),
   // 审核驳回
-  reject: (id, reason) => service.post(`/teacher/review/reject`, { reason }),
+  reject: (id, reason) => service.post(`/teacher/review/reject`, { id,reason }),
   //获取推荐列表
   getRecommendList: (params) => service.get('/teacher/recommend', { params }),
   // 切换推荐状态
@@ -109,7 +109,53 @@ export const teacherApi = {
   listRecommendations: () => service.get('/teacher/recommend')
 };
 
+// 管理员相关接口
+export const adminApi = {
+  // 用户管理接口
+  getUserList: (params) => service.get('/admin/user', { params }),
+  createUser: (data) => service.post('/admin/add', data),
+  updateUser: (id, data) => service.put(`/admin/update`, data),
+  deleteUser: (id) => service.delete(`/admin/delete`),
+  resetUserPassword: (id, password) => service.post(`/admin/password`, { password }),
+  toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
+  
+  // 数据统计接口
+  getStatistics: () => service.get('/admin/statistics'),
+  getAchievementStats: () => service.get('/admin/statistics/achievements'),
+  getUserStats: () => service.get('/admin/statistics/users'),
 
+  //分类设置接口
+  getCategoryList: () => service.get('/admin/categories'),
+  createCategory: (data) => service.post('/admin/categories/add', data),
+  deleteCategory: (id) => service.delete(`/admin/categories/delete`),
+
+  //标签设置接口
+  getTagList: () => service.get('/admin/tags'),
+  createTag: (data) => service.post('/admin/tags', data),
+  updateTag: (id, data) => service.put(`/admin/tags/${id}`, data),
+  deleteTag: (id) => service.delete(`/admin/tags/${id}`),
+  
+  // 系统设置接口
+  getSystemSettings: () => service.get('/admin/settings'),
+  updateSystemSettings: (data) => service.put('/admin/settings', data),
+  
+  // 成果管理接口
+  getAllAchievements: (params) => service.get('/admin/achievements', { params }),
+  deleteAchievement: (id) => service.delete(`/admin/achievements/${id}`),
+  updateAchievementStatus: (id, status) => service.post(`/admin/achievements/${id}/status`, { status }),
+  
+  // 批量操作接口
+  batchImportUsers: (data) => {
+    const formData = new FormData();
+    formData.append('file', data);
+    return service.post('/admin/users/batch-import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  batchDeleteUsers: (ids) => service.post('/admin/users/batch-delete', { ids }),
+};
 
 export default {
   authApi,
@@ -118,4 +164,5 @@ export default {
   achievementApi,
   studentApi,
   teacherApi,
+  adminApi
 };
