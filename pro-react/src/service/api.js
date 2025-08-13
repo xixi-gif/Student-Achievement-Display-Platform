@@ -2,7 +2,7 @@ import axios from 'axios';
 
 
 const service = axios.create({
-  baseURL: 'http://localhost:8090/api', // 后端 API 地址
+  baseURL: 'http://localhost:8090', // 后端 API 地址
   timeout: 5000
 });
 
@@ -24,22 +24,21 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data;
-    if (res.code !== 200) {
+    if (res.code !== 0) { 
       console.error('业务错误:', res.message);
       return Promise.reject(new Error(res.message || 'Error'));
     }
-    return res.data;
+    return res.data; 
   },
   error => {
     console.error('响应拦截器错误:', error);
     return Promise.reject(error);
   }
 );
-
-// 用户接口（复用）
+//学生
 export const authApi = {
-  login: (data) => service.post('/auth/login', data),
-  register: (data) => service.post('/auth/register', data),
+  login: (data) => service.post('/user/login', data),
+  register: (data) => service.post('/user/register', data),
   forgotPassword: (data) => service.post('/auth/forgot-password', data),
 
   // 上传头像

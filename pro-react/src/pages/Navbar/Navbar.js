@@ -1,48 +1,43 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Dropdown, Avatar, message, Input, Badge, Drawer } from 'antd';
+import { Layout, Menu, Dropdown, Avatar, message, Input, Drawer } from 'antd';
 import { 
   HomeOutlined, TrophyOutlined, UserOutlined, 
   SettingOutlined, LogoutOutlined, BookOutlined,
   UsergroupAddOutlined, EyeOutlined, SearchOutlined,
-  BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,CrownOutlined,
-  StarOutlined, CheckCircleOutlined,BarChartOutlined,ReadOutlined,ReconciliationOutlined, NotificationOutlined
+  BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,
+  CrownOutlined, StarOutlined, CheckCircleOutlined,
+  BarChartOutlined, ReadOutlined, ReconciliationOutlined, 
+  NotificationOutlined, MoreOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
 
-
 const { Header } = Layout;
 const { Search } = Input;
 
-const getNavMenu = (role) => {
-  const baseMenu = [
-    { key: '/home', icon: <HomeOutlined />, label: '首页' },
-    { key: '/achievements', icon: <TrophyOutlined />, label: '成果展示' },
-    { key: '/annoucementlist', icon: <BellOutlined />, label: '公告' },
-    { key: '/requirements', icon: < NotificationOutlined />, label: '需求公告' },
-    { key: '/about', icon: <InfoOutlined />, label: '关于我们' }
-  ];
+const commonMenuItems = [
+  { key: '/home', icon: <HomeOutlined />, label: '首页' },
+  { key: '/achievements', icon: <TrophyOutlined />, label: '成果展示' },
+  { key: '/annoucementlist', icon: <BellOutlined />, label: '公告' },
+  { key: '/requirements', icon: <NotificationOutlined />, label: '需求公告' },
+  { key: '/about', icon: <InfoOutlined />, label: '关于我们' }
+];
 
-  switch(role) {
-    case 'student':
-      return [...baseMenu, { key: '/student/my-achievements', icon: <UserOutlined />, label: '我的成果' }];
-    case 'teacher':
-      return [...baseMenu, 
-        { key: '/teacher/achievements/recommend', icon:<StarOutlined />, label: '成果推荐' },
-        { key: '/teacher/achievements/review', icon:<CheckCircleOutlined />, label: '成果审核' },
-        // { key: '/teacher/manage-students', icon: <BookOutlined />, label: '学生管理' },
-      ];
-    case 'admin':
-      return [...baseMenu,
-        { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
-        {key: '/admin/data-statistics', icon:<BarChartOutlined />, label: '数据统计' }, 
-        { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },
-        { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' },
-      ];
-    case 'visitor':
-    default:
-      return baseMenu;
-  }
+const roleSpecificItems = {
+  student: [
+    { key: '/student/my-achievements', icon: <UserOutlined />, label: '我的成果' }
+  ],
+  teacher: [
+    { key: '/teacher/achievements/recommend', icon: <StarOutlined />, label: '成果推荐' },
+    { key: '/teacher/achievements/review', icon: <CheckCircleOutlined />, label: '成果审核' }
+  ],
+  admin: [
+    { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
+    { key: '/admin/data-statistics', icon: <BarChartOutlined />, label: '数据统计' },
+    { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },
+    { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' }
+  ],
+  visitor: []
 };
 
 const roleIcons = {
@@ -63,18 +58,15 @@ const Navbar = ({ currentUser }) => {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [drawerVisible, setDrawerVisible] = useState(false);
-  // 从本地存储获取用户信息，而不是使用默认值
+  
   const storedToken = localStorage.getItem('token');
   const storedRole = localStorage.getItem('user_role');
   const storedUsername = localStorage.getItem('username');
-  // 如果有存储的用户信息则使用，否则使用访客默认值
+  
   const role = storedToken ? (storedRole || 'visitor') : 'visitor';
   const username = storedToken ? (storedUsername || '访客') : '访客';
-  const menuItemsCount = getNavMenu(role).length;
-
-  const calculateMinWidth = () => {
-    return 240 + (menuItemsCount * 120) + 280 + 160;
-  };
+  
+  const specificItems = roleSpecificItems[role] || [];
 
   const handleSearch = (value) => {
     navigate(`/search?keyword=${encodeURIComponent(value)}`);
@@ -87,29 +79,27 @@ const Navbar = ({ currentUser }) => {
   
     message.success('退出登录成功');
     navigate('/login');
-    // 强制刷新页面或更新全局状态
     window.location.reload();
   };
 
   const userMenu = (
     <Menu>
-{/* 根据角色显示不同的个人中心入口 */}
-    {role === 'student' && (
-      <Menu.Item key="student-profile" icon={<UserOutlined />} onClick={() => navigate('/student/profile')}>
-        个人中心
-      </Menu.Item>
-    )}
-    {role === 'teacher' && (
-      <Menu.Item key="teacher-profile" icon={<SolutionOutlined />}  onClick={() => navigate('/teacher/profile')}>
-        个人中心
-      </Menu.Item>
-    )}
-    {role === 'admin' && (
-      <Menu.Item  key="admin-profile"  icon={<CrownOutlined />} onClick={() => navigate('/admin/profile')}>
-        个人中心
-      </Menu.Item>
-    )}
-    
+      {role === 'student' && (
+        <Menu.Item key="student-profile" icon={<UserOutlined />} onClick={() => navigate('/student/profile')}>
+          个人中心
+        </Menu.Item>
+      )}
+      {role === 'teacher' && (
+        <Menu.Item key="teacher-profile" icon={<SolutionOutlined />}  onClick={() => navigate('/teacher/profile')}>
+          个人中心
+        </Menu.Item>
+      )}
+      {role === 'admin' && (
+        <Menu.Item  key="admin-profile"  icon={<CrownOutlined />} onClick={() => navigate('/admin/profile')}>
+          个人中心
+        </Menu.Item>
+      )}
+      
       {role !== 'visitor' && (
         <Menu.Item key="settings" icon={<SettingOutlined />} onClick={() => navigate('/settings')}>
           账号设置
@@ -126,13 +116,58 @@ const Navbar = ({ currentUser }) => {
     </Menu>
   );
 
-  const mobileMenuItems = getNavMenu(role).map(item => ({
-    ...item,
-    onClick: () => {
-      setDrawerVisible(false);
-      navigate(item.key);
+  const buildNavItems = () => {
+    const items = [...commonMenuItems];
+    
+    if (specificItems.length > 0) {
+      if (specificItems.length === 1) {
+        items.push(specificItems[0]);
+      } else {
+        const dropdownMenu = (
+          <Menu>
+            {specificItems.map(item => (
+              <Menu.Item 
+                key={item.key} 
+                icon={item.icon}
+                onClick={() => navigate(item.key)}
+              >
+                {item.label}
+              </Menu.Item>
+            ))}
+          </Menu>
+        );
+        
+        items.push({
+          key: 'more-actions',
+          // 移除了这里的 icon 属性，解决重复显示三个点的问题
+          label: (
+            <Dropdown overlay={dropdownMenu} placement="bottomRight">
+              <div style={{ cursor: 'pointer' }}>
+                <MoreOutlined style={{ fontSize: 16 }} />
+              </div>
+            </Dropdown>
+          )
+        });
+      }
     }
-  }));
+    
+    return items.map(item => ({
+      ...item,
+      onClick: item.key !== 'more-actions' ? () => navigate(item.key) : undefined
+    }));
+  };
+
+  const mobileMenuItems = () => {
+    const allItems = [...commonMenuItems, ...specificItems];
+    
+    return allItems.map(item => ({
+      ...item,
+      onClick: () => {
+        setDrawerVisible(false);
+        navigate(item.key);
+      }
+    }));
+  };
 
   return (
     <Header style={{ 
@@ -142,7 +177,7 @@ const Navbar = ({ currentUser }) => {
       top: 0,
       zIndex: 100,
       padding: '0 24px',
-      minWidth: calculateMinWidth(),
+      minWidth: 1024,
       width: '100%',
       overflow: 'hidden'
     }}>
@@ -175,10 +210,7 @@ const Navbar = ({ currentUser }) => {
         }}>
           <Menu 
             mode="horizontal" 
-            items={getNavMenu(role).map(item => ({
-              ...item,
-              onClick: () => navigate(item.key)
-            }))}
+            items={buildNavItems()}
             style={{ 
               borderBottom: 0, 
               margin: 0,
@@ -251,7 +283,7 @@ const Navbar = ({ currentUser }) => {
       >
         <Menu
           mode="inline"
-          items={mobileMenuItems}
+          items={mobileMenuItems()}
         />
         
         <div style={{ padding: '16px', borderTop: '1px solid #f0f0f0' }}>
