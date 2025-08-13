@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
+import AnnouncementPublish from '../AnnouncementPublish/AnnouncementPublish';
 
 const { Header } = Layout;
 const { Search } = Input;
@@ -32,6 +33,7 @@ const roleSpecificItems = {
     { key: '/teacher/achievements/review', icon: <CheckCircleOutlined />, label: '成果审核' }
   ],
   admin: [
+    { key: '/admin/announcementpublish', icon: <NotificationOutlined />, label: '公告发布' },
     { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
     { key: '/admin/data-statistics', icon: <BarChartOutlined />, label: '数据统计' },
     { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },

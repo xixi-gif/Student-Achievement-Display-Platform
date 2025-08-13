@@ -26,6 +26,7 @@ import { ConfigProvider } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
 import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage';
+import AnnouncementPublish from './pages/AnnouncementPublish/AnnouncementPublish';
 
 //发布需求、需求列表、需求详情、为需求沟通
 import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
@@ -36,6 +37,7 @@ import ChatPage from './pages/ChatPage/ChatPage';
 
 //路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
+
 
 
 function App() {
@@ -78,6 +80,7 @@ function App() {
               <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
               <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
               <Route path="/admin/achievements-manage" element={<AdminAchievementManagementPage />} />
+              <Route path="/admin/announcementpublish" element={<AnnouncementPublish />} />
 
               {/* 需求发布、需求列表、需求详情、需求沟通中心 */}
               <Route path="/publish-requirement" element={<RequirementPublishPage />} />
