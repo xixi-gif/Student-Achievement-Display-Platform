@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Layout, Card, Avatar, Button, Tabs, Form, Input, 
+import {
+  Layout, Card, Avatar, Button, Tabs, Form, Input,
   Table, Badge, Tag, Upload, Space, Divider, Spin,
-  message, Popconfirm, Radio, Select, Row, Col
+  message, Popconfirm, Select, Row, Col, Tooltip
 } from 'antd';
-import { 
+import {
   CheckCircleOutlined, StarOutlined, EyeOutlined,
   LockOutlined, UserOutlined, PhoneOutlined,
-  MailOutlined, LogoutOutlined, EditOutlined,
-  IdcardOutlined, SafetyOutlined, TeamOutlined
+  MailOutlined, LogoutOutlined, EditOutlined
 } from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
-import { teacherApi, authApi } from '../../service/api';
+import { teacherApi, authApi, achievementApi } from '../../service/api';
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
@@ -26,47 +25,146 @@ const TeacherProfile = () => {
   const [editMode, setEditMode] = useState(false);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('review');
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [recommendLoading, setRecommendLoading] = useState(false);
   const [reviewData, setReviewData] = useState([]);
   const [recommendData, setRecommendData] = useState([]);
 
-  // 加载教师信息和相关数据
+  // 状态映射
+  const statusMap = {
+    1: { text: "待审核", color: "processing" },
+    2: { text: "已发布", color: "blue" },
+    3: { text: "已驳回", color: "error" },
+    4: { text: "已通过", color: "success" }
+  };
+
+  // 初始化数据
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       try {
+        setLoading(true);
+        
         // 获取教师基本信息
-        const profileRes = await teacherApi.getProfile();
-        setCurrentUser(profileRes);
-        form.setFieldsValue(profileRes);
-
-        // 获取审核数据
-        const reviewRes = await teacherApi.listReviewAchievements();
-        setReviewData(reviewRes);
-
-        // 获取推荐数据
-        const recommendRes = await teacherApi.listRecommendations();
-        setRecommendData(recommendRes);
+        const profileResponse = await teacherApi.getProfile();
+        const formattedData = {
+          realName: profileResponse.username,
+          teacherId: profileResponse.teacherId,
+          department: profileResponse.department,
+          title: profileResponse.title,
+          researchField: profileResponse.researchField,
+          email: profileResponse.email,
+          phone: profileResponse.phone,
+          bio: '',
+          avatar: profileResponse.avatar
+        };
+        
+        setCurrentUser(formattedData);
+        form.setFieldsValue(formattedData);
+        
+        // 获取审核和推荐数据
+        await Promise.all([
+          fetchReviewData(),
+          fetchRecommendData()
+        ]);
+        
       } catch (error) {
-        message.error('数据加载失败');
+        console.error('获取教师数据失败:', error);
+        message.error('获取教师信息失败，请刷新重试');
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
-  }, [form]);
+    fetchData();
+  }, []);
+
+  // 获取审核数据 - 参考审核页面逻辑
+  const fetchReviewData = async () => {
+    try {
+      setReviewLoading(true);
+      const response = await achievementApi.getPendingList({
+        current: 1,
+        pageSize: 3
+      });
+      
+      // 审核页面数据结构转换
+      const formattedData = (response.records || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        studentName: item.userName || '未知学生',
+        studentId: item.studentId || '',
+        category: item.category,
+        status: item.status || 1,
+        rejectReason: item.rejectReason,
+        createTime: item.createTime,
+        keyword: item.keyword || [],
+        description: item.description
+      }));
+      
+      setReviewData(formattedData);
+    } catch (error) {
+      console.error('获取审核数据失败:', error);
+      message.error('获取审核数据失败');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  // 获取推荐数据 - 参考推荐页面逻辑
+  const fetchRecommendData = async () => {
+    try {
+      setRecommendLoading(true);
+      const response = await achievementApi.getRecommendList({
+        current: 1,
+        pageSize: 3
+      });
+      
+      // 推荐页面数据结构转换
+      const formattedData = (response.records || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        student: item.studentName,
+        recommendLevel: item.recommendLevel || 0,
+        views: item.views || 0,
+        category: item.category,
+        keyword: item.keyword || [],
+        recommendComment: item.recommendComment,
+        isRecommended: item.recommended
+      }));
+      
+      setRecommendData(formattedData);
+    } catch (error) {
+      console.error('获取推荐数据失败:', error);
+      message.error('获取推荐数据失败');
+    } finally {
+      setRecommendLoading(false);
+    }
+  };
 
   // 保存表单数据
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      await teacherApi.updateProfile(values);
-      message.success('个人信息已保存');
+      const updatedData = {
+        username: values.realName,
+        department: values.department,
+        title: values.title,
+        researchField: values.researchField,
+        email: values.email,
+        phone: values.phone,
+        bio: values.bio
+      };
+
+      await teacherApi.updateProfile(updatedData);
+      
+      const updatedUser = { ...currentUser, ...updatedData };
+      setCurrentUser(updatedUser);
+      
+      message.success('个人信息更新成功');
       setEditMode(false);
-      // 重新加载数据
-      const profileRes = await teacherApi.getProfile();
-      setCurrentUser(profileRes);
     } catch (error) {
       console.error('保存失败:', error);
+      message.error(error.message || '保存失败，请检查输入');
     }
   };
 
@@ -74,47 +172,75 @@ const TeacherProfile = () => {
   const handleAvatarChange = async (info) => {
     if (info.file.status === 'done') {
       try {
-        const avatarUrl = info.file.response?.url;
-        await teacherApi.updateProfile({ avatar: avatarUrl });
-        message.success('头像上传成功');
-        // 重新加载数据
-        const profileRes = await teacherApi.getProfile();
-        setCurrentUser(profileRes);
+        const response = await authApi.uploadAvatar(info.file.originFileObj);
+        const avatarUrl = response.data?.url;
+        
+        if (avatarUrl) {
+          const updatedUser = { ...currentUser, avatar: avatarUrl };
+          setCurrentUser(updatedUser);
+          form.setFieldsValue({ avatar: avatarUrl });
+          message.success('头像上传成功');
+        }
       } catch (error) {
-        message.error('头像更新失败');
+        console.error('头像上传失败:', error);
+        message.error('头像上传失败');
       }
     }
   };
 
   // 上传前校验
-  const beforeAvatarUpload = (file) => {
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
-      message.error('只能上传图片文件');
-      return false;
-    }
-    
-    const isLt2M = file.size / 1024 / 1024 < 2;
-    if (!isLt2M) {
-      message.error('图片大小不能超过2MB');
-      return false;
-    }
-    
-    return true;
+    const beforeAvatarUpload = (file) => {
+      const isImage = file.type.startsWith('image/');
+      if (!isImage) {
+        message.error('只能上传图片文件');
+        return false;
+      }
+  
+      const isLt2M = file.size / 1024 / 1024 < 2;
+      if (!isLt2M) {
+        message.error('图片大小不能超过2MB');
+        return false;
+      }
+  
+      return true;
+    };
+
+  // 状态标签渲染
+  const renderStatusTag = (status, reason) => {
+    const statusInfo = statusMap[status] || { text: '未知状态', color: 'default' };
+    return (
+      <Tooltip title={reason ? `驳回原因: ${reason}` : null}>
+        <Tag color={statusInfo.color}>{statusInfo.text}</Tag>
+      </Tooltip>
+    );
   };
 
-  // 表格列配置
+  // 表格列配置 - 严格匹配审核页面
   const reviewColumns = [
     {
       title: '成果名称',
       dataIndex: 'title',
-      render: (text, record) => <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>{text}</a>,
-      width: 200
+      render: (text, record) => (
+        <Tooltip
+          placement="topLeft"
+          title={
+            <div>
+              <p><strong>描述：</strong>{record.description}</p>
+              <p><strong>关键词：</strong>{record.keyword.join(', ')}</p>
+            </div>
+          }
+        >
+          <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>
+            {text}
+          </a>
+        </Tooltip>
+      ),
+      width: 300
     },
     {
       title: '学生',
-      dataIndex: 'userName',
-      render: (text, record) => `${text} (${record.studentId})`
+      dataIndex: 'student',
+      render: (_, record) => record.studentName
     },
     {
       title: '分类',
@@ -126,39 +252,50 @@ const TeacherProfile = () => {
     {
       title: '状态',
       dataIndex: 'status',
-      render: (status) => (
-        <Tag color={status === 2 ? 'green' : 'red'}>
-          {status === 2 ? '已通过' : status === 3 ? '已驳回' : '待审核'}
-        </Tag>
-      )
+      render: (status, record) => renderStatusTag(status, record.rejectReason)
     },
     {
-      title: '操作',
-      render: (_, record) => (
-        <Button size="small" onClick={() => navigate(`/teacher/review`)}>
-          审核
-        </Button>
-      )
+      title: '提交时间',
+      dataIndex: 'createTime',
+      width: 200
     }
   ];
 
+  // 表格列配置 - 严格匹配推荐页面
   const recommendColumns = [
     {
       title: '成果名称',
       dataIndex: 'title',
       render: (text, record) => (
-        <Space>
-          <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>{text}</a>
-          <Tag color="gold">{'★'.repeat(record.recommendLevel)}</Tag>
-        </Space>
-      )
+        <Tooltip
+          title={
+            <div>
+              <p><strong>关键词：</strong>{record.keyword.join(', ')}</p>
+              {record.recommendComment && (
+                <p><strong>推荐说明：</strong>{record.recommendComment}</p>
+              )}
+            </div>
+          }
+        >
+          <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>
+            {text}
+          </a>
+        </Tooltip>
+      ),
+      width: 330
+    },
+    {
+      title: '学生',
+      dataIndex: 'student',
+      width: 120,
+      render: (studentName) => (studentName)
     },
     {
       title: '推荐等级',
       dataIndex: 'recommendLevel',
       render: (level) => (
-        <Tag color={level === 3 ? 'gold' : level === 2 ? 'orange' : 'blue'}>
-          {['一般推荐', '重点推荐', '强烈推荐'][level - 1]}
+        <Tag color={level >= 4 ? 'gold' : level >= 2 ? 'orange' : 'blue'}>
+          {'★'.repeat(level)}
         </Tag>
       )
     },
@@ -174,13 +311,14 @@ const TeacherProfile = () => {
     }
   ];
 
-  // 辅助函数
+  // 分类颜色映射
   const getCategoryColor = (category) => {
     const colors = {
       '软件开发': 'blue',
       '科研项目': 'purple',
       '毕业论文': 'green',
-      '竞赛作品': 'orange'
+      '竞赛作品': 'orange',
+      '学术论文': 'red'
     };
     return colors[category] || 'gray';
   };
@@ -248,8 +386,8 @@ const TeacherProfile = () => {
                   onChange={handleAvatarChange}
                   disabled={!editMode}
                 >
-                  {currentUser.userAvatar ? (
-                    <Avatar size={160} src={currentUser.userAvatar} />
+                  {currentUser.avatar ? (
+                    <Avatar size={160} src={currentUser.avatar} />
                   ) : (
                     <div>
                       <UserOutlined style={{ fontSize: 48 }} />
@@ -257,7 +395,7 @@ const TeacherProfile = () => {
                     </div>
                   )}
                 </Upload>
-                <h3 style={{ marginTop: 16 }}>{currentUser.userName}</h3>
+                <h3 style={{ marginTop: 16 }}>{currentUser.realName}</h3>
                 <Tag color="purple" icon={<UserOutlined />}>
                   教师
                 </Tag>
@@ -282,7 +420,7 @@ const TeacherProfile = () => {
                         label="教师工号"
                         rules={[{ required: true }]}
                       >
-                        <Input />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                   </Row>
@@ -353,29 +491,67 @@ const TeacherProfile = () => {
           <Card bordered={false}>
             <Tabs activeKey={activeTab} onChange={setActiveTab}>
               <TabPane
-                tab={<span><CheckCircleOutlined /> 成果审核</span>}
+                tab={
+                  <Space>
+                    <CheckCircleOutlined />
+                    <span>成果审核</span>
+                    <Badge 
+                      count={reviewData.length} 
+                      style={{ backgroundColor: '#1890ff' }} 
+                    />
+                  </Space>
+                }
                 key="review"
               >
-                <Table
-                  columns={reviewColumns}
-                  dataSource={reviewData}
-                  rowKey="id"
-                  pagination={{ pageSize: 5 }}
-                  loading={loading}
-                />
+                <Spin spinning={reviewLoading}>
+                  <Table
+                    columns={reviewColumns}
+                    dataSource={reviewData}
+                    rowKey="id"
+                    pagination={false}
+                  />
+                  <div style={{ textAlign: 'center', marginTop: 16 }}>
+                    <Button 
+                      type="link" 
+                      icon={<EyeOutlined />}
+                      onClick={() => navigate('/teacher/achievements/review')}
+                    >
+                      查看全部待审核成果
+                    </Button>
+                  </div>
+                </Spin>
               </TabPane>
               
               <TabPane
-                tab={<span><StarOutlined /> 推荐成果</span>}
+                tab={
+                  <Space>
+                    <StarOutlined />
+                    <span>推荐成果</span>
+                    <Badge 
+                      count={recommendData.length} 
+                      style={{ backgroundColor: '#52c41a' }} 
+                    />
+                  </Space>
+                }
                 key="recommend"
               >
-                <Table
-                  columns={recommendColumns}
-                  dataSource={recommendData}
-                  rowKey="id"
-                  pagination={{ pageSize: 5 }}
-                  loading={loading}
-                />
+                <Spin spinning={recommendLoading}>
+                  <Table
+                    columns={recommendColumns}
+                    dataSource={recommendData}
+                    rowKey="id"
+                    pagination={false}
+                  />
+                  <div style={{ textAlign: 'center', marginTop: 16 }}>
+                    <Button 
+                      type="link" 
+                      icon={<EyeOutlined />}
+                      onClick={() => navigate('/teacher/achievements/recommend')}
+                    >
+                      查看全部推荐成果
+                    </Button>
+                  </div>
+                </Spin>
               </TabPane>
               
               <TabPane
@@ -397,10 +573,13 @@ const TeacherProfile = () => {
                           onClick={async () => {
                             try {
                               const values = await form.validateFields();
-                              await authApi.changePassword(values.oldPassword, values.newPassword);
+                              await authApi.changePassword(
+                                values.oldPassword, 
+                                values.newPassword
+                              );
                               message.success('密码修改成功');
                             } catch (error) {
-                              message.error('密码修改失败');
+                              message.error(error.message || '密码修改失败');
                             }
                           }}
                         >
@@ -413,10 +592,13 @@ const TeacherProfile = () => {
                   <div style={{ textAlign: 'center', marginTop: 24 }}>
                     <Popconfirm
                       title="确定要退出登录吗？"
-                      onConfirm={() => {
-                        authApi.logout();
-                        localStorage.clear();
-                        navigate('/login');
+                      onConfirm={async () => {
+                        try {
+                          await authApi.logout();
+                        } finally {
+                          localStorage.clear();
+                          navigate('/login');
+                        }
                       }}
                     >
                       <Button danger icon={<LogoutOutlined />}>

@@ -4,7 +4,11 @@ import { data } from 'react-router-dom';
 const service = axios.create({
   baseURL: 'http://localhost:8090', // 后端 API 地址
   timeout: 5000,
+<<<<<<< Updated upstream
   withCredentials: true // 允许携带 cookie
+=======
+  withCredentials: true
+>>>>>>> Stashed changes
 });
 
 service.interceptors.request.use(
@@ -101,9 +105,15 @@ export const achievementApi = {
   // 获取待审核成果列表
   getPendingList: (params) => service.get(`/teacher/review`, { params }),
   // 审核通过
+<<<<<<< Updated upstream
   approve: (id) => service.post(`/teacher/review/approve`,{id}),
   // 审核驳回
   reject: (id, reason) => service.post(`/teacher/review/reject`, { id,reason }),
+=======
+  approve: (id) => service.post(`/teacher/review/approve`,null,{ params: { id } }),
+  // 审核驳回
+  reject: (id, reason) => service.post(`/teacher/review/reject`, { reason },{ params: { id } }),
+>>>>>>> Stashed changes
   //获取推荐列表
   getRecommendList: (params) => service.get('/teacher/recommend', { params }),
   // 切换推荐状态

@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Layout, Card, Table, Tag, Button, Space, Input, Divider,
+  Modal, message, Select, Badge, Popover, Switch,Descriptions
+} from 'antd';
+import { 
+  StarOutlined, InfoCircleOutlined,  FilterOutlined,StarFilled,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import {Table, Button, Tag, Card, Input, Select, Modal, Space, Popover,  
-  Badge, Descriptions, Divider, message, Switch, Layout} from 'antd';
-import {StarOutlined, SearchOutlined, FilterOutlined, InfoCircleOutlined} from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
 import { achievementApi } from '../../service/api';
 
+const { Content, Footer } = Layout;
 const { Search } = Input;
-const {Option} = Select;
-const { Footer } = Layout;
+const { Option } = Select;
+const { TextArea } = Input;
 
 const AchievementRecommendPage = () => {
   const [data, setData] = useState([]);
@@ -33,34 +38,45 @@ const AchievementRecommendPage = () => {
 
   // 获取可推荐成果列表
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params = {
-        current: pagination.current,
-        pageSize: pagination.pageSize,
-        ...searchParams
-      };
-      
-      const res = await achievementApi.getRecommendList(params);
-      setData(res.records);
-      setPagination({
-        ...pagination,
-        total: res.total
-      });
-    } catch (error) {
-      message.error('数据加载失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const params = {
+      current: pagination.current,
+      size: pagination.pageSize,
+      ...searchParams
+    };
+    
+    // 拦截器已提取data，这里直接获取分页数据
+    const response = await achievementApi.getRecommendList(params);
+    
+    // 转换数据格式
+    const formattedData = (response.records || []).map(item => ({
+      ...item,
+      userName: item.studentName, // 字段映射
+      isRecommended: item.recommended,
+      keyword: item.keywords || [], // 使用返回的keywords数组
+      category: item.category || '未分类'
+    }));
+    
+    setData(formattedData);
+    setPagination({
+      ...pagination,
+      current: response.current || 1,
+      pageSize: response.size || 10,
+      total: response.total || 0
+    });
+    
+  } catch (error) {
+    console.error('获取推荐列表失败:', error);
+    message.error(error.message || '获取数据失败');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     // 加载用户信息
-    const role = localStorage.getItem('user_role') || 'visitor';
-    const username = localStorage.getItem('username') || '访客';
-    setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
-
-    // 加载推荐数据
     fetchData();
   }, [pagination.current, searchParams]);
 
@@ -68,27 +84,75 @@ const AchievementRecommendPage = () => {
   const handleToggleRecommend = async (id, recommended) => {
     try {
       await achievementApi.toggleRecommend(id);
-      setData(data.map(item =>
-        item.id === id ? { ...item, recommended } : item
-      ));
+      // 更新本地数据
+    setData(data.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          isRecommended: recommended,
+          recommendLevel: recommended ? (item.recommendLevel || 1) : 0 // 切换时自动设置默认等级
+        };
+      }
+      return item;
+    }));
       message.success(recommended ? '已推荐该成果' : '已取消推荐');
     } catch (error) {
-      message.error('操作失败');
+      message.error(`操作失败:${error.message}`);
     }
   };
 
+  // 添加星星组件
+  const StarRating = ({ value, onChange, disabled }) => {
+  return (
+    <div className="star-rating">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <StarFilled
+          key={star}
+          style={{
+            fontSize: 20,
+            color: star <= value ? '#ffc107' : '#e0e0e0',
+            cursor: disabled ? 'default' : 'pointer'
+          }}
+          onClick={() => !disabled && onChange(star)}
+        />
+      ))}
+    </div>
+  );
+};
   // 处理推荐等级变更
   const handleLevelChange = async (id, level) => {
-    try {
-      await achievementApi.setRecommendLevel(id, level);
-      setData(data.map(item =>
-        item.id === id ? { ...item, recommendLevel: level } : item
-      ));
-      message.success('推荐等级已更新');
-    } catch (error) {
-      message.error('操作失败');
-    }
-  };
+  try {
+    await achievementApi.setRecommendLevel(id, level);
+    
+    // 更新本地数据
+    setData(data.map(item => {
+      if (item.id === id) {
+        return { 
+          ...item,
+          recommendLevel: level,
+          isRecommended: level > 0 // 自动同步推荐状态
+        };
+      }
+      return item;
+    }));
+    message.success(`已设置为${getLevelLabel(level)}`);
+  } catch (error) {
+    message.error(`设置失败: ${error.message}`);
+  }
+};
+
+// 等级标签映射
+const getLevelLabel = (level) => {
+  const labels = [
+    '无',
+    '⭐ 一般',
+    '⭐⭐ 良好',
+    '⭐⭐⭐ 优秀',
+    '⭐⭐⭐⭐ 重点',
+    '⭐⭐⭐⭐⭐ 强烈'
+  ];
+  return labels[level] || '未知';
+};
 
   // 处理推荐说明提交
   const handleCommentSubmit = async () => {
@@ -103,11 +167,12 @@ const AchievementRecommendPage = () => {
       setCommentModal({ ...commentModal, visible: false });
       message.success('推荐说明已保存');
     } catch (error) {
-      message.error('操作失败');
+      message.error(`操作失败${error.message}`);
     }
   };
 
   // 表格列配置
+
   const columns = [
     {
       title: '成果标题',
@@ -119,8 +184,9 @@ const AchievementRecommendPage = () => {
           content={
             <div style={{ width: 300 }}>
               <p><strong>学生：</strong>{record.userName}</p>
-              <p><strong>类型：</strong>{record.category?.name}</p>
+              <p><strong>类型：</strong>{record.category || '未分类'}</p>
               <p><strong>关键词：</strong>{record.keyword?.join(', ') || '无'}</p>
+              <p><strong>浏览量：</strong>{record.views}</p>
               {record.recommendComment && (
                 <p><strong>推荐说明：</strong>{record.recommendComment}</p>
               )}
@@ -144,32 +210,36 @@ const AchievementRecommendPage = () => {
       dataIndex: 'category',
       key: 'category',
       width: 120,
-      render: category => <Tag color="blue">{category?.name}</Tag>
+      render: category => <Tag color="blue">{category || '未分类'}</Tag>
     },
     {
       title: '推荐等级',
       dataIndex: 'recommendLevel',
       key: 'recommendLevel',
-      width: 150,
+      width: 220,
       render: (level, record) => (
-        <Select
-          value={level}
-          style={{ width: 120 }}
-          onChange={value => handleLevelChange(record.id, value)}
-          options={[
-            { value: 1, label: '⭐ 一般' },
-            { value: 2, label: '⭐⭐ 重点' },
-            { value: 3, label: '⭐⭐⭐ 强烈' }
-          ]}
-          disabled={!record.isRecommended}
-        />
-      )
+    <Select
+      value={record.isRecommended ? (level || 1) : 0} // 不推荐时强制为0级
+      onChange={value => handleLevelChange(record.id, value)}
+      style={{ width: 120 }}
+      disabled={!record.isRecommended}
+      options={[
+        { value: 0, label: '无' },
+        { value: 1, label: '⭐ 不错' },
+        { value: 2, label: '⭐⭐ 良好' },
+        { value: 3, label: '⭐⭐⭐ 优秀' },
+        { value: 4, label: '⭐⭐⭐⭐ 重点' },
+        { value: 5, label: '⭐⭐⭐⭐⭐ 强烈' }
+      ]}
+    />
+    )
     },
     {
       title: '推荐状态',
       dataIndex: 'isRecommended',
       key: 'isRecommended',
       width: 120,
+      
       render: (recommended, record) => (
         <Switch
           checked={recommended}
@@ -213,6 +283,7 @@ const AchievementRecommendPage = () => {
             />
           </Space>
         }
+
         bordered={false}
         extra={
           <Space wrap>
@@ -257,9 +328,12 @@ const AchievementRecommendPage = () => {
               }}
               suffixIcon={<FilterOutlined />}
             >
+              <Option value={0}>未评级及以上</Option>
               <Option value={1}>⭐ 及以上</Option>
               <Option value={2}>⭐⭐ 及以上</Option>
-              <Option value={3}>⭐⭐⭐</Option>
+              <Option value={3}>⭐⭐⭐ 及以上</Option>
+              <Option value={4}>⭐⭐⭐⭐ 及以上</Option>
+              <Option value={5}>⭐⭐⭐⭐⭐</Option>
             </Select>
           </Space>
         }
@@ -295,14 +369,15 @@ const AchievementRecommendPage = () => {
               {commentModal.currentItem?.title}
             </Descriptions.Item>
             <Descriptions.Item label="当前推荐等级">
-              {commentModal.currentItem?.recommendLevel && (
+              {commentModal.currentItem?.recommendLevel !== undefined && (
                 <Tag color="gold">
                   {Array(commentModal.currentItem.recommendLevel)
                     .fill('⭐')
-                    .join('')}
+                    .join('') || '未评级'}
                 </Tag>
               )}
             </Descriptions.Item>
+
           </Descriptions>
           <Divider />
           <Input.TextArea
