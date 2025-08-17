@@ -114,14 +114,13 @@ const Navbar = ({ currentUser }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
   
-  // 确定显示的角色、用户名和头像（使用userAvatar字段）
   const role = storedToken ? (userInfo?.role || storedRole || 'visitor') : 'visitor';
   const username = storedToken 
     ? (userInfo?.realName || storedUsername || '用户') 
     : '访客';
   const avatarProps = storedToken && userInfo?.userAvatar 
     ? { 
-        src: userInfo.userAvatar, // 读取接口返回的userAvatar字段
+        src: userInfo.userAvatar,
         fallback: roleIcons[role],
         alt: username 
       } 

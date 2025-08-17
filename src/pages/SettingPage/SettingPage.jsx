@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Layout, Card, Form, Input, Button, Divider,
   Popconfirm, message, Spin
@@ -8,45 +8,101 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
-import { authApi  } from '../../service/api'; // 导入api接口
+import { authApi } from '../../service/api'; 
 
 const { Content } = Layout;
 const { Item } = Form;
 
-const staticUser = {
-  username: 'zhangming2023',
-  realName: '张明',
-  role: 'student'
-};
-
 const AccountSettingsPage = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const [loading, setLoading] = React.useState(false); // 加载状态
+  const [loading, setLoading] = useState(false); 
+  const [userInfo, setUserInfo] = useState(null); 
+  const [fetchingUser, setFetchingUser] = useState(true); 
+  const storedToken = localStorage.getItem('token') || '';
 
-  React.useEffect(() => {
-    form.setFieldsValue({ username: staticUser.username });
-  }, [form]);
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (!storedToken) {
+        setFetchingUser(false);
+        return;
+      }
+      
+      try {
+        setFetchingUser(true);
+        const response = await authApi.getuserlogin({ params: {} });
+        if (response.code === 0 && response.data) {
+          setUserInfo(response.data);
+          localStorage.setItem('userInfo', JSON.stringify(response.data));
+          form.setFieldsValue({ realname: response.data.realName || '' });
+        } else {
+          const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          if (Object.keys(cachedUser).length > 0) {
+            setUserInfo(cachedUser);
+            form.setFieldsValue({ realname: cachedUser.realName || '' });
+          } else {
+            message.warning('未获取到用户信息');
+          }
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        if (Object.keys(cachedUser).length > 0) {
+          setUserInfo(cachedUser);
+          form.setFieldsValue({ realname: cachedUser.realName || '' });
+        } else {
+          message.error('获取用户信息失败，请重新登录');
+        }
+      } finally {
+        setFetchingUser(false);
+      }
+    };
+    
+    fetchUserInfo();
+  }, [storedToken, form]); 
 
 
   const handlePasswordChange = async () => {
     try {
       const values = await form.validateFields();
-      if (values.newPassword !== values.confirmPassword) {
+      const oldPassword = (values.oldPassword || '').trim();
+      const newPassword = (values.newPassword || '').trim();
+      const checkNewPassword = (values.checkNewPassword || '').trim();
+
+      if (!oldPassword) {
+        message.error('请输入原密码');
+        return;
+      }
+      
+      if (newPassword.length < 8) {
+        message.error('新密码长度不能少于8位');
+        return;
+      }
+      
+      if (newPassword === oldPassword) {
+        message.error('新密码不能与原密码相同');
+        return;
+      }
+      
+      if (newPassword !== checkNewPassword) {
         message.error('两次输入的新密码不一致');
         return;
       }
-  
+
       setLoading(true);
-      const response = await authApi.updatePassword(
-        values.oldPassword, 
-        values.newPassword
-      );
+     
+      const response = await authApi.updatePassword({
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+        checkNewPassword: checkNewPassword 
+      });
     
-      if (response?.success) {
+      if (response?.success || response?.code === 0) {
         message.success('密码修改成功，请重新登录');
-        form.resetFields(['oldPassword', 'newPassword', 'confirmPassword']);
+        form.resetFields(['oldPassword', 'newPassword', 'checkNewPassword']);
         setTimeout(() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('userInfo');
           navigate('/login');
         }, 1500);
       } else {
@@ -54,8 +110,7 @@ const AccountSettingsPage = () => {
       }
     } catch (error) {
       if (error.name === 'ValidateError') {
-
-        return;
+        return; 
       }
       console.error('密码修改错误:', error);
       if (error.response) {
@@ -71,12 +126,14 @@ const AccountSettingsPage = () => {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userInfo');
     navigate('/login');
   };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Navbar currentUser={staticUser} />
+      <Navbar currentUser={userInfo || {}} />
       
       <Content style={{ 
         background: '#f0f2f5', 
@@ -107,9 +164,12 @@ const AccountSettingsPage = () => {
             <Form 
               form={form} 
               layout="vertical" 
-              initialValues={{ username: staticUser.username }}
+              initialValues={{ realname: userInfo?.realName || '' }}
+              // 关闭表单的自动校验，使用手动校验
+              validateMessages={{
+                required: '${label}为必填项',
+              }}
             >
-              {/* 账号信息区域 */}
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ 
                   margin: '0 0 16px', 
@@ -123,20 +183,21 @@ const AccountSettingsPage = () => {
                 </h3>
                 <Item 
                   label="登录账号" 
-                  name="username" 
-                  rules={[{ required: true, message: '账号不能为空' }]}
+                  name="realname" 
+                  rules={[{ required: true }]}
                 >
                   <Input 
                     disabled 
-                    placeholder="登录账号" 
+                    placeholder="登录账号"
                     style={{ backgroundColor: '#f5f5f5' }}
+                    loading={fetchingUser} 
+                    value={userInfo?.realName || ''}
                   />
                 </Item>
               </div>
               
               <Divider style={{ margin: '16px 0' }} />
               
-              {/* 密码修改区域 */}
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ 
                   margin: '0 0 16px', 
@@ -152,55 +213,41 @@ const AccountSettingsPage = () => {
                   label="原密码" 
                   name="oldPassword" 
                   rules={[
-                    { required: true, message: '请输入原密码' },
-                    { min: 8, message: '密码长度不能少于8位' } 
+                    { required: true },
+                    { min: 8, message: '密码长度不能少于8位' }
                   ]}
                 >
                   <Input.Password 
                     placeholder="请输入原密码" 
                     disabled={loading}
+                    allowClear
                   />
                 </Item>
                 <Item 
                   label="新密码" 
                   name="newPassword" 
                   rules={[
-                    { required: true, message: '请输入新密码' },
-                    { min: 8, message: '密码长度不能少于8位' },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        // 避免与原密码相同
-                        if (value && getFieldValue('oldPassword') === value) {
-                          return Promise.reject(new Error('新密码不能与原密码相同'));
-                        }
-                        return Promise.resolve();
-                      }
-                    })
+                    { required: true },
+                    { min: 8, message: '密码长度不能少于8位' }
                   ]}
                 >
                   <Input.Password 
                     placeholder="请输入新密码（至少8位）" 
                     disabled={loading}
+                    allowClear
                   />
                 </Item>
                 <Item 
                   label="确认新密码" 
-                  name="confirmPassword" 
+                  name="checkNewPassword" 
                   rules={[
-                    { required: true, message: '请确认新密码' },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        if (value && getFieldValue('newPassword') !== value) {
-                          return Promise.reject(new Error('两次输入的新密码不一致'));
-                        }
-                        return Promise.resolve();
-                      }
-                    })
+                    { required: true }
                   ]}
                 >
                   <Input.Password 
                     placeholder="请再次输入新密码" 
                     disabled={loading}
+                    allowClear
                   />
                 </Item>
                 <Item>
@@ -210,11 +257,10 @@ const AccountSettingsPage = () => {
                     style={{ marginRight: 16 }}
                     loading={loading}
                   >
-                    <Spin spinning={loading} size="small" />
                     保存修改
                   </Button>
                   <Button 
-                    onClick={() => form.resetFields(['oldPassword', 'newPassword', 'confirmPassword'])}
+                    onClick={() => form.resetFields(['oldPassword', 'newPassword', 'checkNewPassword'])}
                     disabled={loading}
                   >
                     取消
@@ -224,7 +270,6 @@ const AccountSettingsPage = () => {
               
               <Divider style={{ margin: '16px 0' }} />
               
-              {/* 安全操作区域 */}
               <div style={{ 
                 textAlign: 'center', 
                 padding: '20px 0',

@@ -70,12 +70,12 @@ export const authApi = {
         throw error;
       });
   },
-  
+  //忘记密码
   resetpassword: (data) => service.post('/user/reset/password', data),
   // 修改个人信息
   updateInfo: (data) => service.post('/user/update/my', data),
   // 修改密码
-  changePassword: (oldPassword, newPassword) => service.post('/user/change/password', { oldPassword, newPassword }),
+  updatePassword: (data) => service.post('/user/update/password', data),
   // 退出登录
   logout: () => service.post('/user/logout')
 };
