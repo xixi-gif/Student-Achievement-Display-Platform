@@ -34,7 +34,7 @@ const roleSpecificItems = {
     { key: '/teacher/achievements/review', icon: <CheckCircleOutlined />, label: '成果审核' }
   ],
   admin: [
-    { key: '/admin/announcementpublish', icon: <NotificationOutlined />, label: '公告发布' },
+    { key: '/admin/announcement-publish', icon: <NotificationOutlined />, label: '公告发布' },
     { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
     { key: '/admin/data-statistics', icon: <BarChartOutlined />, label: '数据统计' },
     { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },

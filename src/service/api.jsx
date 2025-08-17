@@ -2,9 +2,9 @@ import axios from 'axios';
 import { data } from 'react-router-dom';
 
 const service = axios.create({
-  baseURL: 'http://localhost:8090', // 后端 API 地址
+  baseURL: 'http://localhost:8090', 
   timeout: 5000,
-  withCredentials: true // 允许携带 cookie
+  withCredentials: true 
 });
 
 service.interceptors.request.use(
@@ -28,7 +28,7 @@ service.interceptors.response.use(
       console.error('业务错误:', res.message);
       return Promise.reject({ code: res.code, message: res.message || '服务器返回错误' });
     }
-    return res; // 返回完整的响应对象，包含code和data
+    return res; 
   },
   error => {
     console.error('响应拦截器错误:', error);
@@ -133,6 +133,8 @@ export const teacherApi = {
 
 // 管理员相关接口
 export const adminApi = {
+  //个人中心
+  getProfile:(data)=> service.get('/admin/profile',{data}),
   // 用户管理接口
   getUserList: (params) => service.get('/admin/user', { params }),
   createUser: (data) => service.post('/admin/add', data),
@@ -146,16 +148,23 @@ export const adminApi = {
   getAchievementStats: () => service.get('/admin/statistics/achievements'),
   getUserStats: () => service.get('/admin/statistics/users'),
 
-  //分类设置接口
-  getCategoryList: () => service.get('/admin/categories'),
-  createCategory: (data) => service.post('/admin/categories/add', data),
-  deleteCategory: (id) => service.delete(`/admin/categories/delete`),
-
   //标签设置接口
-  getTagList: () => service.get('/admin/tags'),
-  createTag: (data) => service.post('/admin/tags', data),
-  updateTag: (id, data) => service.put(`/admin/tags/${id}`, data),
-  deleteTag: (id) => service.delete(`/admin/tags/${id}`),
+  getCategoryList: () => service.get('/admin/categories',),
+  createCategory: (data) => service.post('/admin/categories/add', data),
+  // deleteCategory: (id) => service.delete(`/admin/categories/delete`,id),
+  deleteCategory: (id) => service.post(
+    '/admin/categories/delete',
+    null, 
+    {
+      params: { id }, 
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }
+  ),
+
+  //分类设置接口
+  getTagList: () => service.get('/tags/tags'),
+  createTag: (data) => service.post('/tags/add', data),
+  deleteTag: (id) => service.delete(`/tags/${id}`),
   
   // 系统设置接口
   getSystemSettings: () => service.get('/admin/settings'),
