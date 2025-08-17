@@ -1,11 +1,12 @@
 import axios from 'axios';
-import { data } from 'react-router-dom';
+
 
 const service = axios.create({
   baseURL: 'http://localhost:8090', // 后端 API 地址
   timeout: 5000,
   withCredentials: true // 允许携带 cookie
 });
+
 
 service.interceptors.request.use(
   config => {
@@ -17,7 +18,7 @@ service.interceptors.request.use(
   },
   error => {
     console.error('请求拦截器错误:', error);
-    return Promise.reject({ code: 500, message: error.message || '请求异常' });
+    return Promise.reject(error);
   }
 );
 
@@ -26,52 +27,31 @@ service.interceptors.response.use(
     const res = response.data;
     if (res.code !== 0) { 
       console.error('业务错误:', res.message);
-      return Promise.reject({ code: res.code, message: res.message || '服务器返回错误' });
+      return Promise.reject(new Error(res.message || 'Error'));
     }
-    return res; // 返回完整的响应对象，包含code和data
+    return res.data; 
   },
   error => {
     console.error('响应拦截器错误:', error);
-    // 网络错误或服务器错误处理
-    return Promise.reject({ 
-      code: error.response?.status || 500, 
-      message: error.message || '网络请求失败' 
-    });
+    return Promise.reject(error);
   }
 );
-
-
-//公用
+//学生
 export const authApi = {
   login: (data) => service.post('/user/login', data),
   register: (data) => service.post('/user/register', data),
   forgotPassword: (data) => service.post('/auth/forgot-password', data),
-  getuserlogin: (data) => service.get('/user/get/login',data),
-  //上传头像
+
+  // 上传头像
   uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('avatar', file);
-    const token = localStorage.getItem('token');
-    console.log('uploadAvatar - 从localStorage获取的Token:', token ? '存在（长度：' + token.length + '）' : '不存在');
-    
-    const headers = {
-      'Content-Type': 'multipart/form-data',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
-    console.log('uploadAvatar - 请求头:', headers);
-    
-    return service.post(`/user/upload/avatar`, formData, { headers })
-      .then(response => {
-        console.log('uploadAvatar - 接口响应成功:', response);
-        return response;
-      })
-      .catch(error => {
-        console.log('uploadAvatar - 接口响应失败:', error);
-        throw error;
-      });
+    return axios.post(`/user/upload/avatar`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
   },
-  
-  resetpassword: (data) => service.post('/user/reset/password', data),
   // 修改个人信息
   updateInfo: (data) => service.post('/user/update/my', data),
   // 修改密码
@@ -119,9 +99,7 @@ export const achievementApi = {
 
 export const studentApi = {
   getProfile: () => service.get('/student/profile'),
-  updateProfile: (data) => service.put('/student/update', data),
-  getAchievements: () => service.get('/student/achievements'),
-  deleteAchievement: (id) => service.delete(`/student/achievements/${id}`)
+  updateProfile: (data) => service.put('/student/profile', data),
 };
 
 export const teacherApi = {

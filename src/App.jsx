@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LoginPage from './pages/LoginPage/LoginPage';
+import LoginPage from './pages/Loginpage/Loginpage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
 import HomePage from './pages/HomePage/HomePage';
 import ProfilePage from './pages/ProfilePage/ProfilePage';
@@ -25,6 +25,7 @@ import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
 import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage';
 import AnnouncementPublish from './pages/AnnouncementPublish/AnnouncementPublish';
+import AccountSettingsPage from './pages/SettingPage/SettingPage'
 
 // 需求相关页面
 import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
@@ -52,6 +53,7 @@ function App() {
             <Route path="/announcements/detail" element={<AnnouncementDetail/>} />
             <Route path="/requirements" element={<RequirementListPage />} />
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
+            <Route path="/setting" element={<AccountSettingsPage />}/>
 
             {/* 需要权限验证的路由 */}
             <Route element={<AuthRoute/>}>

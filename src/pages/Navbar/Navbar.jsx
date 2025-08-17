@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, Dropdown, Avatar, message, Input, Drawer } from 'antd';
 import { 
   HomeOutlined, TrophyOutlined, UserOutlined, 
@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
 import AnnouncementPublish from '../AnnouncementPublish/AnnouncementPublish';
+import { authApi } from '../../service/api';
 
 const { Header } = Layout;
 const { Search } = Input;
@@ -60,13 +61,71 @@ const Navbar = ({ currentUser }) => {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
   
   const storedToken = localStorage.getItem('token');
   const storedRole = localStorage.getItem('user_role');
   const storedUsername = localStorage.getItem('username');
   
-  const role = storedToken ? (storedRole || 'visitor') : 'visitor';
-  const username = storedToken ? (storedUsername || '访客') : '访客';
+ 
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (!storedToken) return;
+      
+      try {
+        const response = await authApi.getuserlogin({ params: {} });
+        if (response.code === 0 && response.data) {
+          setUserInfo(response.data);
+          localStorage.setItem('userInfo', JSON.stringify(response.data));
+        } else {
+          const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          if (Object.keys(cachedUser).length > 0) {
+            setUserInfo(cachedUser);
+          }
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        if (Object.keys(cachedUser).length > 0) {
+          setUserInfo(cachedUser);
+        }
+      }
+    };
+    
+    fetchUserInfo();
+  }, [storedToken]);
+
+  // 监听localStorage变化以同步头像更新
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'userInfo') {
+        try {
+          const updatedUser = JSON.parse(e.newValue || '{}');
+          if (Object.keys(updatedUser).length > 0) {
+            setUserInfo(updatedUser);
+          }
+        } catch (err) {
+          console.error('解析用户信息失败:', err);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+  
+  // 确定显示的角色、用户名和头像（使用userAvatar字段）
+  const role = storedToken ? (userInfo?.role || storedRole || 'visitor') : 'visitor';
+  const username = storedToken 
+    ? (userInfo?.realName || storedUsername || '用户') 
+    : '访客';
+  const avatarProps = storedToken && userInfo?.userAvatar 
+    ? { 
+        src: userInfo.userAvatar, // 读取接口返回的userAvatar字段
+        fallback: roleIcons[role],
+        alt: username 
+      } 
+    : { icon: roleIcons[role] };
   
   const specificItems = roleSpecificItems[role] || [];
 
@@ -75,10 +134,14 @@ const Navbar = ({ currentUser }) => {
   };
 
   const handleLogout = () => {
+    authApi.logout().catch(err => console.error('退出登录接口调用失败', err));
+    
     localStorage.removeItem('token');
     localStorage.removeItem('user_role');
     localStorage.removeItem('username');
-  
+    localStorage.removeItem('userInfo');
+    setUserInfo(null);
+    
     message.success('退出登录成功');
     navigate('/login');
     window.location.reload();
@@ -103,7 +166,7 @@ const Navbar = ({ currentUser }) => {
       )}
       
       {role !== 'visitor' && (
-        <Menu.Item key="settings" icon={<SettingOutlined />} onClick={() => navigate('/settings')}>
+        <Menu.Item key="settings" icon={<SettingOutlined />} onClick={() => navigate('/setting')}>
           账号设置
         </Menu.Item>
       )}
@@ -141,7 +204,6 @@ const Navbar = ({ currentUser }) => {
         
         items.push({
           key: 'more-actions',
-          // 移除了这里的 icon 属性，解决重复显示三个点的问题
           label: (
             <Dropdown overlay={dropdownMenu} placement="bottomRight">
               <div style={{ cursor: 'pointer' }}>
@@ -247,7 +309,14 @@ const Navbar = ({ currentUser }) => {
               marginLeft: 24,
               padding: '0 12px'
             }}>
-              <Avatar icon={roleIcons[role]} size="large" style={{ marginRight: 10 }} />
+              <Avatar 
+                {...avatarProps} 
+                size="large" 
+                style={{ 
+                  marginRight: 10,
+                  objectFit: 'cover'
+                }} 
+              />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontWeight: 500 }}>{username}</span>
                 <span style={{ 

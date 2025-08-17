@@ -1,95 +1,243 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layout, Card, Avatar, Button, Tabs, Form, Input, 
-  Table, Badge, Tag, Upload, Space, Divider, Spin,
-  message, Popconfirm
+  Table, Badge, Tag, Upload, Space, Spin, message
 } from 'antd';
 import { 
   UserOutlined, EditOutlined, MailOutlined, PhoneOutlined,
-  UploadOutlined, LockOutlined, LogoutOutlined, EyeOutlined, 
-  TrophyOutlined
+  UploadOutlined, EyeOutlined, TrophyOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
+import { authApi, studentApi } from '../../service/api'; 
+import TextArea from 'antd/es/input/TextArea';
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
-const { TextArea } = Input;
 
-const myAchievements = [
-  {
-    id: 1,
-    title: "基于深度学习的校园垃圾分类系统研究",
-    category: "毕业论文",
-    status: "已展示",
-    date: "2023-10-15",
-    views: 128,
-    isFeatured: true
-  },
-  {
-    id: 2,
-    title: "校园智能导航APP设计与实现",
-    category: "一级项目",
-    status: "审核中",
-    date: "2023-09-28",
-    views: 45,
-    isFeatured: false
-  },
-  {
-    id: 3,
-    title: "全国大学生数学建模竞赛一等奖",
-    category: "竞赛作品",
-    status: "已展示",
-    date: "2023-08-12",
-    views: 203,
-    isFeatured: true
-  }
-];
+const DEFAULT_USER = {
+  realName: "",
+  bio: "",
+  studentId: 0,
+  major: "",
+  grade: "",
+  email: "",
+  phone: "",
+  avatar: "",
+  achievementCount: 0,
+  username: ""
+};
+
+const ERROR_CODES = {
+  STUDENT_NOT_FOUND: 1001,
+  TOKEN_INVALID: 401,
+};
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(DEFAULT_USER);
   const [editMode, setEditMode] = useState(false);
+  const [myAchievements, setMyAchievements] = useState([]);
   const [form] = Form.useForm();
   
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const role = localStorage.getItem('user_role') || 'student';
-      const username = localStorage.getItem('username') || '张明';
-      
-      // 从本地存储获取保存的用户信息，初始为空
-      const savedInfo = JSON.parse(localStorage.getItem('user_info') || 'null');
-      
-      // 初始数据为空对象，仅保留必要的身份信息
-      const userInfo = savedInfo || {
-        role,
-        username,
-        realName: "",
-        studentId: "",
-        major: "",
-        grade: "",
-        email: "",
-        phone: "",
-        bio: "",
-        avatar: ""
-      };
-      
-      setCurrentUser(userInfo);
-      form.setFieldsValue(userInfo);
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const response = await studentApi.getProfile();
+      if (response.code === 0) {
+        const userData = { ...DEFAULT_USER, ...cachedUser, ...response.data };
+        localStorage.setItem('userInfo', JSON.stringify(userData));
+        setCurrentUser(userData);
+        form.setFieldsValue(userData);
+      } else {
+        throw { code: response.code, message: response.message || "获取用户资料失败" };
+      }
+    } catch (error) {
+      const { code, message: errorMsg } = error;
+      if (code === ERROR_CODES.STUDENT_NOT_FOUND) { 
+        message.error("学生信息不存在，请联系管理员或重新登录");
+        setTimeout(() => navigate('/login'), 1500);
+        return;
+      }
+      if (code === ERROR_CODES.TOKEN_INVALID) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('user_role');
+        message.error("登录已过期，请重新登录");
+        setTimeout(() => navigate('/login'), 1500);
+        return;
+      }
+      const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      if (Object.keys(cachedUser).length > 0) {
+        const userData = { ...DEFAULT_USER, ...cachedUser };
+        setCurrentUser(userData);
+        form.setFieldsValue(userData);
+        message.warning(`获取资料失败，已加载本地缓存：${errorMsg}`);
+      } else {
+        setCurrentUser(DEFAULT_USER);
+        message.error(`获取资料失败：${errorMsg}`);
+      }
+    } finally {
       setLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [form]);
+    }
+  };
   
+  const fetchAchievements = async () => {
+    try {
+      const response = await studentApi.getAchievements();
+      if (response.code === 0) {
+        setMyAchievements(response.data || []);
+      } else {
+        message.warning(response.message || "获取成果数据失败");
+      }
+    } catch (error) {
+      const errorMsg = error.message || "获取成果数据失败";
+      message.error(errorMsg);
+    }
+  };
+  
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      message.error('请先登录');
+      navigate('/login');
+      setLoading(false);
+      return;
+    }
+    fetchUserProfile();
+  }, [navigate]);
+  
+  useEffect(() => {
+    if (currentUser.studentId !== 0 && !loading) {
+      fetchAchievements();
+    }
+  }, [currentUser.studentId, loading]);
+  
+  const getCategoryColor = (category) => {
+    const colorMap = {
+      '毕业论文': '#1890ff',
+      '一级项目': '#52c41a',
+      '竞赛作品': '#faad14',
+      '技术专利': '#f5222d',
+      '期刊论文': '#722ed1',
+      '课程作业': '#13c2c2'
+    };
+    return colorMap[category] || '#666';
+  };
+  
+  const handleFormSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      const updatedData = {
+        email: values.email,
+        phone: values.phone,
+        bio : values.bio
+      };
+      const response = await studentApi.updateProfile(updatedData);
+      if (response.code !== 0) {
+        throw { code: response.code, message: response.message || "更新信息失败" };
+      }
+      const newUserData = { ...currentUser, ...response.data };
+      localStorage.setItem('userInfo', JSON.stringify(newUserData));
+      setCurrentUser(newUserData);
+      message.success(response.message || '个人信息更新成功');
+      setEditMode(false);
+    } catch (error) {
+      const { code, message: errorMsg } = error;
+      if (code === ERROR_CODES.STUDENT_NOT_FOUND || code === ERROR_CODES.TOKEN_INVALID) {
+        if (code === ERROR_CODES.TOKEN_INVALID) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('userInfo');
+          localStorage.removeItem('user_role');
+        }
+        message.error(code === ERROR_CODES.STUDENT_NOT_FOUND ? "学生信息已失效" : "登录已过期");
+        setTimeout(() => navigate('/login'), 1500);
+        return;
+      }
+      message.error(errorMsg || "更新失败，请重试");
+    }
+  };
+  
+  const handleDelete = async (id) => {
+    try {
+      const response = await studentApi.deleteAchievement(id);
+      if (response.code === 0) {
+        message.success(response.message || `成果已删除`);
+        fetchAchievements();
+      } else {
+        message.error(response.message || "删除失败");
+      }
+    } catch (error) {
+      message.error("删除操作失败，请重试");
+    }
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('username');
+    localStorage.removeItem('userInfo'); 
+    message.success('退出登录成功');
+    navigate('/login');
+  };
+  
+  const handleAvatarChange = async (info) => {
+    if (info.file.status === 'uploading') {
+      message.loading('头像上传中...', 0);
+      return;
+    }
+    if (info.file.status === 'done') {
+      message.destroy();
+      try {
+        const response = info.file.response;
+        if (response?.code === 0 && response?.data?.url) {
+          const avatarUrl = response.data.url;
+          const updatedUser = { ...currentUser, avatar: avatarUrl };
+          localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+          setCurrentUser(updatedUser);
+          form.setFieldsValue({ avatar: avatarUrl });
+          message.success(response.message || '头像上传成功');
+        } else {
+          message.error(response?.message || '头像上传失败');
+        }
+      } catch (error) {
+        message.error('头像处理失败，请重试');
+      }
+    }
+    if (info.file.status === 'error') {
+      message.destroy();
+      message.error('上传失败，请检查网络或文件格式');
+    }
+  };
+
+  const beforeAvatarUpload = (file) => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('只能上传图片文件');
+      return false;
+    }
+    const isSupportedFormat = ['image/jpeg', 'image/png', 'image/gif'].includes(file.type);
+    if (!isSupportedFormat) {
+      message.error('仅支持JPG、PNG、GIF格式的图片');
+      return false;
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error('图片大小不能超过2MB');
+      return false;
+    }
+    return true;
+  };
+
   const achievementColumns = [
     {
       title: '成果名称',
       dataIndex: 'title',
       key: 'title',
       render: (text, record) => (
-        <a onClick={() => navigate(`/achievement/detail`)}>{text}</a>
+        <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>{text}</a>
       )
     },
     {
@@ -128,7 +276,7 @@ const ProfilePage = () => {
             type="text" 
             icon={<EditOutlined />} 
             size="small"
-            onClick={() => navigate(`/student/achievement/edit`)}
+            onClick={() => navigate(`/student/achievement/edit/${record.id}`)}
           >
             编辑
           </Button>
@@ -144,66 +292,8 @@ const ProfilePage = () => {
       )
     }
   ];
-  
-  function getCategoryColor(category) {
-    const colorMap = {
-      '毕业论文': '#1890ff',
-      '一级项目': '#52c41a',
-      '竞赛作品': '#faad14',
-      '技术专利': '#f5222d',
-      '期刊论文': '#722ed1',
-      '课程作业': '#13c2c2'
-    };
-    return colorMap[category] || '#666';
-  }
-  
-  const handleFormSubmit = () => {
-    form.validateFields()
-      .then(values => {
-        // 合并身份信息和表单数据
-        const updatedUser = { ...currentUser, ...values };
-        // 保存到本地存储
-        localStorage.setItem('user_info', JSON.stringify(updatedUser));
-        // 更新状态
-        setCurrentUser(updatedUser);
-        message.success('个人信息保存成功');
-        setEditMode(false);
-      })
-      .catch(info => {
-        console.log(info);
-      });
-  };
-  
-  const handleDelete = (id) => {
-    message.success(`成果 ${id} 已删除`);
-  };
-  
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('username');
-    message.success('退出登录成功');
-    navigate('/login');
-  };
-  
-  const handleAvatarChange = (info) => {
-    if (info.file.status === 'done') {
-      // 模拟头像URL保存
-      const avatarUrl = info.file.response?.url || `https://picsum.photos/id/${Math.floor(Math.random() * 100)}/200/200`;
-      
-      // 更新并保存头像信息
-      const updatedUser = { ...currentUser, avatar: avatarUrl };
-      localStorage.setItem('user_info', JSON.stringify(updatedUser));
-      setCurrentUser(updatedUser);
-      form.setFieldsValue({ avatar: avatarUrl });
-      
-      message.success('头像上传成功');
-    } else if (info.file.status === 'error') {
-      message.error('头像上传失败');
-    }
-  };
 
-  if (!currentUser || loading) {
+  if (loading) {
     return (
       <Layout style={{ minHeight: '100vh' }}>
         <Navbar currentUser={currentUser} />
@@ -214,7 +304,7 @@ const ProfilePage = () => {
           background: '#f0f2f5',
           minHeight: 'calc(100vh - 64px)'
         }}>
-          <Spin size="large" />
+          <Spin size="large" tip="加载中..." />
         </Content>
       </Layout>
     );
@@ -232,28 +322,18 @@ const ProfilePage = () => {
             extra={
               editMode ? (
                 <Space size="middle">
-                  <Button 
-                    onClick={() => {
-                      form.resetFields();
-                      setEditMode(false);
-                    }}
-                  >
-                    取消
-                  </Button>
-                  <Button 
-                    type="primary" 
-                    onClick={handleFormSubmit}
-                  >
-                    保存
-                  </Button>
+                  <Button onClick={() => setEditMode(false)}>取消</Button>
+                  <Button type="primary" onClick={handleFormSubmit}>保存</Button>
                 </Space>
               ) : (
-                <Button 
-                  icon={<EditOutlined />} 
-                  onClick={() => setEditMode(true)}
-                >
-                  编辑资料
-                </Button>
+                <Space size="middle">
+                  <Button icon={<EditOutlined />} onClick={() => setEditMode(true)}>
+                    编辑资料
+                  </Button>
+                  <Button danger icon={<UserOutlined />} onClick={handleLogout}>
+                    退出登录
+                  </Button>
+                </Space>
               )
             }
             style={{ marginBottom: 24 }}
@@ -265,15 +345,26 @@ const ProfilePage = () => {
                     name="avatar"
                     listType="picture-card"
                     showUploadList={false}
-                    action="/api/upload/avatar"
                     onChange={handleAvatarChange}
                     disabled={!editMode}
+                    beforeUpload={beforeAvatarUpload}
+                    customRequest={({ file, onSuccess, onError }) => {
+                      authApi.uploadAvatar(file)
+                       .then(response => onSuccess(response, file))
+                       .catch(error => onError(error, file));
+                    }}
                   >
                     {currentUser.avatar ? (
                       <Avatar
                         size={160}
                         src={currentUser.avatar}
-                        style={{ marginBottom: 16 }}
+                        shape="square"
+                        style={{ 
+                          marginBottom: 16, 
+                          width: '100%', 
+                          height: 'auto', 
+                          objectFit: 'cover' 
+                        }}
                       />
                     ) : (
                       <div style={{ padding: '36px 0' }}>
@@ -284,8 +375,15 @@ const ProfilePage = () => {
                     {editMode && <div>更换头像</div>}
                   </Upload>
                   
-                  <h2 style={{ margin: '16px 0 8px' }}>{currentUser.username}</h2>
-                  <Badge status="success" text={currentUser.role === 'student' ? '学生' : '教师'} />
+                  <h2 style={{ margin: '16px 0 8px' }}>
+                    {currentUser.realName}
+                  </h2>
+                  <div style={{ marginBottom: 8 }}>
+                    <Badge status="success" text="学生" />
+                    <span style={{ marginLeft: 16 }}>
+                      成果数量: {currentUser.achievementCount}
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -296,41 +394,36 @@ const ProfilePage = () => {
                   disabled={!editMode}
                   initialValues={currentUser}
                 >
+                  {/* 真实姓名设置为始终不可编辑 */}
                   <Form.Item
                     name="realName"
                     label="真实姓名"
                     rules={[{ required: true, message: '请输入真实姓名' }]}
                   >
-                    <Input placeholder="请输入真实姓名" />
+                    <Input placeholder="请输入真实姓名" disabled />
                   </Form.Item>
                   
-                  {currentUser.role === 'student' && (
-                    <Form.Item
-                      name="studentId"
-                      label="学号"
-                      rules={[{ required: true, message: '请输入学号' }]}
-                    >
-                      <Input placeholder="请输入学号" />
-                    </Form.Item>
-                  )}
+                  <Form.Item
+                    name="studentId"
+                    label="学号"
+                    rules={[{ required: true, message: '请输入学号' }]}
+                  >
+                    <Input placeholder="请输入学号" disabled />
+                  </Form.Item>
                   
                   <Form.Item
                     name="major"
                     label="专业"
-                    rules={[{ required: true, message: '请输入专业' }]}
                   >
-                    <Input placeholder="请输入专业" />
+                    <Input placeholder="请输入专业" disabled />
                   </Form.Item>
                   
-                  {currentUser.role === 'student' && (
-                    <Form.Item
-                      name="grade"
-                      label="年级"
-                      rules={[{ required: true, message: '请输入年级' }]}
-                    >
-                      <Input placeholder="请输入年级" />
-                    </Form.Item>
-                  )}
+                  <Form.Item
+                    name="grade"
+                    label="年级"
+                  >
+                    <Input placeholder="请输入年级" disabled />
+                  </Form.Item>
                   
                   <Form.Item
                     name="email"
@@ -353,16 +446,19 @@ const ProfilePage = () => {
                   >
                     <Input prefix={<PhoneOutlined />} placeholder="请输入联系电话" />
                   </Form.Item>
-                  
+
                   <Form.Item
                     name="bio"
                     label="个人简介"
+                    rules={[{ required: true, message: '请输入个人简介' }]}
                   >
-                    <TextArea 
-                      rows={4} 
-                      placeholder="请输入个人简介" 
-                      maxLength={200}
-                    />
+                  <TextArea
+                  rows={4}
+                  placeholder='请输入个人简介'
+                  maxLength={200}
+                  />
+
+                  
                   </Form.Item>
                 </Form>
               </div>
@@ -398,62 +494,6 @@ const ProfilePage = () => {
                 />
               </Card>
             </TabPane>
-            
-            <TabPane 
-              tab={
-                <span>
-                  <LockOutlined /> 账号设置
-                </span>
-              } 
-              key="account"
-            >
-              <Card bordered={false}>
-                <Form layout="vertical" style={{ maxWidth: 600 }}>
-                  <h3 style={{ margin: '0 0 24px' }}>账号安全</h3>
-                  
-                  <Form.Item label="登录账号" name="username" initialValue={currentUser.username}>
-                    <Input disabled />
-                  </Form.Item>
-                  
-                  <Form.Item label="原密码">
-                    <Input.Password placeholder="请输入原密码" />
-                  </Form.Item>
-                  
-                  <Form.Item label="新密码">
-                    <Input.Password placeholder="请输入新密码" />
-                  </Form.Item>
-                  
-                  <Form.Item label="确认新密码">
-                    <Input.Password placeholder="请确认新密码" />
-                  </Form.Item>
-                  
-                  <Form.Item>
-                    <Button type="primary" style={{ marginRight: 16 }}>
-                      修改密码
-                    </Button>
-
-                  </Form.Item>
-                  
-                  <Divider />
-                  
-                  <div style={{ textAlign: 'center', marginTop: 24 }}>
-                    <Popconfirm
-                      title="确定要退出登录吗？"
-                      onConfirm={handleLogout}
-                      okText="确定"
-                      cancelText="取消"
-                    >
-                      <Button 
-                        danger 
-                        icon={<LogoutOutlined />}
-                      >
-                        退出当前账号
-                      </Button>
-                    </Popconfirm>
-                  </div>
-                </Form>
-              </Card>
-            </TabPane>
           </Tabs>
         </div>
       </Content>
@@ -462,3 +502,4 @@ const ProfilePage = () => {
 };
 
 export default ProfilePage;
+    

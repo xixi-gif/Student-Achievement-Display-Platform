@@ -1,25 +1,48 @@
 import React from 'react';
-import { Form, Input, Button, Card, message, Space } from 'antd';
+import { Form, Input, Button, Card, message, Spin } from 'antd';
 import { MailOutlined, LockOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
+import { authApi } from '../../service/api';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
   
-  const onFinish = (values) => {
-    console.log('重置密码:', values);
-    
-    setTimeout(() => {
-      message.success('密码重置成功，请使用新密码登录');
-      navigate('/login'); 
-    }, 800);
+  const onFinish = async (values) => {
+    setLoading(true);
+    try {
+      const requestData = {
+        email: values.email,
+        phone: values.phone,
+        newPassword: values.newPassword,
+        checkNewPassword: values.confirmPassword
+      };
+      const response = await authApi.resetpassword(requestData);
+      if (response?.success) {
+        message.success('密码重置成功，请使用新密码登录');
+        setTimeout(() => navigate('/login'), 1500);
+      } else {
+        message.error(response?.message || '密码重置失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('重置密码错误:', error);
+      if (error.response) {
+        message.error(error.response.data?.message || `错误: ${error.response.status}`);
+      } else if (error.request) {
+        message.error('网络错误，请检查连接');
+      } else {
+        message.error('操作失败，请稍后重试');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onFinishFailed = (errorInfo) => {
-    console.log('操作失败:', errorInfo);
-    message.error('请检查输入内容');
+    console.log('表单验证失败:', errorInfo);
+    message.error('请检查输入内容是否正确');
   };
 
   return (
@@ -46,11 +69,8 @@ const ForgotPasswordPage = () => {
         }}>
           <img 
             src={logo} 
-            alt="Logo" 
-            style={{ 
-              height: 48, 
-              marginBottom: 16 
-            }} 
+            alt="系统Logo" 
+            style={{ height: 48, marginBottom: 16 }} 
           />
           <h1 style={{ 
             fontSize: 24, 
@@ -80,6 +100,7 @@ const ForgotPasswordPage = () => {
               prefix={<MailOutlined className="site-form-item-icon" />} 
               placeholder="注册邮箱" 
               size="large"
+              disabled={loading}
             />
           </Form.Item>
 
@@ -94,6 +115,7 @@ const ForgotPasswordPage = () => {
               prefix={<PhoneOutlined className="site-form-item-icon" />} 
               placeholder="注册手机号" 
               size="large"
+              disabled={loading}
             />
           </Form.Item>
 
@@ -101,13 +123,14 @@ const ForgotPasswordPage = () => {
             name="newPassword"
             rules={[
               { required: true, message: '请输入新密码' },
-              { min: 6, message: '密码至少6个字符' }
+              { min: 8, message: '密码至少8个字符' }
             ]}
           >
             <Input.Password
               prefix={<LockOutlined className="site-form-item-icon" />}
               placeholder="新密码"
               size="large"
+              disabled={loading}
             />
           </Form.Item>
 
@@ -118,18 +141,18 @@ const ForgotPasswordPage = () => {
               { required: true, message: '请确认新密码' },
               ({ getFieldValue }) => ({
                 validator(_, value) {
-                  if (!value || getFieldValue('newPassword') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('两次输入的密码不一致'));
-                },
-              }),
+                  return !value || getFieldValue('newPassword') === value 
+                    ? Promise.resolve() 
+                    : Promise.reject(new Error('两次输入的密码不一致'));
+                }
+              })
             ]}
           >
             <Input.Password
               prefix={<LockOutlined className="site-form-item-icon" />}
               placeholder="确认新密码"
               size="large"
+              disabled={loading}
             />
           </Form.Item>
 
@@ -139,13 +162,18 @@ const ForgotPasswordPage = () => {
               htmlType="submit" 
               size="large"
               style={{ width: '100%', height: 40, marginBottom: 16 }}
+              loading={loading}
             >
+              <Spin spinning={false} size="small" />
               重置密码
             </Button>
           </Form.Item>
 
           <div style={{ textAlign: 'center', color: 'rgba(0, 0, 0, 0.65)' }}>
-            想起密码了? <a href="/login">立即登录</a>
+            想起密码了? <a href="/login" onClick={(e) => {
+              e.preventDefault();
+              navigate('/login');
+            }}>立即登录</a>
           </div>
         </Form>
       </Card>
@@ -153,4 +181,4 @@ const ForgotPasswordPage = () => {
   );
 };
 
-export default ForgotPasswordPage;  
+export default ForgotPasswordPage;

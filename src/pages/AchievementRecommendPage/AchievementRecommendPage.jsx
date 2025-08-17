@@ -234,11 +234,11 @@ const AchievementRecommendPage = () => {
     <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentUser={currentUser} />
       
-      {/* 主要内容区域 - 设置为块级元素，不使用flex居中 */}
+      {}
       <Content style={{ 
         flex: '1', 
         padding: '24px', 
-        display: 'block',  /* 确保不是flex布局 */
+        display: 'block',  
         background: '#fff' 
       }}>
         <Card

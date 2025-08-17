@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Checkbox, Card, message, Select } from 'antd';
 import { 
   UserOutlined, LockOutlined, 
-  BookOutlined, UsergroupAddOutlined, EyeOutlined 
+  BookOutlined, UsergroupAddOutlined, EyeOutlined,
+  CloseOutlined
 } from '@ant-design/icons'; 
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
@@ -13,7 +14,9 @@ const { Option } = Select;
 const LoginPage = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState('student');
-  const [loading, setLoading] = useState(false); 
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
   const roleOptions = [
     { value: 'student', label: '学生', icon: <UserOutlined /> },
     { value: 'teacher', label: '老师', icon: <BookOutlined /> },
@@ -21,31 +24,85 @@ const LoginPage = () => {
     { value: 'visitor', label: '访客', icon: <EyeOutlined /> }
   ];
 
-  const onFinish = async (values) => {
+  const clearError = () => {
+    setErrorMessage('');
+  };
+
+
+      const onFinish = async (values) => {
+    clearError();
     setLoading(true);
     try {
-  
       const response = await authApi.login({
         userAccount: values.username,  
         password: values.password,     
         role: role                     
       });
 
+      // 关键修改：从 response.data 中获取 token（而非直接从 response 中获取）
+      const token = response.data?.token;
+      const userInfo = response.data?.userInfo;
+      
+      if (!token) {
+        throw new Error('登录成功但未返回 Token');
+      }
 
-      localStorage.setItem('token', response.token);
+      // 正确存储 Token 和用户信息
+      localStorage.setItem('token', token);
       localStorage.setItem('user_role', role);
       localStorage.setItem('username', values.username);
-      localStorage.setItem('userInfo', JSON.stringify(response.userInfo || {}));
+      localStorage.setItem('userInfo', JSON.stringify(userInfo || {}));
+      
+      // 调试：确认存储成功
+      console.log('登录后存储的 Token:', localStorage.getItem('token'));
       
       message.success('登录成功，即将进入首页');
     
-      // 延迟跳转首页
       setTimeout(() => {
         navigate('/home', { replace: true }); 
       }, 800);
     } catch (error) {
-      console.error('登录错误:', error);
-      message.error(error.message || '登录失败，请检查账号密码');
+      console.log('登录错误详情:', {
+        error: error,
+        response: error.response,
+        responseData: error.response?.data,
+        status: error.response?.status
+      });
+      
+      let errorText = '登录失败，请稍后重试';
+      
+      if (error.response) {
+        if (typeof error.response.data === 'object' && error.response.data.message) {
+          errorText = error.response.data.message;
+        }
+        else if (typeof error.response.data === 'object' && error.response.data.description) {
+          errorText = error.response.data.description;
+        }
+        else if (typeof error.response.data === 'string') {
+          errorText = error.response.data;
+        }
+        else if (error.response.status === 401) {
+          errorText = '用户名或密码不正确';
+        } 
+        else if (error.response.status === 403) {
+          errorText = '没有权限访问，请检查您的身份';
+        }
+        else if (error.response.status === 400) {
+          errorText = '输入参数错误，请检查您的输入';
+        }
+        else if (error.response.status === 500) {
+          errorText = '服务器内部错误，请稍后重试';
+        }
+      }
+      else if (error.request) {
+        errorText = '网络连接失败，请检查网络设置';
+      }
+      else if (error.message) {
+        errorText = error.message;
+      }
+      
+      setErrorMessage(errorText);
+      message.error(errorText);
     } finally {
       setLoading(false);
     }
@@ -53,7 +110,15 @@ const LoginPage = () => {
 
   const onFinishFailed = (errorInfo) => {
     console.log('表单验证失败:', errorInfo);
-    message.error('请检查输入内容是否符合要求');
+    const errorText = '请检查输入内容是否符合要求';
+    setErrorMessage(errorText);
+    message.error(errorText);
+  };
+
+  const handleInputChange = () => {
+    if (errorMessage) {
+      clearError();
+    }
   };
 
   return (
@@ -92,6 +157,25 @@ const LoginPage = () => {
           </h1>
         </div>
 
+        {/* 仅红色文字显示错误信息 */}
+        {errorMessage && (
+          <div style={{
+            color: '#f5222d', 
+            fontSize: 14,
+            textAlign: 'center', 
+            marginBottom: 16, 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <CloseOutlined 
+              style={{ marginRight: 6, cursor: 'pointer', fontSize: 14 }} 
+              onClick={clearError} 
+            />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         <Form
           name="login_form"
           initialValues={{ remember: true, role: 'student' }}
@@ -108,7 +192,10 @@ const LoginPage = () => {
           >
             <Select
               value={role}
-              onChange={setRole}
+              onChange={(value) => {
+                setRole(value);
+                handleInputChange();
+              }}
               size="large"
               placeholder="请选择身份"
               showSearch
@@ -140,6 +227,7 @@ const LoginPage = () => {
               placeholder="请输入用户名/邮箱" 
               size="large"
               disabled={loading}
+              onChange={handleInputChange}
             />
           </Form.Item>
 
@@ -157,6 +245,7 @@ const LoginPage = () => {
               placeholder="请输入密码"
               size="large"
               disabled={loading}
+              onChange={handleInputChange}
             />
           </Form.Item>
 
@@ -165,12 +254,12 @@ const LoginPage = () => {
             valuePropName="checked"
             style={{ 
               marginBottom: 24,
-              display: 'flex',       // 使用flex布局
-              justifyContent: 'space-between',  // 两端对齐
-              alignItems: 'center'   // 垂直居中对齐
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}
           >
-            <Checkbox style={{ margin: 0 }}>记住我</Checkbox>  {/* 移除默认margin */}
+            <Checkbox style={{ margin: 0 }}>记住我</Checkbox>
             <a 
               href="/forgot-password" 
               onClick={(e) => {
@@ -214,4 +303,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-    
