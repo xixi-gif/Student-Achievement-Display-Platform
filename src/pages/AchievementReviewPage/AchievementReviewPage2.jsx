@@ -78,7 +78,8 @@ const AchievementReviewPage = () => {
         status: filterStatus === "all" ? null : filterStatus,
       };
 
-      const res = await achievementApi.getPendingList(params);
+      // const res = await achievementApi.getPendingList(params);
+      const { data: res } = await achievementApi.getPendingList(params);
       // 数据解析逻辑
       const records = res.records || [];
       const formattedData = records.map((item) => ({

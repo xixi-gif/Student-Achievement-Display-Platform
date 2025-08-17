@@ -45,7 +45,8 @@ const TeacherProfile = () => {
         setLoading(true);
         
         // 获取教师基本信息
-        const profileResponse = await teacherApi.getProfile();
+        // const profileResponse = await teacherApi.getProfile();
+        const { data: profileResponse } = await teacherApi.getProfile();
         const formattedData = {
           realName: profileResponse.username,
           teacherId: profileResponse.teacherId,
@@ -82,7 +83,7 @@ const TeacherProfile = () => {
   const fetchReviewData = async () => {
     try {
       setReviewLoading(true);
-      const response = await achievementApi.getPendingList({
+      const {data: response} = await achievementApi.getPendingList({
         current: 1,
         pageSize: 3
       });
@@ -114,7 +115,7 @@ const TeacherProfile = () => {
   const fetchRecommendData = async () => {
     try {
       setRecommendLoading(true);
-      const response = await achievementApi.getRecommendList({
+      const {data:response} = await achievementApi.getRecommendList({
         current: 1,
         pageSize: 3
       });

@@ -47,7 +47,9 @@ const AchievementRecommendPage = () => {
     };
     
     // 拦截器已提取data，这里直接获取分页数据
-    const response = await achievementApi.getRecommendList(params);
+    // const response = await achievementApi.getRecommendList(params);
+    // 把返回对象的 data 字段直接起别名成 response
+    const { data: response } = await achievementApi.getRecommendList(params);
     
     // 转换数据格式
     const formattedData = (response.records || []).map(item => ({
