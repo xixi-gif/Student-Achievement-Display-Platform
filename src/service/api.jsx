@@ -95,8 +95,13 @@ export const achievementApi = {
   getList: () => service.get('/achievements'),
   getDetail: (id) => service.get(`/achievements/${id}`),
   getMyAchievements: () => service.get('/student/achievements'),
-  createAchievement: (data) => service.post('/student/achievements', data),
-  updateAchievement: (id, data) => service.put(`/student/achievements/${id}`, data),
+  createAchievement: (data) => service.post('/achievement/add', data,{
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
+  updateAchievement: (data) => service.post(`/achievement/update`,null,{ data }),
+  deleteAchievement: (id) => service.post('/achievement/delete',null,{ params: { id } }),
 
   // 获取待审核成果列表
   getPendingList: (params) => service.get(`/teacher/review`, { params }),
@@ -148,7 +153,7 @@ export const adminApi = {
   getAchievementStats: () => service.get('/admin/statistics/achievements'),
   getUserStats: () => service.get('/admin/statistics/users'),
 
-  //标签设置接口
+  //分类设置接口
   getCategoryList: () => service.get('/admin/categories',),
   createCategory: (data) => service.post('/admin/categories/add', data),
   // deleteCategory: (id) => service.delete(`/admin/categories/delete`,id),
@@ -161,7 +166,7 @@ export const adminApi = {
     }
   ),
 
-  //分类设置接口
+  //标签设置接口
   getTagList: () => service.get('/tags/tags'),
   createTag: (data) => service.post('/tags/add', data),
   deleteTag: (id) => service.delete(`/tags/${id}`),

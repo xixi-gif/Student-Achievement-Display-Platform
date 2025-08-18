@@ -223,7 +223,7 @@ const getLevelLabel = (level) => {
     <Select
       value={record.isRecommended ? (level || 1) : 0} // 不推荐时强制为0级
       onChange={value => handleLevelChange(record.id, value)}
-      style={{ width: 120 }}
+      style={{ width: 200 }}
       disabled={!record.isRecommended}
       options={[
         { value: 0, label: '无' },

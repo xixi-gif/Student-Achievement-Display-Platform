@@ -8,7 +8,7 @@ import MyAchievements from './pages/MyAchievements/MyAchievements';
 import AnnouncementList from './pages/AnnouncementList/AnnouncementList';
 import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail';
 import AchievementsPage from './pages/AchievementsPage/AchievementsPage';
-import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage';
+import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage2';
 import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
