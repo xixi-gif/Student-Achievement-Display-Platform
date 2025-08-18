@@ -19,24 +19,24 @@ const mockCarouselItems = [
 ];
 
 const SystemSettingsPage = () => {
-  // 状态管理（已交换Tag和Category的数据源对应关系）
+
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('categories');
-  const [categories, setCategories] = useState([]); // 分类数据（对应categories接口）
-  const [tags, setTags] = useState([]); // 标签数据（对应tags接口）
+  const [categories, setCategories] = useState([]); 
+  const [tags, setTags] = useState([]); 
   const [carouselItems, setCarouselItems] = useState([]);
-  const [loading, setLoading] = useState(false); // 分类操作加载态
-  const [tagLoading, setTagLoading] = useState(false); // 标签操作加载态
+  const [loading, setLoading] = useState(false); 
+  const [tagLoading, setTagLoading] = useState(false); 
   const [deleteId, setDeleteId] = useState(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [currentEditId, setCurrentEditId] = useState(null); // 分类编辑ID
+  const [currentEditId, setCurrentEditId] = useState(null); 
 
-  // 表单实例
+
   const [categoryForm] = Form.useForm();
   const [tagForm] = Form.useForm();
   const [carouselForm] = Form.useForm();
 
-  // 初始化加载数据（已交换接口调用）
+
   useEffect(() => {
     const fetchAllData = async () => {
       setLoading(true);
@@ -50,13 +50,11 @@ const SystemSettingsPage = () => {
           avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` 
         });
 
-        // 并行加载：分类数据（categories接口）和标签数据（tags接口）【已交换】
         const [categoryRes, tagRes] = await Promise.all([
-          adminApi.getCategoryList(), // 分类数据（对应categories接口）
-          adminApi.getTagList()       // 标签数据（对应tags接口）
+          adminApi.getCategoryList(), 
+          adminApi.getTagList()      
         ]);
 
-        // 处理分类数据（来自categories接口）【已交换】
         if (categoryRes.code === 0) {
           const formattedCategories = (categoryRes.data || []).map(item => {
             let name = item.name || item.categoryName || '';
@@ -77,7 +75,6 @@ const SystemSettingsPage = () => {
           message.error('获取分类失败：' + (categoryRes.message || '接口返回错误'));
         }
 
-        // 处理标签数据（来自tags接口）【已交换】
         if (tagRes.code === 0) {
           const validTags = (tagRes.data || []).filter(item => !item.isDeleted)
             .map(item => ({ 
@@ -102,7 +99,6 @@ const SystemSettingsPage = () => {
   }, []);
 
 
-  // 分类添加（调用categories接口【已交换】）
   const handleAddCategory = async () => {
     try {
       const values = await categoryForm.validateFields();
@@ -116,12 +112,12 @@ const SystemSettingsPage = () => {
       setLoading(true);
       const formData = new URLSearchParams();
       formData.append('name', categoryName);
-      const response = await adminApi.createCategory(formData); // 调用categories的添加接口【已交换】
+      const response = await adminApi.createCategory(formData); 
       
       if (response.code === 0) {
         message.success('分类添加成功');
         categoryForm.resetFields();
-        // 重新加载分类数据（调用categories接口【已交换】）
+  
         const res = await adminApi.getCategoryList();
         if (res.code === 0) {
           setCategories(res.data.map(item => ({
@@ -142,14 +138,14 @@ const SystemSettingsPage = () => {
   };
 
 
-  // 分类编辑（逻辑不变，数据源对应categories接口）
+
   const handleEditCategory = (record) => {
     setCurrentEditId(record.id);
     categoryForm.setFieldsValue({ name: record.name });
   };
 
 
-  // 分类更新（调用categories接口【已交换】）
+
   const handleUpdateCategory = async () => {
     if (!currentEditId) {
       message.warning('未选择编辑的分类');
@@ -168,13 +164,12 @@ const SystemSettingsPage = () => {
       setLoading(true);
       const formData = new URLSearchParams();
       formData.append('name', categoryName);
-      const response = await adminApi.updateCategory?.(currentEditId, formData); // 调用categories的更新接口【已交换】
+      const response = await adminApi.updateCategory?.(currentEditId, formData); 
       
       if (response?.code === 0) {
         message.success('分类更新成功');
         categoryForm.resetFields();
         setCurrentEditId(null);
-        // 刷新分类数据（调用categories接口【已交换】）
         const res = await adminApi.getCategoryList();
         if (res.code === 0) {
           setCategories(res.data.map(item => ({
@@ -195,14 +190,14 @@ const SystemSettingsPage = () => {
   };
 
 
-  // 分类删除（调用categories接口【已交换】）
+  
   const handleDeleteCategory = (id) => {
     setDeleteId(id);
     setDeleteModalVisible(true);
   };
 
 
-  // 标签添加（调用tags接口【已交换】）
+
   const handleAddTag = async () => {
     try {
       const values = await tagForm.validateFields();
@@ -216,12 +211,11 @@ const SystemSettingsPage = () => {
       setTagLoading(true);
       const formData = new URLSearchParams();
       formData.append('name', tagName);
-      const response = await adminApi.createTag(formData); // 调用tags的添加接口【已交换】
+      const response = await adminApi.createTag(formData); 
 
       if (response.code === 0) {
         message.success('标签添加成功');
         tagForm.resetFields();
-        // 重新加载标签数据（调用tags接口【已交换】）
         const res = await adminApi.getTagList();
         if (res.code === 0) {
           setTags(res.data.filter(item => !item.isDeleted).map(item => ({
@@ -243,7 +237,7 @@ const SystemSettingsPage = () => {
   };
 
 
-  // 标签删除（调用tags接口【已交换】）
+
   const handleTagDeleteClick = (id, e) => {
     e.preventDefault();
     setDeleteId(id);
@@ -251,7 +245,7 @@ const SystemSettingsPage = () => {
   };
 
 
-  // 统一删除确认（已交换接口调用）
+
   const confirmDelete = async () => {
     if (!deleteId) {
       message.warning('未获取到ID，请重试');
@@ -261,12 +255,10 @@ const SystemSettingsPage = () => {
 
     try {
       if (activeTab === 'categories') {
-        // 分类删除：调用categories接口【已交换】
         setLoading(true);
         const response = await adminApi.deleteCategory(deleteId);
         if (response.code === 0) {
           message.success('分类删除成功');
-          // 刷新分类数据（调用categories接口【已交换】）
           const res = await adminApi.getCategoryList();
           if (res.code === 0) {
             setCategories(res.data.map(item => ({
@@ -282,12 +274,10 @@ const SystemSettingsPage = () => {
           message.error('删除失败：' + (response.message || '服务器处理错误'));
         }
       } else {
-        // 标签删除：调用tags接口【已交换】
         setTagLoading(true);
         const response = await adminApi.deleteTag(deleteId);
         if (response.code === 0) {
           message.success('标签删除成功');
-          // 刷新标签数据（调用tags接口【已交换】）
           const res = await adminApi.getTagList();
           if (res.code === 0) {
             setTags(res.data.filter(item => !item.isDeleted).map(item => ({
@@ -316,7 +306,7 @@ const SystemSettingsPage = () => {
   };
 
 
-  // 轮播图相关方法（保持不变）
+//轮播（需要修改）
   const handleAddCarouselItem = async () => {
     try {
       const values = await carouselForm.validateFields();
@@ -415,12 +405,6 @@ const SystemSettingsPage = () => {
                       width: 200,
                       render: (_, record) => (
                         <Space>
-                          <Button 
-                            size="small" 
-                            icon={<EditOutlined />} 
-                            onClick={() => handleEditCategory(record)} 
-                            disabled={currentEditId && currentEditId !== record.id}
-                          />
                           <Button
                             size="small"
                             danger
