@@ -14,7 +14,6 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
 import AchievementForm from './pages/AchievementForm/AchievementForm';
 import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage2';
-import UserManagementPage from './pages/UserManagePage/UserManagePage';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
 import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
 import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage';
@@ -36,6 +35,7 @@ import ChatPage from './pages/ChatPage/ChatPage';
 
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
+import UserManage from './pages/UserManagePage/UserManagePage';
 
 function App() {
   return (
@@ -78,7 +78,7 @@ function App() {
 
               {/* 管理员相关路由 */}
               <Route path='/admin/profile' element={<AdminProfilePage/>} />
-              <Route path='/admin/manage-users' element={<UserManagementPage/>} />
+              <Route path='/admin/manage-users' element={<UserManage/>} />
               <Route path="/admin/system-settings" element={<SystemSettingsPage />} />
               <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
               <Route path="/admin/achievements-manage" element={<AdminAchievementManagementPage />} />

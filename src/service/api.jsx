@@ -4,7 +4,10 @@ import { data } from 'react-router-dom';
 const service = axios.create({
   baseURL: 'http://localhost:8090', 
   timeout: 5000,
-  withCredentials: true 
+  withCredentials: true ,
+  headers: {
+    'Content-Type': 'application/json;charset=UTF-8'
+  }
 });
 
 service.interceptors.request.use(
@@ -143,9 +146,15 @@ export const adminApi = {
   // 用户管理接口
   getUserList: (params) => service.get('/admin/user', { params }),
   createUser: (data) => service.post('/admin/add', data),
-  updateUser: (id, data) => service.put(`/admin/update`, data),
-  deleteUser: (id) => service.delete(`/admin/delete`),
-  resetUserPassword: (id, password) => service.post(`/admin/password`, { password }),
+  updateUser: (data) => service.post(`/admin/update/`, data),
+  
+  // deleteUser: (id) => service.post(`/admin/delete`,{ params: { id } }),
+  deleteUser: (data) => service.post({
+    url: '/user/delete',
+    method: 'post',
+    data: data  
+  }),
+  resetUserPassword: (id, password) => service.put(`/admin/password`, { password } ,{ params: { id } }),
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
   
   // 数据统计接口
