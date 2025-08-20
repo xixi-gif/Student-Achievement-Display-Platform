@@ -4,7 +4,7 @@ import LoginPage from './pages/Loginpage/Loginpage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
 import HomePage from './pages/HomePage/HomePage';
 import ProfilePage from './pages/ProfilePage/ProfilePage';
-import MyAchievements from './pages/MyAchievements/MyAchievements';
+import MyAchievements from './pages/MyAchievements/MyAchievements2';
 import AnnouncementList from './pages/AnnouncementList/AnnouncementList';
 import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail';
 import AchievementsPage from './pages/AchievementsPage/AchievementsPage';
