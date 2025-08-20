@@ -97,7 +97,7 @@ export const authorApi = {
 export const achievementApi = {
   getList: () => service.get('/achievements'),
   getDetail: (id) => service.get(`/achievements/${id}`),
-  getMyAchievements: () => service.get('/student/achievements'),
+  getMyAchievements: () => service.get('/achievement/my/achievements'),
   createAchievement: (data) => service.post('/achievement/add', data,{
     headers: {
       'Content-Type': 'multipart/form-data'
