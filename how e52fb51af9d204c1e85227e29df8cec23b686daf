@@ -1,0 +1,78 @@
+[33mcommit 99e9d7a99a1ff1f4c6f5d83c413b46114a54e7b2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mvite[m[33m)[m
+Merge: e52fb51 6efc036
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Thu Aug 21 01:08:43 2025 +0800
+
+    Merge branch 'vite' of https://github.com/xixi-gif/Student-Achievement-Display-Platform into vite
+
+[33mcommit e52fb51af9d204c1e85227e29df8cec23b686daf[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Thu Aug 21 00:59:36 2025 +0800
+
+    发布请求接口已对接好
+
+[33mcommit 6efc036dad5245a80bae9be17fa70fece9e95c9a[m[33m ([m[1;31morigin/vite[m[33m)[m
+Author: liyu <227029683@qq.com>
+Date:   Wed Aug 20 18:21:48 2025 +0800
+
+    学生：我的成果页面对接
+
+[33mcommit 89c2a81de69cfb997446fc7bdc99954b04e05cef[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Wed Aug 20 00:05:40 2025 +0800
+
+    管理员管理用户，获取列表，重置密码，更新个人信息（后端缺字段）其他已对接后端
+
+[33mcommit df082215b56a5c86a934bbb4f08c3f95046053f7[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Mon Aug 18 22:53:19 2025 +0800
+
+    修改了一点系统设置
+
+[33mcommit 1a90bc06b036f4ac0338e83357c01d499ccc2593[m
+Author: liyu <227029683@qq.com>
+Date:   Mon Aug 18 16:59:41 2025 +0800
+
+    创建成果对接
+
+[33mcommit 93f581d505b59892cbb2b4fe92ba6ad6cc953717[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Sun Aug 17 23:37:00 2025 +0800
+
+    管理员发布标签，发布分类接口已对接完成
+
+[33mcommit 5ff0c6e75e57fa6ab6344e42d39fe5cfe693b3dc[m
+Author: liyu <227029683@qq.com>
+Date:   Sun Aug 17 18:10:10 2025 +0800
+
+    对接教师端
+
+[33mcommit 749f7fcb8d1bf811308c7f01cd3eb32e161771fd[m
+Author: liyu <227029683@qq.com>
+Date:   Sun Aug 17 17:46:23 2025 +0800
+
+    对接教师端
+
+[33mcommit 02c967dd3cb5220f733a85da07825d54d087bf6b[m
+Author: liyu <227029683@qq.com>
+Date:   Sun Aug 17 17:30:58 2025 +0800
+
+    对接教师端
+
+[33mcommit f586c12e93c63c71d460858fd0ac06aed3277147[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Sun Aug 17 16:41:41 2025 +0800
+
+    公共修改密码更新密码，导航栏登录，个人中心
+
+[33mcommit 39f91aea6071162f3c4f668cab725de41e465a52[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Sun Aug 17 15:47:35 2025 +0800
+
+    一些接口xixi
+
+[33mcommit ffaf00a7ac3de42f033057e0b7d46ae8adc1d14f[m[33m ([m[1;32mmaster[m[33m)[m
+Author: xixidj0304 <2312299367@qq.com>
+Date:   Thu Aug 14 22:54:56 2025 +0800
+
+    改成react+vite
