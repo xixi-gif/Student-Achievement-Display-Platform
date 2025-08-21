@@ -152,10 +152,10 @@ const UserModals = ({
                 <Col span={12}>
                   <Item
                     name="className"
-                    label="班级"
-                    rules={[{ required: true, message: "请输入班级" }]}
+                    label="年级"
+                    rules={[{ required: true, message: "请输入年级" }]}
                   >
-                    <Input placeholder="如：计算机2101班" />
+                    <Input placeholder="如：2022级" />
                   </Item>
                 </Col>
               </Row>

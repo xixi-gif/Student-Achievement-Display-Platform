@@ -81,8 +81,10 @@ export const authApi = {
   updatePassword: (data) => service.post('/user/update/password', data),
   // 退出登录
   logout: () => service.post('/user/logout'),
+ //
+  addRequirement: (data)=> service.post('/requirements',data),
 
-  addRequirement: (data)=> service.post('/requirements',data)
+
 };
 
 export const announcementApi = {

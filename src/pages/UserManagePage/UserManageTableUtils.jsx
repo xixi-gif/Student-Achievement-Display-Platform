@@ -107,7 +107,7 @@ export const getTableColumns = (
       sorter: (a, b) => (a[isStudent ? "studentId" : "teacherId"] || "").localeCompare(b[isStudent ? "studentId" : "teacherId"] || ""),
     },
     {
-      title: isStudent ? "班级" : "职称",
+      title: isStudent ? "年级" : "职称",
       dataIndex: isStudent ? "className" : "title",
       key: isStudent ? "className" : "title",
       filters: [
@@ -229,7 +229,7 @@ export const exportToExcel = (data, isStudent, onSuccess, onError) => {
     ? [
         { header: '姓名', key: 'name' },
         { header: '学号', key: 'studentId' },
-        { header: '班级', key: 'className' },
+        { header: '年级', key: 'className' },
         { header: '专业', key: 'major' },
         { header: '邮箱', key: 'email' },
         { header: '状态', key: 'status', formatter: v => v === 'active' ? '正常' : '已禁用' },

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Row,
-  Col, Popconfirm, Tabs, Layout, Form, Radio, Upload,
-  Table, Checkbox, Spin, InputNumber } from "antd";
+  Col, Popconfirm, Tabs, Layout, Form, Radio,
+  Table, Checkbox, Spin, InputNumber, Progress, Upload } from "antd";
 import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined, 
   UserOutlined, TeamOutlined, PlusOutlined, CheckCircleOutlined, 
   CloseCircleOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
@@ -46,7 +46,14 @@ const UserManage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
+
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
+  const fileDataRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   const fetchUserList = async () => {
     setLoading(true);
@@ -71,20 +78,12 @@ const UserManage = () => {
         const formattedUsers = records.map(user => ({
           id: user.id,
           name: user.name || '未知姓名',
-          username: user.userAccount || '',
-          password: user.userPassword,
-          avatar: getAvatarUrl(user.avatar, user.name),
+          username: user.userName || '',
+          avatar: getAvatarUrl(user.avatar, user.realName),
           email: user.email || '',
           phone: user.phone || '',
-          bio: user.bio || '',
-          role: activeTab === "students" ? "student" : "teacher",
-          status: user.status === null ? 'active' : (user.status === 1 ? 'active' : 'inactive'),
-          createTime: user.createTime 
-            ? new Date(user.createTime).toLocaleString() 
-            : '未知时间',
-          updateTime: user.updateTime 
-            ? new Date(user.updateTime).toLocaleString() 
-            : '未知时间',
+          role: user.userRole || (activeTab === "students" ? "student" : "teacher"),
+          status: user.status === "1" ? 'active' : (user.status === "0" ? 'inactive' : 'active'),
           studentId: user.studentId || "",
           className: user.className || "",
           major: user.major || "",
@@ -92,8 +91,8 @@ const UserManage = () => {
           department: user.department || "",
           title: user.title || "",
           achievementCount: user.achievementCount || 0,
-          lastLogin: user.lastLogin 
-            ? new Date(user.lastLogin).toLocaleString() 
+          lastLogin: user.lastLoginTime 
+            ? new Date(user.lastLoginTime).toLocaleString() 
             : "从未登录"
         }));
         setUsers(prev => ({ ...prev, [activeTab]: formattedUsers }));
@@ -144,25 +143,6 @@ const UserManage = () => {
     },
   };
 
-  const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "active" ? "inactive" : "active";
-    try {
-      const response = await adminApi.updateUser({ 
-        id: user.id,
-        status: newStatus === "active" ? 1 : 0
-      });
-      if (response.code === 0) {
-        message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.name}`);
-        fetchUserList();
-      } else {
-        message.error(response.message || "状态更新失败");
-      }
-    } catch (error) {
-      console.error("更新状态错误：", error);
-      message.error("网络错误，状态更新失败");
-    }
-  };
-
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -173,9 +153,15 @@ const UserManage = () => {
     try {
       let successCount = 0;
       for (const id of selectedIds) {
+        const user = users[activeTab].find(u => u.id === id);
         const response = await adminApi.updateUser({
           id: id,
-          status: enable ? 1 : 0
+          status: enable ? "1" : "0",
+          userRole: user?.role,
+          realName: user?.name,
+          userName: user?.username,
+          email: user?.email,
+          phone: user?.phone
         });
         if (response.code === 0) successCount++;
       }
@@ -264,13 +250,13 @@ const UserManage = () => {
       const userData = {
         userAccount: newUserType === "student" ? values.studentId : values.teacherId,
         userAvatar: "",
-        userName: values.name,
+        realName: values.name,
         userRole: newUserType,
         email: values.email,
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          className: values.className,
+          grade: values.className,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -278,7 +264,8 @@ const UserManage = () => {
           department: values.department,
           title: values.title
         }),
-        password: "123456789"
+        password: "123456789",
+        status: "1"
       };
 
       const response = await adminApi.createUser(userData);
@@ -358,14 +345,15 @@ const UserManage = () => {
         const userData = {
           userAccount: importType === "student" ? item.studentId : item.teacherId,
           userAvatar: "",
-          userName: item.name,
+          realName: item.name,
           userRole: importType,
           email: item.email,
           phone: item.phone || "",
           password: item.password || "123456789",
+          status: "1",
           ...(importType === "student" && {
             studentId: item.studentId,
-            className: item.className,
+            grade: item.className,
             major: item.major
           }),
           ...(importType === "teacher" && {
@@ -429,19 +417,34 @@ const UserManage = () => {
   const handleEditSubmit = async () => {
     try {
       const values = await editForm.validateFields();
+      const originalData = selectedUser;
+      const hasChanges = Object.keys(values).some(key => {
+        const originalValue = originalData[key === 'className' ? 'className' : 
+                             key === 'major' ? 'major' : 
+                             key === 'department' ? 'department' : 
+                             key === 'title' ? 'title' : 
+                             originalData[key]];
+        return values[key] !== originalValue;
+      });
+
+      if (!hasChanges) {
+        message.info("未修改任何用户信息");
+        return;
+      }
+
       const updateData = {
         id: selectedUser.id,
-        userName: values.name,
+        realName: values.name,
         email: values.email,
         phone: values.phone || "",
-        status: values.status === "active" ? 1 : 0,
+        status: values.status === "active" ? "1" : "0",
+        userRole: selectedUser.role,
+        userName: selectedUser.username,
         ...(selectedUser.role === "student" && {
-          studentId: values.studentId,
-          className: values.className,
+          grade: values.className,
           major: values.major
         }),
         ...(selectedUser.role === "teacher" && {
-          teacherId: values.teacherId,
           department: values.department,
           title: values.title
         })
@@ -463,47 +466,271 @@ const UserManage = () => {
     }
   };
 
-  const handleAvatarChange = async (info) => {
-    if (!selectedUser) return;
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
     
-    if (info.file.status === 'uploading') {
-      setAvatarUploading(true);
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('请选择图片文件（JPG/PNG/WebP等）');
+      e.target.value = '';
       return;
     }
     
-    if (info.file.status === 'done') {
-      try {
-        const formData = new FormData();
-        formData.append('avatar', info.file.originFileObj);
-        
-        const response = await authApi.uploadAvatar(formData);
-        
-        if (response.code === 0) {
-          const avatarUrl = response.data.avatarUrl;
-          await adminApi.updateUser({
-            id: selectedUser.id,
-            userAvatar: avatarUrl
-          });
-          
-          message.success('头像上传成功');
-          fetchUserList();
-        } else {
-          message.error(response.message || '头像上传失败');
-        }
-      } catch (error) {
-        console.error('头像上传错误:', error);
-        message.error('网络错误，头像上传失败');
-      } finally {
-        setAvatarUploading(false);
-      }
-    } else if (info.file.status === 'error') {
-      message.error('头像上传失败');
-      setAvatarUploading(false);
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 2) {
+      message.error('图片大小不能超过2MB');
+      e.target.value = '';
+      return;
+    }
+    
+    fileDataRef.current = file;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPreviewImage(event.target.result);
+      setPreviewVisible(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerFileSelect = () => {
+    if (avatarUploading) return;
+    if (currentUser?.role !== 'admin') {
+      message.error('仅管理员可修改用户头像');
+      return;
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
+  const cancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    fileDataRef.current = null;
+    setAvatarUploading(false);
+    setUploadProgress(0);
+    setPreviewVisible(false);
+    setPreviewImage('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    message.info('已取消上传');
+  };
+
+  const confirmAvatarUpload = async () => {
+    if (!selectedUser) {
+      message.warning("未选择用户");
+      return;
+    }
+    
+    const file = fileDataRef.current;
+    if (!file) {
+      message.warning("请先选择图片");
+      return;
+    }
+    
+    setAvatarUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      const uploadResult = await authApi.uploadAvatar(file, (percent) => {
+        setUploadProgress(percent);
+      });
+      
+      let avatarUrl = null;
+      if (Array.isArray(uploadResult.data) && uploadResult.data.length > 0) {
+        avatarUrl = uploadResult.data[0]?.url;
+      } else if (typeof uploadResult.data === 'object' && uploadResult.data !== null) {
+        avatarUrl = uploadResult.data.url;
+      }
+      
+      if (!avatarUrl || !/^https?:\/\//.test(avatarUrl.trim())) {
+        throw new Error('服务器返回的头像URL无效，请重试');
+      }
+
+      const updateData = {
+        id: selectedUser.id,
+        userAvatar: avatarUrl,
+        userRole: selectedUser.role,
+        realName: selectedUser.name,
+        userName: selectedUser.username,
+        email: selectedUser.email,
+        phone: selectedUser.phone
+      };
+      
+      try {
+        const updateResponse = await adminApi.updateUser(updateData);
+        if (updateResponse.code !== 0) {
+          throw new Error(`更新失败：${updateResponse.message || '用户信息未同步'}`);
+        }
+      } catch (updateError) {
+        message.error(`头像上传成功，但更新用户信息失败：${updateError.message}`);
+        setPreviewVisible(true);
+        return;
+      }
+
+      setUsers(prev => ({
+        ...prev,
+        [activeTab]: prev[activeTab].map(user => 
+          user.id === selectedUser.id ? { ...user, avatar: avatarUrl } : user
+        )
+      }));
+      
+      setSelectedUser(prev => prev ? { ...prev, avatar: avatarUrl } : prev);
+      
+      message.success('头像上传并更新成功');
+      setUploadProgress(100);
+      
+      setTimeout(() => {
+        setPreviewVisible(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        fileDataRef.current = null;
+      }, 500);
+
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('头像上传全流程错误:', error);
+        const errorMsg = error.code === 401 
+          ? '登录已过期，请重新登录后重试' 
+          : error.code === 403
+            ? '权限不足，无法修改该用户头像'
+            : error.message || '上传失败，请稍后重试';
+        message.error(errorMsg);
+      }
+    } finally {
+      setTimeout(() => {
+        setAvatarUploading(false);
+        setUploadProgress(0);
+      }, 500);
+    }
+  };
+
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === "active" ? "0" : "1";
+    try {
+      const updateData = {
+        id: user.id,
+        status: newStatus,
+        userRole: user.role,
+        realName: user.name,
+        userName: user.username,
+        email: user.email,
+        phone: user.phone
+      };
+      
+      const response = await adminApi.updateUser(updateData);
+      if (response.code === 0) {
+        message.success(`已${newStatus === "1" ? "启用" : "禁用"} ${user.name}`);
+        fetchUserList();
+      } else {
+        message.error(response.message || "状态更新失败");
+      }
+    } catch (error) {
+      console.error("更新状态错误：", error);
+      message.error("网络错误，状态更新失败");
+    }
+  };
+
+  const renderAvatarUpload = () => (
+    <Form.Item label="头像">
+      <Avatar
+        src={selectedUser?.avatar || undefined}
+        alt={selectedUser?.name || "用户"}
+        size={100}
+        style={{ display: "block", margin: "0 auto 16px" }}
+      >
+        {selectedUser?.name?.charAt(0) || "未"}
+      </Avatar>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
+      
+      <Button 
+        type="primary" 
+        icon={<UploadOutlined />}
+        onClick={triggerFileSelect}
+        disabled={avatarUploading}
+        style={{ display: 'block', margin: '0 auto' }}
+      >
+        选择头像
+      </Button>
+      
+      <Modal
+        visible={previewVisible}
+        title={avatarUploading ? "上传中..." : "预览头像"}
+        footer={!avatarUploading ? [
+          <Button key="cancel" onClick={cancelUpload}>
+            取消
+          </Button>,
+          <Button 
+            key="confirm" 
+            type="primary" 
+            onClick={confirmAvatarUpload}
+          >
+            确认上传
+          </Button>
+        ] : null}
+        onCancel={avatarUploading ? undefined : cancelUpload}
+        maskClosable={!avatarUploading}
+        width={400}
+      >
+        {avatarUploading ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Progress percent={uploadProgress} status="active" />
+            <p style={{ marginTop: 16 }}>正在上传，请稍候...</p>
+            <Button 
+              type="text" 
+              onClick={cancelUpload}
+              style={{ marginTop: 16 }}
+            >
+              取消上传
+            </Button>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center' }}>
+            <img 
+              src={previewImage} 
+              alt="头像预览" 
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: 300, 
+                borderRadius: 4 
+              }}
+            />
+            {fileDataRef.current && (
+              <p style={{ marginTop: 16, color: '#666' }}>
+                文件名: {fileDataRef.current.name}
+                <br />
+                文件大小: {(fileDataRef.current.size / 1024).toFixed(1)} KB
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+    </Form.Item>
+  );
+
   const currentTableData = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
   const isStudentTab = activeTab === "students";
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      fileDataRef.current = null;
+    };
+  }, []);
 
   return (
     <Layout style={{ minHeight: '100vh', margin: 0, padding: 0 }}>
@@ -930,12 +1157,12 @@ const UserManage = () => {
                     <Col span={12}>
                     <Form.Item
                       name="className"
-                      label="班级"
+                      label="年级"
                       rules={[
-                        { required: true, message: "请输入班级" } 
+                        { required: true, message: "请输入年级" } 
                       ]}
                     >
-                      <Input placeholder="如：计算机2101班" />
+                      <Input placeholder="如：2022级" />
                     </Form.Item>
                     </Col>
                   </Row>
@@ -1094,34 +1321,7 @@ const UserManage = () => {
               <Form form={editForm} layout="vertical">
                 <Row gutter={16}>
                   <Col span={8}>
-                    <Form.Item label="头像">
-                      <Avatar
-                        src={getAvatarUrl(selectedUser.avatar, selectedUser.name)}
-                        size={100}
-                        style={{ display: "block", margin: "0 auto" }}
-                        onError={(e) => {
-                          e.target.src = getAvatarUrl(null, selectedUser.name);
-                          e.target.onerror = null;
-                        }}
-                      />
-                      <Upload
-                        showUploadList={false}
-                        beforeUpload={handleAvatarChange}
-                        style={{
-                          display: "block",
-                          textAlign: "center",
-                          marginTop: 8,
-                        }}
-                      >
-                        <Button 
-                          type="link" 
-                          icon={<UploadOutlined />}
-                          loading={avatarUploading}
-                        >
-                          更换头像
-                        </Button>
-                      </Upload>
-                    </Form.Item>
+                    {renderAvatarUpload()}
                   </Col>
                   <Col span={16}>
                     <Form.Item
@@ -1134,14 +1334,8 @@ const UserManage = () => {
 
                     <Form.Item
                       label={selectedUser.role === "student" ? "学号" : "工号"}
-                      name={
-                        selectedUser.role === "student"
-                          ? "studentId"
-                          : "teacherId"
-                      }
-                      rules={[
-                        { required: true },
-                      ]}
+                      name={selectedUser.role === "student" ? "studentId" : "teacherId"}
+                      rules={[{ required: true }]}
                     >
                       <Input disabled={selectedUser.role === "student"} />
                     </Form.Item>
@@ -1163,8 +1357,8 @@ const UserManage = () => {
                     <Col span={12}>
                       <Form.Item
                         name="className"
-                        label="班级"
-                        rules={[{ required: true, message: "请输入班级" }]}
+                        label="年级"
+                        rules={[{ required: true, message: "请输入年级" }]}
                       >
                         <Input />
                       </Form.Item>
@@ -1203,10 +1397,7 @@ const UserManage = () => {
                     label="邮箱"
                     rules={[
                       { required: true, message: "请输入邮箱" },
-                      {
-                        type: "email",
-                        message: "请输入有效的邮箱地址",
-                      },
+                      { type: "email", message: "请输入有效的邮箱地址" },
                     ]}
                   >
                     <Input />
@@ -1218,10 +1409,7 @@ const UserManage = () => {
                     label="手机号"
                     rules={[
                       { required: true, message: "请输入手机号" },
-                      {
-                        pattern: /^1[3-9]\d{9}$/,
-                        message: "请输入有效的手机号",
-                      },
+                      { pattern: /^1[3-9]\d{9}$/, message: "请输入有效的手机号" },
                     ]}
                   >
                     <Input />

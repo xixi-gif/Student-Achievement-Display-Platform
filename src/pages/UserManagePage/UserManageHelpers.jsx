@@ -5,7 +5,7 @@ export const importTemplateColumns = {
   student: [
     { title: '姓名', dataIndex: 'name', required: true },
     { title: '学号', dataIndex: 'studentId', required: true },
-    { title: '班级', dataIndex: 'className', required: true },
+    { title: '年级', dataIndex: 'className', required: true },
     { title: '专业', dataIndex: 'major', required: true },
     { title: '邮箱', dataIndex: 'email', required: true },
     { title: '电话', dataIndex: 'phone', required: false },
