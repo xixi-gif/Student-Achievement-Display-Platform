@@ -111,7 +111,7 @@ export const achievementApi = {
       'Content-Type': 'multipart/form-data' // 支持文件上传
     }
   }),
-  deleteAchievement: (id) => service.post('/achievement/delete',null,{ params: { id } }),
+  deleteAchievement: (id) => service.post('/achievement/delete',{ id }),
 
   // 获取待审核成果列表
   getPendingList: (params) => service.get(`/teacher/review`, { params }),
