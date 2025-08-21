@@ -41,7 +41,7 @@ const LoginPage = () => {
 
       // 关键修改：从 response.data 中获取 token（而非直接从 response 中获取）
       const token = response.data?.token;
-      const userInfo = response.data?.userInfo;
+      const userInfo = response.data?.userInfoVO;
       
       if (!token) {
         throw new Error('登录成功但未返回 Token');
@@ -52,6 +52,7 @@ const LoginPage = () => {
       localStorage.setItem('user_role', role);
       localStorage.setItem('username', values.username);
       localStorage.setItem('userInfo', JSON.stringify(userInfo || {}));
+      localStorage.setItem('userId', userInfo.userId); //存储用户id，发布公告需传用户id给后端
       
       // 调试：确认存储成功
       console.log('登录后存储的 Token:', localStorage.getItem('token'));

@@ -13,11 +13,11 @@ const { Option } = Select;
 
 // 级别映射
 const levels = [
-  { value: 'school', label: '校级' },
-  { value: 'city', label: '市级' },
-  { value: 'province', label: '省级' },
-  { value: 'national', label: '国家级' },
-  { value: 'international', label: '国际级' }
+  { value: '校级', label: '校级' },
+  { value: '市级', label: '市级' },
+  { value: '省级', label: '省级' },
+  { value: '国家级', label: '国家级' },
+  { value: '国际级', label: '国际级' }
 ];
 
 // 状态映射（与后端保持一致：0草稿 1待审核 2已发布 3驳回 4老师已审核）
@@ -257,7 +257,7 @@ const MyAchievements = () => {
     try {
       setLoading(true);
       // 对接后端 /achievement/delete 接口（POST请求，参数为{id}）
-      await achievementApi.deleteAchievement({ id }); 
+      await achievementApi.deleteAchievement(id); 
       message.success('成果删除成功');
       fetchMyAchievements(); // 重新获取列表
     } catch (error) {

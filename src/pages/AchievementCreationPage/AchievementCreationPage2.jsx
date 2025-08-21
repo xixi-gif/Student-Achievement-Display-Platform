@@ -101,11 +101,11 @@ const AchievementCreationPage = () => {
   }, []);
 
   const levels = [
-    { value: "school", label: "校级" },
-    { value: "city", label: "市级" },
-    { value: "province", label: "省级" },
-    { value: "national", label: "国家级" },
-    { value: "international", label: "国际级" },
+    { value: "校级", label: "校级" },
+    { value: "市级", label: "市级" },
+    { value: "省级", label: "省级" },
+    { value: "国家级", label: "国家级" },
+    { value: "国际级", label: "国际级" },
   ];
 
   // 图片上传配置

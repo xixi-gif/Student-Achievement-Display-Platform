@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, SendOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
 import TextArea from 'antd/es/input/TextArea';
+import { announcementApi } from '../../service/api';
 
 const { Content, Footer } = Layout;
 const { Title } = Typography;
@@ -13,27 +14,36 @@ const AnnouncementPublish = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const currentUser = { role: 'admin', username: '管理员' };
+  const currentUser = { 
+  id: localStorage.getItem('userId'), // 必须获取真实用户ID
+  role: localStorage.getItem('role') || 'admin',
+  username: localStorage.getItem('username') || '管理员'
+};
 
   const handleSubmit = async () => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-      const newAnnouncement = {
-        id: Date.now(),
-        title: values.title,
-        content: values.content,
-        createTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        author: currentUser.username
-      };
-      setTimeout(() => {
+      const requestData = {
+      title: values.title,
+      content: values.content,
+      publisherId: currentUser.id,
+    };
+
+    // 调用发布接口
+    const response = await announcementApi.createAnnouncement(requestData)
+    if(response.code === 0){
         message.success('公告发布成功');
         setLoading(false);
         navigate('/announcements');
-      }, 800);
+      }
     } catch (error) {
-      setLoading(false);
-      message.error('发布失败，请检查输入内容');
+      message.error({
+      content: `发布失败: ${error.response?.data?.message || error.message}`,
+      duration: 3
+  });
+    }finally{
+        setLoading(false);
     }
   };
 
@@ -46,7 +56,7 @@ const AnnouncementPublish = () => {
           <Button 
             type="link" 
             icon={<ArrowLeftOutlined />} 
-            onClick={() => navigate('/annoucementlist')}
+            onClick={() => navigate('/announcements')}
             style={{ marginBottom: 16 }}
           >
             返回公告列表
@@ -58,6 +68,7 @@ const AnnouncementPublish = () => {
             <Form
               form={form}
               layout="vertical"
+              onFinish={handleSubmit}
               initialValues={{ remember: true }}
             >
               <Item
@@ -83,14 +94,14 @@ const AnnouncementPublish = () => {
               <Item style={{ textAlign: 'right', marginTop: 24 }}>
                 <Space size="middle">
                   <Button 
-                    onClick={() => navigate('/annoucementlist')}
+                    onClick={() => navigate('/announcements')}
                   >
                     取消
                   </Button>
                   <Button 
                     type="primary" 
                     icon={<SendOutlined />} 
-                    onClick={handleSubmit}
+                    htmlType="submit"
                     loading={loading}
                   >
                     发布公告
