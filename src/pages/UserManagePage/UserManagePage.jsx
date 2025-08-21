@@ -7,7 +7,7 @@ import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined,
   CloseCircleOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
-import { adminApi , authApi } from "../../service/api";
+import api, { adminApi , authApi } from "../../service/api";
 import { getAvatarUrl, importTemplateColumns, handleFileUploadHelper, exportTemplateHelper } from "./UserManageHelpers";
 import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
 
@@ -77,9 +77,10 @@ const UserManage = () => {
         const { records, total: totalCount } = response.data;
         const formattedUsers = records.map(user => ({
           id: user.id,
-          name: user.name || '未知姓名',
-          username: user.userName || '',
-          avatar: getAvatarUrl(user.avatar, user.realName),
+          realName: user.name || '未知姓名',
+          userName: user.userAccount || '',
+          password: user.userPassword,
+          avatar: getAvatarUrl(user.avatar, user.name),
           email: user.email || '',
           phone: user.phone || '',
           role: user.userRole || (activeTab === "students" ? "student" : "teacher"),
@@ -141,6 +142,25 @@ const UserManage = () => {
     selectAllCheckboxProps: {
       disabled: loading,
     },
+  };
+
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === "active" ? "inactive" : "active";
+    try {
+      const response = await adminApi.updateUser({ 
+        id: user.id,
+        status: newStatus === "active" ? 1 : 0
+      });
+      if (response.code === 0) {
+        message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.realName}`);
+        fetchUserList();
+      } else {
+        message.error(response.message || "状态更新失败");
+      }
+    } catch (error) {
+      console.error("更新状态错误：", error);
+      message.error("网络错误，状态更新失败");
+    }
   };
 
   const handleBatchToggleStatus = async (enable) => {
@@ -227,7 +247,7 @@ const UserManage = () => {
           const userNames = [];
           for (const id of selectedIds) {
             const user = users[activeTab].find(u => u.id === id);
-            if (user) userNames.push(user.name);
+            if (user) userNames.push(user.realName);
             const response = await adminApi.resetUserPassword(id, "123456789");
             if (response.code === 0) successCount++;
           }
@@ -256,7 +276,7 @@ const UserManage = () => {
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          grade: values.className,
+          className: values.grade,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -353,7 +373,7 @@ const UserManage = () => {
           status: "1",
           ...(importType === "student" && {
             studentId: item.studentId,
-            grade: item.className,
+            className: item.garde,
             major: item.major
           }),
           ...(importType === "teacher" && {
@@ -388,8 +408,7 @@ const UserManage = () => {
   const handleEdit = (user) => {
     setSelectedUser(user);
     editForm.setFieldsValue({
-      name: user.name,
-      [user.role === "student" ? "studentId" : "teacherId"]: user[user.role === "student" ? "studentId" : "teacherId"],
+      name: user.realName,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
       [user.role === "student" ? "major" : "department"]: user[user.role === "student" ? "major" : "department"],
       email: user.email,
@@ -403,7 +422,7 @@ const UserManage = () => {
     try {
       const response = await adminApi.resetUserPassword(selectedUser.id, "123456789");
       if (response.code === 0) {
-        message.success(`已重置 ${selectedUser.name} 的密码为123456789`);
+        message.success(`已重置 ${selectedUser.realName} 的密码为123456789`);
         setResetPwdModalVisible(false);
       } else {
         message.error(response.message || "重置密码失败");
@@ -441,7 +460,7 @@ const UserManage = () => {
         userRole: selectedUser.role,
         userName: selectedUser.username,
         ...(selectedUser.role === "student" && {
-          grade: values.className,
+          className: values.garde,
           major: values.major
         }),
         ...(selectedUser.role === "teacher" && {
@@ -610,31 +629,31 @@ const UserManage = () => {
     }
   };
 
-  const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "active" ? "0" : "1";
-    try {
-      const updateData = {
-        id: user.id,
-        status: newStatus,
-        userRole: user.role,
-        realName: user.name,
-        userName: user.username,
-        email: user.email,
-        phone: user.phone
-      };
+  // const handleToggleStatus = async (user) => {
+  //   const newStatus = user.status === "active" ? "0" : "1";
+  //   try {
+  //     const updateData = {
+  //       id: user.id,
+  //       status: newStatus,
+  //       userRole: user.role,
+  //       realName: user.name,
+  //       userName: user.username,
+  //       email: user.email,
+  //       phone: user.phone
+  //     };
       
-      const response = await adminApi.updateUser(updateData);
-      if (response.code === 0) {
-        message.success(`已${newStatus === "1" ? "启用" : "禁用"} ${user.name}`);
-        fetchUserList();
-      } else {
-        message.error(response.message || "状态更新失败");
-      }
-    } catch (error) {
-      console.error("更新状态错误：", error);
-      message.error("网络错误，状态更新失败");
-    }
-  };
+  //     const response = await adminApi.updateUser(updateData);
+  //     if (response.code === 0) {
+  //       message.success(`已${newStatus === "1" ? "启用" : "禁用"} ${user.name}`);
+  //       fetchUserList();
+  //     } else {
+  //       message.error(response.message || "状态更新失败");
+  //     }
+  //   } catch (error) {
+  //     console.error("更新状态错误：", error);
+  //     message.error("网络错误，状态更新失败");
+  //   }
+  // };
 
   const renderAvatarUpload = () => (
     <Form.Item label="头像">
@@ -1296,7 +1315,7 @@ const UserManage = () => {
             cancelText="取消"
           >
             <p>
-              确定要重置用户 <strong>{selectedUser?.name}</strong> (
+              确定要重置用户 <strong>{selectedUser?.realName}</strong> (
               {selectedUser?.role === "student" ? "学号" : "工号"}:{" "}
               {selectedUser?.studentId || selectedUser?.teacherId}) 的密码吗？
             </p>
@@ -1304,7 +1323,7 @@ const UserManage = () => {
           </Modal>
 
           <Modal
-            title={`编辑用户 - ${selectedUser?.name}`}
+            title={`编辑用户 - ${selectedUser?.realName}`}
             visible={editModalVisible}
             onCancel={() => setEditModalVisible(false)}
             footer={[
@@ -1321,7 +1340,34 @@ const UserManage = () => {
               <Form form={editForm} layout="vertical">
                 <Row gutter={16}>
                   <Col span={8}>
-                    {renderAvatarUpload()}
+                    <Form.Item label="头像">
+                      <Avatar
+                        src={getAvatarUrl(selectedUser.avatar, selectedUser.realName)}
+                        size={100}
+                        style={{ display: "block", margin: "0 auto" }}
+                        onError={(e) => {
+                          e.target.src = getAvatarUrl(null, selectedUser.realName);
+                          e.target.onerror = null;
+                        }}
+                      />
+                      <Upload
+                        showUploadList={false}
+                        beforeUpload={handleAvatarChange}
+                        style={{
+                          display: "block",
+                          textAlign: "center",
+                          marginTop: 8,
+                        }}
+                      >
+                        <Button 
+                          type="link" 
+                          icon={<UploadOutlined />}
+                          loading={avatarUploading}
+                        >
+                          更换头像
+                        </Button>
+                      </Upload>
+                    </Form.Item>
                   </Col>
                   <Col span={16}>
                     <Form.Item
@@ -1332,13 +1378,28 @@ const UserManage = () => {
                       <Input />
                     </Form.Item>
 
-                    <Form.Item
-                      label={selectedUser.role === "student" ? "学号" : "工号"}
-                      name={selectedUser.role === "student" ? "studentId" : "teacherId"}
-                      rules={[{ required: true }]}
-                    >
-                      <Input disabled={selectedUser.role === "student"} />
-                    </Form.Item>
+                    {selectedUser.role === "teacher" && (
+                      <Form.Item
+                        label="工号"
+                        name="teacherId"
+                        rules={[
+                          { required: true },
+                        ]}
+                      >
+                        <Input />
+                      </Form.Item>
+                    )}
+                    
+                    {selectedUser.role === "student" && (
+                      <Form.Item
+                        label="学号"
+                        rules={[
+                          { required: true },
+                        ]}
+                      >
+                        <Input value={selectedUser.studentId} disabled />
+                      </Form.Item>
+                    )}
                   </Col>
                 </Row>
 
