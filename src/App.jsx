@@ -5,14 +5,14 @@ import RegisterPage from './pages/RegisterPage/RegisterPage';
 import HomePage from './pages/HomePage/HomePage';
 import ProfilePage from './pages/ProfilePage/ProfilePage';
 import MyAchievements from './pages/MyAchievements/MyAchievements2';
-import AnnouncementList from './pages/AnnouncementList/AnnouncementList';
-import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail';
+import AnnouncementList from './pages/AnnouncementList/AnnouncementList2';
+import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail2';
 import AchievementsPage from './pages/AchievementsPage/AchievementsPage';
 import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage2';
 import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
-import AchievementForm from './pages/AchievementForm/AchievementForm';
+import AchievementForm from './pages/AchievementForm/AchievementForm2';
 import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage2';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
 import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
@@ -50,7 +50,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/announcements" element={<AnnouncementList/>} />
-            <Route path="/announcements/detail" element={<AnnouncementDetail/>} />
+            <Route path="/announcement/detail/:id" element={<AnnouncementDetail/>} />
             <Route path="/requirements" element={<RequirementListPage />} />
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
             <Route path="/setting" element={<AccountSettingsPage />}/>
@@ -66,7 +66,7 @@ function App() {
               {/* 公共功能路由 */}
               <Route path="/author" element={<AuthorDetailPage/>} />
               <Route path="/achievements" element={<AchievementsPage />} />
-              <Route path="/achievement/detail" element={<AchievementDetailPage />} />
+              <Route path="/achievement/detail/:id" element={<AchievementDetailPage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/publish-requirement" element={<RequirementPublishPage />} />
               <Route path="/messages" element={<MessageCenterPage />} />

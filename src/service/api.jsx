@@ -86,8 +86,9 @@ export const authApi = {
 };
 
 export const announcementApi = {
-  getList: () => service.get('/announcements'),
+  getList: (params) => service.get('/announcements', { params }),
   getDetail: (id) => service.get(`/announcements/${id}`),
+  createAnnouncement: (data) => service.post('/announcements', data),
 };
 
 
@@ -105,7 +106,11 @@ export const achievementApi = {
       'Content-Type': 'multipart/form-data'
     }
   }),
-  updateAchievement: (data) => service.post(`/achievement/update`,null,{ data }),
+  updateAchievement: (data) => service.post(`/achievement/update`,data, {
+    headers: {
+      'Content-Type': 'multipart/form-data' // 支持文件上传
+    }
+  }),
   deleteAchievement: (id) => service.post('/achievement/delete',null,{ params: { id } }),
 
   // 获取待审核成果列表
