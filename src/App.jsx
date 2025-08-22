@@ -15,7 +15,7 @@ import AchievementReviewPage from './pages/AchievementReviewPage/AchievementRevi
 import AchievementForm from './pages/AchievementForm/AchievementForm2';
 import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage2';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
-import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
+import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage2';
 import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage';
 import AdminProfilePage from './pages/AdminProfilePage/AdminProfilePage';
 import TeacherProfilePage from './pages/TeacherProfilePage/TeacherProfilePage2';
