@@ -80,12 +80,8 @@ const UserManage = () => {
         const { records, total: totalCount } = response.data;
         const formattedUsers = records.map(user => ({
           id: user.id,
-<<<<<<< Updated upstream
           realName: user.realname || '未知姓名',
           name: user.name || '',
-=======
-          realName: user.name || '未知姓名',
->>>>>>> Stashed changes
           userName: user.userAccount || '',
           password: user.userPassword,
           avatar: getAvatarUrl(user.avatar, user.name),
@@ -94,7 +90,7 @@ const UserManage = () => {
           role: user.userRole || (activeTab === "students" ? "student" : "teacher"),
           status: user.status === "正常" ? 'active' : 'inactive',
           studentId: user.studentId || "",
-          className: user.grade || "",
+          className: user.className || "",
           major: user.major || "",
           teacherId: user.teacherId || "",
           department: user.department || "",
@@ -156,7 +152,6 @@ const UserManage = () => {
     },
   };
 
-<<<<<<< Updated upstream
   // // 切换用户状态
   // const handleToggleStatus = async (user) => {
   //   const newStatus = user.status === "active" ? "inactive" : "active";
@@ -176,26 +171,6 @@ const UserManage = () => {
   //     message.error("网络错误，状态更新失败");
   //   }
   // };
-=======
-  const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "active" ? "inactive" : "active";
-    try {
-      const response = await adminApi.updateUser({ 
-        id: user.id,
-        status: newStatus === "active" ? 1 : 0
-      });
-      if (response.code === 0) {
-        message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.realName}`);
-        fetchUserList();
-      } else {
-        message.error(response.message || "状态更新失败");
-      }
-    } catch (error) {
-      console.error("更新状态错误：", error);
-      message.error("网络错误，状态更新失败");
-    }
-  };
->>>>>>> Stashed changes
 
   // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
@@ -489,17 +464,13 @@ const handleToggleStatus = async (user) => {
       const userData = {
         userAccount: newUserType === "student" ? values.studentId : values.teacherId,
         userAvatar: "",
-<<<<<<< Updated upstream
         realName: values.realname,
-=======
-        realName: values.name,
->>>>>>> Stashed changes
         userRole: newUserType,
         email: values.email,
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          className: values.grade,
+          className: values.className,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -601,7 +572,7 @@ const handleToggleStatus = async (user) => {
           status: 0,
           ...(importType === "student" && {
             studentId: item.studentId,
-            className: item.garde,
+            className: item.className,
             major: item.major
           }),
           ...(importType === "teacher" && {
@@ -673,29 +644,7 @@ const handleToggleStatus = async (user) => {
     }
   };
 
-<<<<<<< Updated upstream
   
-=======
-  const handleEditSubmit = async () => {
-    try {
-      const values = await editForm.validateFields();
-      const updateData = {
-        id: selectedUser.id,
-        realName: values.name,
-        email: values.email,
-        phone: values.phone || "",
-        status: values.status === "active" ? 1 : 0,
-        ...(selectedUser.role === "student" && {
-          className: values.garde,
-          major: values.major
-        }),
-        ...(selectedUser.role === "teacher" && {
-          teacherId: values.teacherId,
-          department: values.department,
-          title: values.title
-        })
-      };
->>>>>>> Stashed changes
 
   // // 提交编辑表单
   // const handleEditSubmit = async () => {
@@ -1443,11 +1392,7 @@ const handleToggleStatus = async (user) => {
                         { required: true, message: "请输入年级" } 
                       ]}
                     >
-<<<<<<< Updated upstream
                       <Input placeholder="如：2022级" />
-=======
-                      <Input placeholder="如：22级" />
->>>>>>> Stashed changes
                     </Form.Item>
                     </Col>
                   </Row>
@@ -1608,38 +1553,7 @@ const handleToggleStatus = async (user) => {
               <Form form={editForm} layout="vertical">
                 <Row gutter={16}>
                   <Col span={8}>
-<<<<<<< Updated upstream
                     {renderAvatarUpload()}
-=======
-                    <Form.Item label="头像">
-                      <Avatar
-                        src={getAvatarUrl(selectedUser.avatar, selectedUser.realName)}
-                        size={100}
-                        style={{ display: "block", margin: "0 auto" }}
-                        onError={(e) => {
-                          e.target.src = getAvatarUrl(null, selectedUser.realName);
-                          e.target.onerror = null;
-                        }}
-                      />
-                      <Upload
-                        showUploadList={false}
-                        beforeUpload={handleAvatarChange}
-                        style={{
-                          display: "block",
-                          textAlign: "center",
-                          marginTop: 8,
-                        }}
-                      >
-                        <Button 
-                          type="link" 
-                          icon={<UploadOutlined />}
-                          loading={avatarUploading}
-                        >
-                          更换头像
-                        </Button>
-                      </Upload>
-                    </Form.Item>
->>>>>>> Stashed changes
                   </Col>
                   <Col span={16}>
                     <Form.Item
@@ -1655,11 +1569,7 @@ const handleToggleStatus = async (user) => {
                         label="工号"
                         name="teacherId"
                         rules={[
-<<<<<<< Updated upstream
                           { required: true, message: "请输入工号" },
-=======
-                          { required: true },
->>>>>>> Stashed changes
                         ]}
                       >
                         <Input />
@@ -1669,12 +1579,6 @@ const handleToggleStatus = async (user) => {
                     {selectedUser.role === "student" && (
                       <Form.Item
                         label="学号"
-<<<<<<< Updated upstream
-=======
-                        rules={[
-                          { required: true },
-                        ]}
->>>>>>> Stashed changes
                       >
                         <Input value={selectedUser.studentId} disabled />
                       </Form.Item>
