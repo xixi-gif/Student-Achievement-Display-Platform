@@ -16,6 +16,7 @@ const { TabPane } = Tabs;
 const { Header, Content, Footer } = Layout;
 
 const UserManage = () => {
+  // 状态管理
   const [users, setUsers] = useState({ students: [], teachers: [] });
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ const UserManage = () => {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
+  // 头像上传相关状态
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -55,6 +57,7 @@ const UserManage = () => {
   const fileDataRef = useRef(null);
   const abortControllerRef = useRef(null);
 
+  // 获取用户列表
   const fetchUserList = async () => {
     setLoading(true);
     try {
@@ -77,14 +80,15 @@ const UserManage = () => {
         const { records, total: totalCount } = response.data;
         const formattedUsers = records.map(user => ({
           id: user.id,
-          realName: user.name || '未知姓名',
+          realName: user.realname || '未知姓名',
+          name: user.name || '',
           userName: user.userAccount || '',
           password: user.userPassword,
           avatar: getAvatarUrl(user.avatar, user.name),
           email: user.email || '',
           phone: user.phone || '',
           role: user.userRole || (activeTab === "students" ? "student" : "teacher"),
-          status: user.status === "1" ? 'active' : (user.status === "0" ? 'inactive' : 'active'),
+          status: user.status === "正常" ? 'active' : 'inactive',
           studentId: user.studentId || "",
           className: user.className || "",
           major: user.major || "",
@@ -109,6 +113,7 @@ const UserManage = () => {
     }
   };
 
+  // 初始化
   useEffect(() => {
     const init = async () => {
       const role = localStorage.getItem("user_role") || "visitor";
@@ -124,18 +129,21 @@ const UserManage = () => {
     init();
   }, [currentPage, pageSize, activeTab, searchKeyword, columnFilters]);
 
+  // 搜索处理
   const handleSearch = (value) => {
     setSearchKeyword(value.toLowerCase());
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
+  // 列筛选处理
   const handleColumnFilter = (columnKey, values) => {
     setColumnFilters(prev => ({ ...prev, [columnKey]: values }));
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
+  // 行选择配置
   const rowSelection = {
     selectedRowKeys: selectedIds,
     onChange: (keys) => setSelectedIds(keys),
@@ -144,25 +152,27 @@ const UserManage = () => {
     },
   };
 
-  const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "active" ? "inactive" : "active";
-    try {
-      const response = await adminApi.updateUser({ 
-        id: user.id,
-        status: newStatus === "active" ? 1 : 0
-      });
-      if (response.code === 0) {
-        message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.realName}`);
-        fetchUserList();
-      } else {
-        message.error(response.message || "状态更新失败");
-      }
-    } catch (error) {
-      console.error("更新状态错误：", error);
-      message.error("网络错误，状态更新失败");
-    }
-  };
+  // // 切换用户状态
+  // const handleToggleStatus = async (user) => {
+  //   const newStatus = user.status === "active" ? "inactive" : "active";
+  //   try {
+  //     const response = await adminApi.updateUser({ 
+  //       id: user.id,
+  //       status: newStatus === "active" ? "正常" : "禁用"
+  //     });
+  //     if (response.code === 0) {
+  //       message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.realName}`);
+  //       fetchUserList();
+  //     } else {
+  //       message.error(response.message || "状态更新失败");
+  //     }
+  //   } catch (error) {
+  //     console.error("更新状态错误：", error);
+  //     message.error("网络错误，状态更新失败");
+  //   }
+  // };
 
+  // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -176,10 +186,10 @@ const UserManage = () => {
         const user = users[activeTab].find(u => u.id === id);
         const response = await adminApi.updateUser({
           id: id,
-          status: enable ? "1" : "0",
+          status: enable ? 0 : 1,
           userRole: user?.role,
-          realName: user?.name,
-          userName: user?.username,
+          realName: user?.realName,
+          userName: user?.userName,
           email: user?.email,
           phone: user?.phone
         });
@@ -196,6 +206,7 @@ const UserManage = () => {
     }
   };
 
+  // 批量删除
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -229,6 +240,7 @@ const UserManage = () => {
     });
   };
 
+  // 批量重置密码
   const handleBatchResetPassword = async () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -262,7 +274,189 @@ const UserManage = () => {
       },
     });
   };
+  const handleEditSubmit = async () => {
+  if (!selectedUser) return;
+  
+  try {
+    const values = await editForm.validateFields();
+    
+    const updateData = {
+      id: selectedUser.id,
+      // 保留双角色逻辑，用 selectedUser.role 动态判断
+      userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
+      userName: selectedUser.userName,
+      // 状态值用数字（0/1），与后端 Integer 类型匹配
+      status: values.status === "active" ? 0 : 1,  
+      realName: values.name,
+      email: values.email,
+      phone: values.phone || "",
+      
+      // 关键修改：学生学号字段用 studentNo，而非 studentId
+      ...(selectedUser.role === "student" && {
+        studentNo: selectedUser.studentId, // 前端本地存的是 studentId，传递时用后端需要的 studentNo
+        className: values.className,
+        major: values.major
+      }),
+      ...(selectedUser.role === "teacher" && {
+        department: values.department,
+        title: values.title,
+        // 教师工号字段同理，若后端用 teacherNo 则改这里
+        teacherId: values.teacherId
+      })
+    };
 
+    console.log("最终提交参数：", updateData); // 确认已无 studentId
+
+    const response = await adminApi.updateUser(updateData);
+    if (response.code === 0) {
+      message.success("用户状态已更新");
+      setEditModalVisible(false);
+      fetchUserList();
+    } else {
+      message.error(`更新失败: ${response.message || '未知错误'}`);
+    }
+  } catch (error) {
+    if (error.name !== "ValidateError") {
+      console.error("更新错误详情:", error);
+      message.error("网络错误，更新失败");
+    }
+  }
+};
+
+
+
+
+
+  // 修改handleEditSubmit函数中针对学生的参数处理部分
+// const handleEditSubmit = async () => {
+//   if (!selectedUser) return;
+  
+//   try {
+//     const values = await editForm.validateFields();
+    
+//     // 构建更新数据对象
+//     const updateData = {
+//       id: selectedUser.id,
+//       userRole: "student", // 明确指定学生角色，避免动态获取可能出现的问题
+//       userName: selectedUser.userName,
+//       status: values.status === "active" ? "正常" : "禁用", // 确保状态是数字类型
+//       realName: values.name,
+//       email: values.email,
+//       phone: values.phone || "",
+      
+//       // 学生特有字段 - 关键修复：确保所有必要字段都被传递
+//       ...(selectedUser.role === "student" && {
+//         studentId: selectedUser.studentId, // 必须传递学号，后端可能以此作为关键标识
+//         className: values.className,
+//         major: values.major,
+//         // 补充可能需要的其他学生字段
+//         achievementCount: values.achievementCount || 0
+//       }),
+//       ...(selectedUser.role === "teacher" && {
+//         department: values.department,
+//         title: values.title,
+//         teacherId: values.teacherId
+//       })
+//     };
+
+//     // 调试信息：确认参数正确性
+//     console.log("学生更新参数:", updateData);
+
+//     const response = await adminApi.updateUser(updateData);
+//     if (response.code === 0) {
+//       message.success("用户状态已更新");
+//       setEditModalVisible(false);
+//       fetchUserList(); // 强制刷新列表
+//     } else {
+//       message.error(`更新失败: ${response.message || '未知错误'}`);
+//     }
+//   } catch (error) {
+//     if (error.name !== "ValidateError") {
+//       console.error("更新错误详情:", error);
+//       message.error("网络错误，更新失败");
+//     }
+//   }
+// };
+const handleToggleStatus = async (user) => {
+  const newStatus = user.status === "active" ? "禁用" : "正常"; 
+  try {
+    const updateData = {
+      id: user.id,
+      status: newStatus,
+      userRole: user.role, 
+      userName: user.userName,
+      ...(user.role === "student" && {
+        studentNo: user.studentId 
+      }),
+      ...(user.role === "teacher" && {
+        teacherId: user.teacherId 
+      })
+    };
+
+    const response = await adminApi.updateUser(updateData);
+    if (response.code === 0) {
+      message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
+      fetchUserList();
+    } else {
+      message.error(response.message || "状态更新失败");
+    }
+  } catch (error) {
+    console.error("更新状态错误：", error);
+    message.error("网络错误，状态更新失败");
+  }
+};
+// const handleToggleStatus = async (user) => {
+//   if (user.role !== "student") return;
+  
+//   const newStatus = user.status === "active" ? 1 : 0; // 直接使用数字状态值
+//   try {
+//     const response = await adminApi.updateUser({ 
+//       id: user.id,
+//       status: newStatus,
+//       userRole: "student", // 明确传递角色
+//       userName: user.userName,
+//       studentId: user.studentId // 传递学号
+//     });
+//     if (response.code === 0) {
+//       message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
+//       fetchUserList();
+//     } else {
+//       message.error(response.message || "状态更新失败");
+//     }
+//   } catch (error) {
+//     console.error("更新状态错误：", error);
+//     message.error("网络错误，状态更新失败");
+//   }
+// };
+
+// // 同时检查学生状态切换的单独处理函数（如果有）
+// const handleToggleStatus = async (user) => {
+//   if (user.role !== "student") return; // 确保只处理学生
+  
+//   const newStatus = user.status === "active" ? 1 : 0; // 直接使用数字状态值
+//   try {
+//     const response = await adminApi.updateUser({ 
+//       id: user.id,
+//       status: newStatus,
+//       userRole: "student", // 明确传递角色
+//       userName: user.userName,
+//       studentId: user.studentId // 传递学号
+//     });
+//     if (response.code === 0) {
+//       message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
+//       fetchUserList();
+//     } else {
+//       message.error(response.message || "状态更新失败");
+//     }
+//   } catch (error) {
+//     console.error("更新状态错误：", error);
+//     message.error("网络错误，状态更新失败");
+//   }
+// };
+    
+  
+
+  // 添加用户
   const handleAddUser = async () => {
     setAdding(true);
     try {
@@ -270,13 +464,13 @@ const UserManage = () => {
       const userData = {
         userAccount: newUserType === "student" ? values.studentId : values.teacherId,
         userAvatar: "",
-        realName: values.name,
+        realName: values.realname,
         userRole: newUserType,
         email: values.email,
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          className: values.grade,
+          className: values.className,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -285,7 +479,7 @@ const UserManage = () => {
           title: values.title
         }),
         password: "123456789",
-        status: "1"
+        status: 0
       };
 
       const response = await adminApi.createUser(userData);
@@ -307,6 +501,7 @@ const UserManage = () => {
     }
   };
 
+  // 删除用户
   const handleDelete = async (id) => {
     try {
       const response = await adminApi.deleteUser({ id });
@@ -323,6 +518,7 @@ const UserManage = () => {
     }
   };
 
+  // 验证学号唯一性
   const validateStudentId = async (_, value) => {
     try {
       const response = await adminApi.checkIdExists({ type: 'student', id: value });
@@ -335,6 +531,7 @@ const UserManage = () => {
     }
   };
 
+  // 验证工号唯一性
   const validateTeacherId = async (_, value) => {
     try {
       const response = await adminApi.checkIdExists({ type: 'teacher', id: value });
@@ -347,10 +544,12 @@ const UserManage = () => {
     }
   };
 
+  // 文件上传处理
   const handleFileUpload = (file) => {
     return handleFileUploadHelper(file, importType, users, setImportData);
   };
 
+  // 导入用户数据
   const handleImport = async () => {
     const validData = importData.filter(item => item._valid);
     if (validData.length === 0) {
@@ -370,10 +569,10 @@ const UserManage = () => {
           email: item.email,
           phone: item.phone || "",
           password: item.password || "123456789",
-          status: "1",
+          status: 0,
           ...(importType === "student" && {
             studentId: item.studentId,
-            className: item.garde,
+            className: item.className,
             major: item.major
           }),
           ...(importType === "teacher" && {
@@ -400,25 +599,37 @@ const UserManage = () => {
     }
   };
 
+  // 处理重置密码
   const handleResetPassword = (user) => {
     setSelectedUser(user);
     setResetPwdModalVisible(true);
   };
 
+  // 处理编辑用户
   const handleEdit = (user) => {
+    if (!user) {
+      message.warning("未找到用户数据");
+      return;
+    }
+    
     setSelectedUser(user);
+    // 根据用户角色设置表单字段值，修复字段不匹配问题
     editForm.setFieldsValue({
       name: user.realName,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
       [user.role === "student" ? "major" : "department"]: user[user.role === "student" ? "major" : "department"],
       email: user.email,
       phone: user.phone,
-      status: user.status
+      status: user.status,
+      ...(user.role === "teacher" && { teacherId: user.teacherId })
     });
     setEditModalVisible(true);
   };
 
+  // 确认重置密码
   const confirmResetPassword = async () => {
+    if (!selectedUser) return;
+    
     try {
       const response = await adminApi.resetUserPassword(selectedUser.id, "123456789");
       if (response.code === 0) {
@@ -433,58 +644,68 @@ const UserManage = () => {
     }
   };
 
-  const handleEditSubmit = async () => {
-    try {
-      const values = await editForm.validateFields();
-      const originalData = selectedUser;
-      const hasChanges = Object.keys(values).some(key => {
-        const originalValue = originalData[key === 'className' ? 'className' : 
-                             key === 'major' ? 'major' : 
-                             key === 'department' ? 'department' : 
-                             key === 'title' ? 'title' : 
-                             originalData[key]];
-        return values[key] !== originalValue;
-      });
+  
 
-      if (!hasChanges) {
-        message.info("未修改任何用户信息");
-        return;
-      }
+  // // 提交编辑表单
+  // const handleEditSubmit = async () => {
+  //   if (!selectedUser) return;
+    
+  //   try {
+  //     const values = await editForm.validateFields();
+  //     const originalData = selectedUser;
+      
+  //     // 检查是否有实际修改
+  //     const hasChanges = Object.keys(values).some(key => {
+  //       const originalValue = originalData[key === 'className' ? 'className' : 
+  //                            key === 'major' ? 'major' : 
+  //                            key === 'department' ? 'department' : 
+  //                            key === 'title' ? 'title' : 
+  //                            originalData[key]];
+  //       return values[key] !== originalValue;
+  //     });
 
-      const updateData = {
-        id: selectedUser.id,
-        realName: values.name,
-        email: values.email,
-        phone: values.phone || "",
-        status: values.status === "active" ? "1" : "0",
-        userRole: selectedUser.role,
-        userName: selectedUser.username,
-        ...(selectedUser.role === "student" && {
-          className: values.garde,
-          major: values.major
-        }),
-        ...(selectedUser.role === "teacher" && {
-          department: values.department,
-          title: values.title
-        })
-      };
+  //     if (!hasChanges) {
+  //       message.info("未修改任何用户信息");
+  //       return;
+  //     }
 
-      const response = await adminApi.updateUser(updateData);
-      if (response.code === 0) {
-        message.success("用户信息已更新");
-        setEditModalVisible(false);
-        fetchUserList();
-      } else {
-        message.error(response.message || "更新失败");
-      }
-    } catch (error) {
-      if (error.name !== "ValidateError") {
-        console.error("编辑用户错误：", error);
-        message.error("网络错误，更新失败");
-      }
-    }
-  };
+  //     const updateData = {
+  //       id: selectedUser.id,
+  //       realName: values.name,
+  //       email: values.email,
+  //       phone: values.phone || "",
+  //       status: values.status === "active" ? 0 : 1,  
+  //       userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
+  //       userName: selectedUser.userName,
+  //       ...(selectedUser.role === "student" && {
+  //         className: values.className,
+  //         major: values.major
+  //       }),
+  //       ...(selectedUser.role === "teacher" && {
+  //         department: values.department,
+  //         title: values.title,
+  //         teacherId: values.teacherId
+  //       })
+  //     };
 
+
+  //     const response = await adminApi.updateUser(updateData);
+  //     if (response.code === 0) {
+  //       message.success("用户信息已更新");
+  //       setEditModalVisible(false);
+  //       fetchUserList();
+  //     } else {
+  //       message.error(response.message || "更新失败");
+  //     }
+  //   } catch (error) {
+  //     if (error.name !== "ValidateError") {
+  //       console.error("编辑用户错误：", error);
+  //       message.error("网络错误，更新失败");
+  //     }
+  //   }
+  // };
+
+  // 处理文件选择
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -512,6 +733,7 @@ const UserManage = () => {
     reader.readAsDataURL(file);
   };
 
+  // 触发文件选择
   const triggerFileSelect = () => {
     if (avatarUploading) return;
     if (currentUser?.role !== 'admin') {
@@ -523,6 +745,7 @@ const UserManage = () => {
     }
   };
 
+  // 取消上传
   const cancelUpload = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -539,6 +762,43 @@ const UserManage = () => {
     message.info('已取消上传');
   };
 
+
+  // 更新头像到用户信息
+  const handleAvatarUpdate = async (avatarUrl) => {
+    if (!selectedUser) return;
+    
+    try {
+      const updateData = {
+        id: selectedUser.id,
+        userAvatar: avatarUrl,
+        userRole: selectedUser.role,
+        realName: selectedUser.realName,
+        userName: selectedUser.userName,
+        email: selectedUser.email,
+        phone: selectedUser.phone
+      };
+      
+      const updateResponse = await adminApi.updateUser(updateData);
+      if (updateResponse.code === 0) {
+        // 更新本地状态
+        setUsers(prev => ({
+          ...prev,
+          [activeTab]: prev[activeTab].map(user => 
+            user.id === selectedUser.id ? { ...user, avatar: avatarUrl } : user
+          )
+        }));
+        
+        setSelectedUser(prev => prev ? { ...prev, avatar: avatarUrl } : prev);
+        message.success('头像已更新');
+      } else {
+        throw new Error(`更新失败：${updateResponse.message || '用户信息未同步'}`);
+      }
+    } catch (updateError) {
+      message.error(`头像上传成功，但更新用户信息失败：${updateError.message}`);
+    }
+  };
+
+  // 确认头像上传
   const confirmAvatarUpload = async () => {
     if (!selectedUser) {
       message.warning("未选择用户");
@@ -570,37 +830,9 @@ const UserManage = () => {
         throw new Error('服务器返回的头像URL无效，请重试');
       }
 
-      const updateData = {
-        id: selectedUser.id,
-        userAvatar: avatarUrl,
-        userRole: selectedUser.role,
-        realName: selectedUser.name,
-        userName: selectedUser.username,
-        email: selectedUser.email,
-        phone: selectedUser.phone
-      };
+      // 更新用户头像信息
+      await handleAvatarUpdate(avatarUrl);
       
-      try {
-        const updateResponse = await adminApi.updateUser(updateData);
-        if (updateResponse.code !== 0) {
-          throw new Error(`更新失败：${updateResponse.message || '用户信息未同步'}`);
-        }
-      } catch (updateError) {
-        message.error(`头像上传成功，但更新用户信息失败：${updateError.message}`);
-        setPreviewVisible(true);
-        return;
-      }
-
-      setUsers(prev => ({
-        ...prev,
-        [activeTab]: prev[activeTab].map(user => 
-          user.id === selectedUser.id ? { ...user, avatar: avatarUrl } : user
-        )
-      }));
-      
-      setSelectedUser(prev => prev ? { ...prev, avatar: avatarUrl } : prev);
-      
-      message.success('头像上传并更新成功');
       setUploadProgress(100);
       
       setTimeout(() => {
@@ -629,41 +861,16 @@ const UserManage = () => {
     }
   };
 
-  // const handleToggleStatus = async (user) => {
-  //   const newStatus = user.status === "active" ? "0" : "1";
-  //   try {
-  //     const updateData = {
-  //       id: user.id,
-  //       status: newStatus,
-  //       userRole: user.role,
-  //       realName: user.name,
-  //       userName: user.username,
-  //       email: user.email,
-  //       phone: user.phone
-  //     };
-      
-  //     const response = await adminApi.updateUser(updateData);
-  //     if (response.code === 0) {
-  //       message.success(`已${newStatus === "1" ? "启用" : "禁用"} ${user.name}`);
-  //       fetchUserList();
-  //     } else {
-  //       message.error(response.message || "状态更新失败");
-  //     }
-  //   } catch (error) {
-  //     console.error("更新状态错误：", error);
-  //     message.error("网络错误，状态更新失败");
-  //   }
-  // };
-
+  // 渲染头像上传组件
   const renderAvatarUpload = () => (
     <Form.Item label="头像">
       <Avatar
         src={selectedUser?.avatar || undefined}
-        alt={selectedUser?.name || "用户"}
+        alt={selectedUser?.realName || "用户"}
         size={100}
         style={{ display: "block", margin: "0 auto 16px" }}
       >
-        {selectedUser?.name?.charAt(0) || "未"}
+        {selectedUser?.realName?.charAt(0) || "未"}
       </Avatar>
       
       <input
@@ -739,9 +946,11 @@ const UserManage = () => {
     </Form.Item>
   );
 
+  // 当前表格数据
   const currentTableData = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
   const isStudentTab = activeTab === "students";
 
+  // 清理函数
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -906,7 +1115,7 @@ const UserManage = () => {
                 <Table
                   columns={getTableColumns(
                     true,
-                    handleEdit,
+                    handleEdit,  // 确保编辑函数正确传递
                     handleResetPassword,
                     handleToggleStatus,
                     handleDelete,
@@ -964,7 +1173,7 @@ const UserManage = () => {
                 <Table
                   columns={getTableColumns(
                     false,
-                    handleEdit,
+                    handleEdit,  // 确保编辑函数正确传递
                     handleResetPassword,
                     handleToggleStatus,
                     handleDelete,
@@ -1012,6 +1221,7 @@ const UserManage = () => {
             </Tabs>
           </Card>
 
+          {/* 批量导入模态框 */}
           <Modal
             title={`批量导入${importType === "student" ? "学生" : "教师"}数据`}
             visible={importModalVisible}
@@ -1112,6 +1322,7 @@ const UserManage = () => {
             )}
           </Modal>
 
+          {/* 添加用户模态框 */}
           <Modal
             title={`添加${newUserType === "student" ? "学生" : "教师"}`}
             visible={addModalVisible}
@@ -1306,6 +1517,7 @@ const UserManage = () => {
             </Form>
           </Modal>
 
+          {/* 重置密码模态框 */}
           <Modal
             title="确认重置密码"
             visible={resetPwdModalVisible}
@@ -1322,6 +1534,7 @@ const UserManage = () => {
             <p>重置后密码将变为123456789，请提醒用户及时修改。</p>
           </Modal>
 
+          {/* 编辑用户模态框 */}
           <Modal
             title={`编辑用户 - ${selectedUser?.realName}`}
             visible={editModalVisible}
@@ -1340,34 +1553,7 @@ const UserManage = () => {
               <Form form={editForm} layout="vertical">
                 <Row gutter={16}>
                   <Col span={8}>
-                    <Form.Item label="头像">
-                      <Avatar
-                        src={getAvatarUrl(selectedUser.avatar, selectedUser.realName)}
-                        size={100}
-                        style={{ display: "block", margin: "0 auto" }}
-                        onError={(e) => {
-                          e.target.src = getAvatarUrl(null, selectedUser.realName);
-                          e.target.onerror = null;
-                        }}
-                      />
-                      <Upload
-                        showUploadList={false}
-                        beforeUpload={handleAvatarChange}
-                        style={{
-                          display: "block",
-                          textAlign: "center",
-                          marginTop: 8,
-                        }}
-                      >
-                        <Button 
-                          type="link" 
-                          icon={<UploadOutlined />}
-                          loading={avatarUploading}
-                        >
-                          更换头像
-                        </Button>
-                      </Upload>
-                    </Form.Item>
+                    {renderAvatarUpload()}
                   </Col>
                   <Col span={16}>
                     <Form.Item
@@ -1383,7 +1569,7 @@ const UserManage = () => {
                         label="工号"
                         name="teacherId"
                         rules={[
-                          { required: true },
+                          { required: true, message: "请输入工号" },
                         ]}
                       >
                         <Input />
@@ -1393,9 +1579,6 @@ const UserManage = () => {
                     {selectedUser.role === "student" && (
                       <Form.Item
                         label="学号"
-                        rules={[
-                          { required: true },
-                        ]}
                       >
                         <Input value={selectedUser.studentId} disabled />
                       </Form.Item>
@@ -1478,6 +1661,7 @@ const UserManage = () => {
                 </Col>
               </Row>
 
+
               <Form.Item
                 label="状态"
                 name="status"
@@ -1502,6 +1686,7 @@ const UserManage = () => {
           )}
         </Modal>
 
+        {/* 批量操作提示框 */}
         <Modal
           title="批量操作进行中"
           visible={batchActionLoading}
