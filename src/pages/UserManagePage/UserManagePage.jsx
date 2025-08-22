@@ -7,7 +7,7 @@ import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined,
   CloseCircleOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
-import api, { adminApi , authApi } from "../../service/api";
+import { adminApi , authApi } from "../../service/api";
 import { getAvatarUrl, importTemplateColumns, handleFileUploadHelper, exportTemplateHelper } from "./UserManageHelpers";
 import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
 
@@ -152,25 +152,7 @@ const UserManage = () => {
     },
   };
 
-  // // 切换用户状态
-  // const handleToggleStatus = async (user) => {
-  //   const newStatus = user.status === "active" ? "inactive" : "active";
-  //   try {
-  //     const response = await adminApi.updateUser({ 
-  //       id: user.id,
-  //       status: newStatus === "active" ? "正常" : "禁用"
-  //     });
-  //     if (response.code === 0) {
-  //       message.success(`已${newStatus === "active" ? "启用" : "禁用"} ${user.realName}`);
-  //       fetchUserList();
-  //     } else {
-  //       message.error(response.message || "状态更新失败");
-  //     }
-  //   } catch (error) {
-  //     console.error("更新状态错误：", error);
-  //     message.error("网络错误，状态更新失败");
-  //   }
-  // };
+
 
   // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
@@ -282,30 +264,27 @@ const UserManage = () => {
     
     const updateData = {
       id: selectedUser.id,
-      // 保留双角色逻辑，用 selectedUser.role 动态判断
       userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
       userName: selectedUser.userName,
-      // 状态值用数字（0/1），与后端 Integer 类型匹配
       status: values.status === "active" ? 0 : 1,  
-      realName: values.name,
+      realName: values.realName,
       email: values.email,
       phone: values.phone || "",
-      
-      // 关键修改：学生学号字段用 studentNo，而非 studentId
+    
       ...(selectedUser.role === "student" && {
-        studentNo: selectedUser.studentId, // 前端本地存的是 studentId，传递时用后端需要的 studentNo
+        studentNo: selectedUser.studentId, 
         grade: values.grade,
         major: values.major
       }),
       ...(selectedUser.role === "teacher" && {
         department: values.department,
         title: values.title,
-        // 教师工号字段同理，若后端用 teacherNo 则改这里
-        teacherId: values.teacherId
+       
+        teacherNo: values.teacherId
       })
     };
 
-    console.log("最终提交参数：", updateData); // 确认已无 studentId
+    console.log("最终提交参数：", updateData); 
 
     const response = await adminApi.updateUser(updateData);
     if (response.code === 0) {
@@ -324,59 +303,6 @@ const UserManage = () => {
 };
 
 
-
-
-
-  // 修改handleEditSubmit函数中针对学生的参数处理部分
-// const handleEditSubmit = async () => {
-//   if (!selectedUser) return;
-  
-//   try {
-//     const values = await editForm.validateFields();
-    
-//     // 构建更新数据对象
-//     const updateData = {
-//       id: selectedUser.id,
-//       userRole: "student", // 明确指定学生角色，避免动态获取可能出现的问题
-//       userName: selectedUser.userName,
-//       status: values.status === "active" ? "正常" : "禁用", // 确保状态是数字类型
-//       realName: values.name,
-//       email: values.email,
-//       phone: values.phone || "",
-      
-//       // 学生特有字段 - 关键修复：确保所有必要字段都被传递
-//       ...(selectedUser.role === "student" && {
-//         studentId: selectedUser.studentId, // 必须传递学号，后端可能以此作为关键标识
-//         className: values.className,
-//         major: values.major,
-//         // 补充可能需要的其他学生字段
-//         achievementCount: values.achievementCount || 0
-//       }),
-//       ...(selectedUser.role === "teacher" && {
-//         department: values.department,
-//         title: values.title,
-//         teacherId: values.teacherId
-//       })
-//     };
-
-//     // 调试信息：确认参数正确性
-//     console.log("学生更新参数:", updateData);
-
-//     const response = await adminApi.updateUser(updateData);
-//     if (response.code === 0) {
-//       message.success("用户状态已更新");
-//       setEditModalVisible(false);
-//       fetchUserList(); // 强制刷新列表
-//     } else {
-//       message.error(`更新失败: ${response.message || '未知错误'}`);
-//     }
-//   } catch (error) {
-//     if (error.name !== "ValidateError") {
-//       console.error("更新错误详情:", error);
-//       message.error("网络错误，更新失败");
-//     }
-//   }
-// };
 const handleToggleStatus = async (user) => {
   const newStatus = user.status === "active" ? "禁用" : "正常"; 
   try {
@@ -405,56 +331,6 @@ const handleToggleStatus = async (user) => {
     message.error("网络错误，状态更新失败");
   }
 };
-// const handleToggleStatus = async (user) => {
-//   if (user.role !== "student") return;
-  
-//   const newStatus = user.status === "active" ? 1 : 0; // 直接使用数字状态值
-//   try {
-//     const response = await adminApi.updateUser({ 
-//       id: user.id,
-//       status: newStatus,
-//       userRole: "student", // 明确传递角色
-//       userName: user.userName,
-//       studentId: user.studentId // 传递学号
-//     });
-//     if (response.code === 0) {
-//       message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
-//       fetchUserList();
-//     } else {
-//       message.error(response.message || "状态更新失败");
-//     }
-//   } catch (error) {
-//     console.error("更新状态错误：", error);
-//     message.error("网络错误，状态更新失败");
-//   }
-// };
-
-// // 同时检查学生状态切换的单独处理函数（如果有）
-// const handleToggleStatus = async (user) => {
-//   if (user.role !== "student") return; // 确保只处理学生
-  
-//   const newStatus = user.status === "active" ? 1 : 0; // 直接使用数字状态值
-//   try {
-//     const response = await adminApi.updateUser({ 
-//       id: user.id,
-//       status: newStatus,
-//       userRole: "student", // 明确传递角色
-//       userName: user.userName,
-//       studentId: user.studentId // 传递学号
-//     });
-//     if (response.code === 0) {
-//       message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
-//       fetchUserList();
-//     } else {
-//       message.error(response.message || "状态更新失败");
-//     }
-//   } catch (error) {
-//     console.error("更新状态错误：", error);
-//     message.error("网络错误，状态更新失败");
-//   }
-// };
-    
-  
 
   // 添加用户
   const handleAddUser = async () => {
@@ -615,7 +491,7 @@ const handleToggleStatus = async (user) => {
     setSelectedUser(user);
     // 根据用户角色设置表单字段值，修复字段不匹配问题
     editForm.setFieldsValue({
-      name: user.realName,
+      name: user.name,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
       [user.role === "student" ? "major" : "department"]: user[user.role === "student" ? "major" : "department"],
       email: user.email,
@@ -645,67 +521,6 @@ const handleToggleStatus = async (user) => {
   };
 
   
-
-  // // 提交编辑表单
-  // const handleEditSubmit = async () => {
-  //   if (!selectedUser) return;
-    
-  //   try {
-  //     const values = await editForm.validateFields();
-  //     const originalData = selectedUser;
-      
-  //     // 检查是否有实际修改
-  //     const hasChanges = Object.keys(values).some(key => {
-  //       const originalValue = originalData[key === 'className' ? 'className' : 
-  //                            key === 'major' ? 'major' : 
-  //                            key === 'department' ? 'department' : 
-  //                            key === 'title' ? 'title' : 
-  //                            originalData[key]];
-  //       return values[key] !== originalValue;
-  //     });
-
-  //     if (!hasChanges) {
-  //       message.info("未修改任何用户信息");
-  //       return;
-  //     }
-
-  //     const updateData = {
-  //       id: selectedUser.id,
-  //       realName: values.name,
-  //       email: values.email,
-  //       phone: values.phone || "",
-  //       status: values.status === "active" ? 0 : 1,  
-  //       userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
-  //       userName: selectedUser.userName,
-  //       ...(selectedUser.role === "student" && {
-  //         className: values.className,
-  //         major: values.major
-  //       }),
-  //       ...(selectedUser.role === "teacher" && {
-  //         department: values.department,
-  //         title: values.title,
-  //         teacherId: values.teacherId
-  //       })
-  //     };
-
-
-  //     const response = await adminApi.updateUser(updateData);
-  //     if (response.code === 0) {
-  //       message.success("用户信息已更新");
-  //       setEditModalVisible(false);
-  //       fetchUserList();
-  //     } else {
-  //       message.error(response.message || "更新失败");
-  //     }
-  //   } catch (error) {
-  //     if (error.name !== "ValidateError") {
-  //       console.error("编辑用户错误：", error);
-  //       message.error("网络错误，更新失败");
-  //     }
-  //   }
-  // };
-
-  // 处理文件选择
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1600,7 +1415,7 @@ const handleToggleStatus = async (user) => {
                     </Col>
                     <Col span={12}>
                       <Form.Item
-                        name="grade"
+                        name="className"
                         label="年级"
                         rules={[{ required: true, message: "请输入年级" }]}
                       >
