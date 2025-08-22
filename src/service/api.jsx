@@ -91,6 +91,12 @@ export const announcementApi = {
   getList: (params) => service.get('/announcements', { params }),
   getDetail: (id) => service.get(`/announcements/${id}`),
   createAnnouncement: (data) => service.post('/announcements', data),
+  // 批量删除（支持单条）
+  deleteAnnouncement: (ids) => {
+  // 确保参数是数组格式，即使单条删除也包装成数组
+  const idList = Array.isArray(ids) ? ids : [ids];
+  return service.post('/announcements/batch-delete', { ids: idList });
+}
 };
 
 
@@ -167,7 +173,8 @@ export const adminApi = {
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
   
   // 数据统计接口
-  getStatistics: () => service.get('/admin/statistics'),
+  getStatistics: () => service.get('/admin//stats/summary'),
+  getStatsTrend: (params) => service.get('/stats/achievement-trends',{params}),
   getAchievementStats: () => service.get('/admin/statistics/achievements'),
   getUserStats: () => service.get('/admin/statistics/users'),
 
