@@ -294,7 +294,7 @@ const UserManage = () => {
       // 关键修改：学生学号字段用 studentNo，而非 studentId
       ...(selectedUser.role === "student" && {
         studentNo: selectedUser.studentId, // 前端本地存的是 studentId，传递时用后端需要的 studentNo
-        className: values.className,
+        grade: values.grade,
         major: values.major
       }),
       ...(selectedUser.role === "teacher" && {
@@ -1386,7 +1386,7 @@ const handleToggleStatus = async (user) => {
                     </Col>
                     <Col span={12}>
                     <Form.Item
-                      name="className"
+                      name="grade"
                       label="年级"
                       rules={[
                         { required: true, message: "请输入年级" } 
@@ -1600,7 +1600,7 @@ const handleToggleStatus = async (user) => {
                     </Col>
                     <Col span={12}>
                       <Form.Item
-                        name="className"
+                        name="grade"
                         label="年级"
                         rules={[{ required: true, message: "请输入年级" }]}
                       >
