@@ -152,8 +152,6 @@ const UserManage = () => {
     },
   };
 
-
-
   // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
@@ -214,7 +212,15 @@ const UserManage = () => {
           fetchUserList();
         } catch (error) {
           console.error("批量删除错误：", error);
-          message.error("网络错误，批量删除失败");
+          // 兼容HTTP状态码异常但业务成功的情况
+          const errorResponse = error.response?.data;
+          if (errorResponse?.code === 0) {
+            message.success("成功删除选中用户");
+            setSelectedIds([]);
+            fetchUserList();
+          } else {
+            message.error("网络错误，批量删除失败");
+          }
         } finally {
           setBatchActionLoading(false);
         }
@@ -256,81 +262,80 @@ const UserManage = () => {
       },
     });
   };
+
   const handleEditSubmit = async () => {
-  if (!selectedUser) return;
-  
-  try {
-    const values = await editForm.validateFields();
+    if (!selectedUser) return;
     
-    const updateData = {
-      id: selectedUser.id,
-      userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
-      userName: selectedUser.userName,
-      status: values.status === "active" ? 0 : 1,  
-      realName: values.name,
-      email: values.email,
-      phone: values.phone || "",
-    
-      ...(selectedUser.role === "student" && {
-        studentNo: selectedUser.studentId, 
-        grade: values.grade,
-        major: values.major
-      }),
-      ...(selectedUser.role === "teacher" && {
-        department: values.department,
-        title: values.title,
-       
-        teacherNo: values.teacherId
-      })
-    };
+    try {
+      const values = await editForm.validateFields();
+      
+      const updateData = {
+        id: selectedUser.id,
+        userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
+        userName: selectedUser.userName,
+        status: values.status === "active" ? 0 : 1,  
+        realName: values.name,
+        email: values.email,
+        phone: values.phone || "",
+      
+        ...(selectedUser.role === "student" && {
+          studentNo: selectedUser.studentId, 
+          grade: values.grade,
+          major: values.major
+        }),
+        ...(selectedUser.role === "teacher" && {
+          department: values.department,
+          title: values.title,
+          teacherNo: values.teacherId
+        })
+      };
 
-    console.log("最终提交参数：", updateData); 
+      console.log("最终提交参数：", updateData); 
 
-    const response = await adminApi.updateUser(updateData);
-    if (response.code === 0) {
-      message.success("用户状态已更新");
-      setEditModalVisible(false);
-      fetchUserList();
-    } else {
-      message.error(`更新失败: ${response.message || '未知错误'}`);
+      const response = await adminApi.updateUser(updateData);
+      if (response.code === 0) {
+        message.success("用户状态已更新");
+        setEditModalVisible(false);
+        fetchUserList();
+      } else {
+        message.error(`更新失败: ${response.message || '未知错误'}`);
+      }
+    } catch (error) {
+      if (error.name !== "ValidateError") {
+        console.error("更新错误详情:", error);
+        message.error("网络错误，更新失败");
+      }
     }
-  } catch (error) {
-    if (error.name !== "ValidateError") {
-      console.error("更新错误详情:", error);
-      message.error("网络错误，更新失败");
+  };
+
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === "active" ? "禁用" : "正常"; 
+    try {
+      const updateData = {
+        id: user.id,
+        status: newStatus,
+        userRole: user.role, 
+        userName: user.userName,
+        ...(user.role === "student" && {
+          studentNo: user.studentId 
+        }),
+        ...(user.role === "teacher" && {
+          teacherId: user.teacherId 
+        })
+      };
+
+      const response = await adminApi.updateUser(updateData);
+      if (response.code === 0) {
+        message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
+        fetchUserList();
+      } else {
+        message.error(response.message || "状态更新失败");
+      }
+    } catch (error) {
+      console.error("更新状态错误：", error);
+      message.error("网络错误，状态更新失败");
     }
-  }
-};
-
-
-const handleToggleStatus = async (user) => {
-  const newStatus = user.status === "active" ? "禁用" : "正常"; 
-  try {
-    const updateData = {
-      id: user.id,
-      status: newStatus,
-      userRole: user.role, 
-      userName: user.userName,
-      ...(user.role === "student" && {
-        studentNo: user.studentId 
-      }),
-      ...(user.role === "teacher" && {
-        teacherId: user.teacherId 
-      })
-    };
-
-    const response = await adminApi.updateUser(updateData);
-    if (response.code === 0) {
-      message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
-      fetchUserList();
-    } else {
-      message.error(response.message || "状态更新失败");
-    }
-  } catch (error) {
-    console.error("更新状态错误：", error);
-    message.error("网络错误，状态更新失败");
-  }
-};
+  };
 
   // 添加用户
   const handleAddUser = async () => {
@@ -377,22 +382,34 @@ const handleToggleStatus = async (user) => {
     }
   };
 
-  // 删除用户
-  const handleDelete = async (id) => {
-    try {
-      const response = await adminApi.deleteUser({ id });
-      if (response.code === 0) {
-        message.success("用户已删除");
-        fetchUserList();
-        setSelectedIds(prev => prev.filter(item => item !== id));
-      } else {
-        message.error(response.message || "删除失败");
-      }
-    } catch (error) {
-      console.error("删除用户错误：", error);
-      message.error("网络错误，删除失败");
+const handleDelete = async (id) => {
+  try {
+
+    const response = await adminApi.deleteUser({ id });
+    console.log("删除接口原始响应：", response);
+
+    if (response.code === 0) {
+      message.success("用户已删除");
+      fetchUserList();
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    } else {
+
+      message.error(`删除失败: ${response.message || '未知错误'}`);
     }
-  };
+  } catch (error) {
+    console.error("删除请求错误：", error);
+    
+    const errorData = error?.response?.data || {};
+
+    if (errorData.code === 0) {
+      message.success("用户已删除");
+      fetchUserList();
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    } else {
+      message.error(`删除失败: ${errorData.message || '网络错误'}`);
+    }
+  }
+};
 
   // 验证学号唯一性
   const validateStudentId = async (_, value) => {
@@ -489,7 +506,7 @@ const handleToggleStatus = async (user) => {
     }
     
     setSelectedUser(user);
-    // 根据用户角色设置表单字段值，修复字段不匹配问题
+    // 根据用户角色设置表单字段值
     editForm.setFieldsValue({
       name: user.name,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
@@ -520,7 +537,6 @@ const handleToggleStatus = async (user) => {
     }
   };
 
-  
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -576,7 +592,6 @@ const handleToggleStatus = async (user) => {
     }
     message.info('已取消上传');
   };
-
 
   // 更新头像到用户信息
   const handleAvatarUpdate = async (avatarUrl) => {
@@ -930,7 +945,7 @@ const handleToggleStatus = async (user) => {
                 <Table
                   columns={getTableColumns(
                     true,
-                    handleEdit,  // 确保编辑函数正确传递
+                    handleEdit,
                     handleResetPassword,
                     handleToggleStatus,
                     handleDelete,
@@ -988,7 +1003,7 @@ const handleToggleStatus = async (user) => {
                 <Table
                   columns={getTableColumns(
                     false,
-                    handleEdit,  // 确保编辑函数正确传递
+                    handleEdit,
                     handleResetPassword,
                     handleToggleStatus,
                     handleDelete,

@@ -24,25 +24,37 @@ service.interceptors.request.use(
   }
 );
 
+
 service.interceptors.response.use(
   response => {
     const res = response.data;
-    if (res.code !== 0) { 
-      console.error('业务错误:', res.message);
-      return Promise.reject({ code: res.code, message: res.message || '服务器返回错误' });
+    console.log('响应数据:', res); 
+
+    if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
+      return res;
     }
-    return res; 
+
+    if (typeof res !== 'object' || res === null) {
+      return res;
+    }
+
+    if (res.code === 0) {
+      return res;
+    }
+
+    console.error('业务错误:', res.message);
+    return { ...res, _isError: true }; 
   },
   error => {
-    console.error('响应拦截器错误:', error);
-    // 网络错误或服务器错误处理
-    return Promise.reject({ 
-      code: error.response?.status || 500, 
-      message: error.message || '网络请求失败' 
-    });
+    console.error('网络/服务器错误:', error);
+    const errorInfo = {
+      code: error.response?.status || 500,
+      message: error.message || '网络请求失败',
+      _isError: true 
+    };
+    return { ...errorInfo };
   }
 );
-
 
 //公用
 export const authApi = {
@@ -163,11 +175,7 @@ export const adminApi = {
   createUser: (data) => service.post('/admin/add', data),
   updateUser: (data) => service.post(`/admin/update/`, data),
  
-
-    deleteUser: async (params) => {
-    const response = await service.post('/admin/delete', params);
-    return response.data; 
-  },
+ deleteUser: (params) => service.post('/admin/delete', params),
 
   resetUserPassword: (id, password) => service.put(`/admin/password`, { password } ,{ params: { id } }),
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),

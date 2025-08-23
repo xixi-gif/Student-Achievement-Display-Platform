@@ -34,6 +34,8 @@ const SystemSettingsPage = () => {
   const [carouselLoading, setCarouselLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentEditCarousel, setCurrentEditCarousel] = useState(null);
+  // 新增：存储临时图片信息
+  const [tempImage, setTempImage] = useState(null);
 
 
   const [categoryForm] = Form.useForm();
@@ -92,7 +94,7 @@ const SystemSettingsPage = () => {
 
         // 加载轮播图数据
         try {
-          const carouselRes = await adminApi.getCarouselList(); // 假设存在获取轮播图列表接口
+          const carouselRes = await adminApi.getCarouselList();
           setCarouselItems(carouselRes.code === 0 ? carouselRes.data : mockCarouselItems);
         } catch (error) {
           console.log('获取轮播图数据失败，使用模拟数据', error);
@@ -145,44 +147,6 @@ const handleAddCategory = async () => {
     setLoading(false);
   }
 };
-  // const handleAddCategory = async () => {
-  //   try {
-  //     const values = await categoryForm.validateFields();
-  //     const categoryName = values.name.trim();
-      
-  //     if (!categoryName) {
-  //       message.warning('分类名称不能为空');
-  //       return;
-  //     }
-
-  //     setLoading(true);
-  //     const formData = new URLSearchParams();
-  //     formData.append('name', categoryName);
-
-  //     const response = await adminApi.createCategory(formData); 
-      
-  //     if (response.code === 0) {
-  //       message.success('分类添加成功');
-  //       categoryForm.resetFields();
-  
-  //       const res = await adminApi.getCategoryList();
-  //       if (res.code === 0) {
-  //         setCategories(res.data.map(item => ({
-  //           id: item.id || item.categoryId,
-  //           name: item.name || item.categoryName || ''
-  //         })));
-  //       }
-  //     } else {
-  //       message.error('添加失败：' + (response.message || '服务器处理错误'));
-  //     }
-  //   } catch (error) {
-  //     if (error.name !== 'ValidateError') {
-  //       message.error('添加失败：' + (error.message || '操作异常'));
-  //     }
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
 
   const handleEditCategory = (record) => {
@@ -338,6 +302,7 @@ const handleAddCategory = async () => {
             if (currentEditCarousel?.id === deleteId) {
               carouselForm.resetFields();
               setCurrentEditCarousel(null);
+              setTempImage(null);
             }
           } else {
             message.error('删除失败：' + (response.message || '服务器处理错误'));
@@ -362,10 +327,11 @@ const handleAddCategory = async () => {
   };
 
 
-  // 轮播图功能完善
+  // 轮播图功能完善 - 调整为本地缓存图片
   const beforeUpload = (file) => {
     const isImage = file.type.startsWith('image/');
     const isLt2M = file.size / 1024 / 1024 < 2;
+    
     if (!isImage) {
       message.error('只能上传图片文件!');
       return false;
@@ -374,41 +340,50 @@ const handleAddCategory = async () => {
       message.error('图片大小不能超过2MB!');
       return false;
     }
-    return true;
+    
+    // 本地读取图片并显示预览，不立即上传到服务器
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      setTempImage({
+        file,
+        base64Url: e.target.result,
+        fileType: file.type
+      });
+      // 设置表单字段用于验证，但不包含实际的base64数据
+      carouselForm.setFieldsValue({ imageUrl: 'local-preview' });
+    };
+    
+    return false; // 阻止自动上传
   };
 
-  const handleImageUpload = async (file) => {
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // 假设存在图片上传接口
-      const uploadRes = await adminApi.uploadImage(formData);
-      if (uploadRes.code === 0 && uploadRes.data?.imageUrl) {
-        carouselForm.setFieldsValue({ imageUrl: uploadRes.data.imageUrl });
-        message.success('图片上传成功');
-        return true;
-      } else {
-        message.error('图片上传失败：' + (uploadRes.message || '未知错误'));
-        return false;
-      }
-    } catch (error) {
-      message.error('上传接口调用失败：' + error.message);
-      return false;
-    } finally {
-      setUploading(false);
-    }
+  // 移除临时图片
+  const removeTempImage = () => {
+    setTempImage(null);
+    carouselForm.setFieldsValue({ imageUrl: '' });
   };
 
-  const handleAddOrEditCarousel = async () => {
+const handleAddOrEditCarousel = async () => {
     try {
+      // 1. 验证表单
       const values = await carouselForm.validateFields();
+      
+      // 2. 处理图片数据 - 放入imageUrl字段
+      let imageUrl = values.imageUrl;
+      if (tempImage) {
+        // 提取base64数据部分（去除data:image/xxx;base64,前缀）
+        imageUrl = tempImage.base64Url;
+      } else if (currentEditCarousel) {
+        // 编辑状态且未上传新图片，保留原图片URL
+        imageUrl = currentEditCarousel.imageUrl;
+      }
+
+      // 3. 组装完整 payload - 只包含后端需要的字段
       const payload = {
         description: values.description || '',
-        imageUrl: values.imageUrl,
         link: values.link,
-        title: values.title
+        title: values.title,
+        imageUrl: imageUrl  // 使用后端期望的字段名
       };
 
       setCarouselLoading(true);
@@ -418,12 +393,15 @@ const handleAddCategory = async () => {
         const res = await adminApi.updateCarousel(currentEditCarousel.id, payload);
         if (res.code === 0) {
           message.success('轮播图更新成功');
+          // 更新本地列表
           const updatedItems = carouselItems.map(item => 
-            item.id === currentEditCarousel.id ? { ...item, ...payload } : item
+            item.id === currentEditCarousel.id ? { 
+              ...item, 
+              ...payload
+            } : item
           );
           setCarouselItems(updatedItems);
-          setCurrentEditCarousel(null);
-          carouselForm.resetFields();
+          resetCarouselForm();
         } else {
           message.error('更新失败：' + (res.message || '服务器错误'));
         }
@@ -432,9 +410,12 @@ const handleAddCategory = async () => {
         const res = await adminApi.addCarousel(payload);
         if (res.code === 0) {
           message.success('轮播图添加成功');
-          // 假设接口返回新增的完整数据，包含id
-          setCarouselItems([...carouselItems, { ...payload, id: res.data.id }]);
-          carouselForm.resetFields();
+          // 添加到本地列表
+          setCarouselItems([...carouselItems, { 
+            ...payload, 
+            id: res.data.id
+          }]);
+          resetCarouselForm();
         } else {
           message.error('添加失败：' + (res.message || '服务器错误'));
         }
@@ -448,19 +429,21 @@ const handleAddCategory = async () => {
     }
   };
 
+  const resetCarouselForm = () => {
+    carouselForm.resetFields();
+    setCurrentEditCarousel(null);
+    setTempImage(null);
+  };
+
   const handleEditCarousel = (record) => {
     setCurrentEditCarousel(record);
     carouselForm.setFieldsValue({
       title: record.title,
       description: record.description,
-      imageUrl: record.imageUrl,
+      imageUrl: record.imageUrl ? 'local-preview' : '',
       link: record.link
     });
-  };
-
-  const handleCancelEditCarousel = () => {
-    carouselForm.resetFields();
-    setCurrentEditCarousel(null);
+    setTempImage(null);
   };
 
   const moveCarouselItem = async (id, direction) => {
@@ -473,7 +456,7 @@ const handleAddCategory = async () => {
 
     try {
       setCarouselLoading(true);
-      // 假设存在调整排序接口
+      // 调整排序接口
       const res = await adminApi.updateCarouselOrder({
         id,
         targetId: swappedId,
@@ -508,7 +491,7 @@ const handleAddCategory = async () => {
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <Card title="系统设置" bordered={false}>
             <Tabs activeKey={activeTab} onChange={setActiveTab} tabBarStyle={{ marginBottom: 24 }}>
-              {/* 成果分类标签页（保持不变） */}
+              {/* 成果分类标签页 */}
               <TabPane tab="成果分类" key="categories">
                 <div style={{ marginBottom: 24 }}>
                   <Form form={categoryForm} layout="inline">
@@ -583,7 +566,7 @@ const handleAddCategory = async () => {
                 />
               </TabPane>
 
-              {/* 成果标签标签页（保持不变） */}
+              {/* 成果标签标签页 */}
               <TabPane tab="成果标签" key="tags">
                 <div style={{ marginBottom: 24 }}>
                   <Form form={tagForm} layout="inline">
@@ -633,7 +616,7 @@ const handleAddCategory = async () => {
                 </div>
               </TabPane>
 
-              {/* 首页轮播标签页（完善后） */}
+              {/* 首页轮播标签页（修改后） */}
               <TabPane tab="首页轮播" key="carousel">
                 <div style={{ marginBottom: 24, padding: 16, background: '#fff', borderRadius: 4 }}>
                   <h3 style={{ marginBottom: 16 }}>
@@ -671,21 +654,13 @@ const handleAddCategory = async () => {
                         listType="picture-card"
                         showUploadList={false}
                         beforeUpload={beforeUpload}
-                        customRequest={async ({ file, onSuccess, onError }) => {
-                          const success = await handleImageUpload(file);
-                          if (success) {
-                            onSuccess(file);
-                          } else {
-                            onError(new Error('上传失败'));
-                          }
-                        }}
                         disabled={uploading}
                       >
-                        {carouselForm.getFieldValue('imageUrl') ? (
+                        {tempImage ? (
                           <div style={{ position: 'relative' }}>
                             <Image 
-                              src={carouselForm.getFieldValue('imageUrl')} 
-                              alt="轮播图" 
+                              src={tempImage.base64Url} 
+                              alt="轮播图预览" 
                               style={{ width: '100%', borderRadius: 4 }} 
                             />
                             <Button
@@ -700,7 +675,44 @@ const handleAddCategory = async () => {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                carouselForm.setFieldsValue({ imageUrl: '' });
+                                removeTempImage();
+                              }}
+                            />
+                          </div>
+                        ) : currentEditCarousel && currentEditCarousel.imageUrl ? (
+                          // 编辑状态显示已有图片
+                          <div style={{ position: 'relative' }}>
+                            <Image 
+                              src={currentEditCarousel.imageUrl} 
+                              alt="轮播图预览" 
+                              style={{ width: '100%', borderRadius: 4 }} 
+                            />
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              background: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              textAlign: 'center'
+                            }}>
+                              点击上传新图片替换
+                            </div>
+                            <Button
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                background: 'rgba(0,0,0,0.5)',
+                                border: 'none'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeTempImage();
                               }}
                             />
                           </div>
@@ -708,7 +720,6 @@ const handleAddCategory = async () => {
                           <div style={{ padding: 24, textAlign: 'center' }}>
                             <UploadOutlined style={{ fontSize: 24, color: '#1890ff' }} />
                             <div style={{ marginTop: 8 }}>点击上传图片</div>
-                            {uploading && <div style={{ marginTop: 8, fontSize: 12 }}>上传中...</div>}
                           </div>
                         )}
                       </Upload>
@@ -724,7 +735,7 @@ const handleAddCategory = async () => {
                           {currentEditCarousel ? '保存修改' : '添加轮播图'}
                         </Button>
                         {currentEditCarousel && (
-                          <Button onClick={handleCancelEditCarousel}>取消编辑</Button>
+                          <Button onClick={resetCarouselForm}>取消编辑</Button>
                         )}
                       </Space>
                     </Form.Item>
