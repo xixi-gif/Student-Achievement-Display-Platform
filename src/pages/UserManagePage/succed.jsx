@@ -267,7 +267,7 @@ const UserManage = () => {
       userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
       userName: selectedUser.userName,
       status: values.status === "active" ? 0 : 1,  
-      realName: values.name,
+      realName: values.realName,
       email: values.email,
       phone: values.phone || "",
     
@@ -393,6 +393,7 @@ const handleToggleStatus = async (user) => {
       message.error("网络错误，删除失败");
     }
   };
+  
 
   // 验证学号唯一性
   const validateStudentId = async (_, value) => {
@@ -1181,7 +1182,7 @@ const handleToggleStatus = async (user) => {
                         label="学号"
                         rules={[
                           { required: true, message: "请输入学号" },
-                          { validator: validateStudentId },
+                         
                         ]}
                       >
                         <Input placeholder="如：2023611001" />

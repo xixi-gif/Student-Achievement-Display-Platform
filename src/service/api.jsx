@@ -162,13 +162,13 @@ export const adminApi = {
   getUserList: (params) => service.get('/admin/user', { params }),
   createUser: (data) => service.post('/admin/add', data),
   updateUser: (data) => service.post(`/admin/update/`, data),
-  
-  // deleteUser: (id) => service.post(`/admin/delete`,{ params: { id } }),
-  deleteUser: (data) => service.post({
-    url: '/user/delete',
-    method: 'post',
-    data: data  
-  }),
+ 
+
+    deleteUser: async (params) => {
+    const response = await service.post('/admin/delete', params);
+    return response.data; 
+  },
+
   resetUserPassword: (id, password) => service.put(`/admin/password`, { password } ,{ params: { id } }),
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
   

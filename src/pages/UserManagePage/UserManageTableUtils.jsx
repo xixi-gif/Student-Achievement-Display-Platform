@@ -1,7 +1,8 @@
-import { Badge, Tag, Space, Button, Avatar, Popconfirm } from "antd";
+import { Badge, Tag, Space, Button, Avatar, Popconfirm, Table } from "antd";
 import { EditOutlined, DeleteOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { getAvatarUrl } from "./UserManageHelpers";
+import { useState, useEffect } from "react";
 
 /**
  * 过滤用户数据（根据搜索关键词、筛选条件等）
@@ -12,10 +13,13 @@ import { getAvatarUrl } from "./UserManageHelpers";
  * @returns {Array} 过滤后的用户列表
  */
 export const getFilteredUsers = (users, activeTab, searchKeyword, columnFilters) => {
-  const { students, teachers } = users;
+  const { students, teachers } = users || { students: [], teachers: [] };
   const keyword = searchKeyword.toLowerCase();
   const isStudentTab = activeTab === "students";
   const currentData = isStudentTab ? students : teachers;
+
+  // 空数据处理
+  if (!currentData || currentData.length === 0) return [];
 
   const filterFn = (user) => {
     // 关键词匹配（姓名/学号/工号/邮箱）
@@ -27,19 +31,113 @@ export const getFilteredUsers = (users, activeTab, searchKeyword, columnFilters)
       : true;
 
     // 状态筛选匹配
-    const statusMatch = columnFilters.status.length > 0
+    const statusMatch = columnFilters.status?.length > 0
       ? columnFilters.status.includes(user.status)
       : true;
 
     // 专业/学院筛选匹配
     const categoryMatch = isStudentTab 
-      ? (columnFilters.major.length > 0 ? columnFilters.major.includes(user.major) : true)
-      : (columnFilters.department.length > 0 ? columnFilters.department.includes(user.department) : true);
+      ? (columnFilters.major?.length > 0 ? columnFilters.major.includes(user.major) : true)
+      : (columnFilters.department?.length > 0 ? columnFilters.department.includes(user.department) : true);
 
-    return keywordMatch && statusMatch && categoryMatch;
+    // 年级/职称筛选匹配
+    const gradeTitleMatch = isStudentTab
+      ? (columnFilters.className?.length > 0 
+          ? columnFilters.className.includes(user.className) 
+          : true)
+      : (columnFilters.title?.length > 0
+          ? columnFilters.title.includes(user.title)
+          : true);
+
+    return keywordMatch && statusMatch && categoryMatch && gradeTitleMatch;
   };
 
   return currentData.filter(filterFn);
+};
+
+/**
+ * 用户表格组件 - 包含完整的筛选逻辑和状态管理
+ */
+export const UserTable = ({ 
+  users, 
+  activeTab, 
+  isStudent 
+}) => {
+  // 状态管理 - 关键修复点
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [columnFilters, setColumnFilters] = useState({
+    status: [],
+    major: [],
+    department: [],
+    className: [],
+    title: []
+  });
+  const [filteredData, setFilteredData] = useState([]);
+
+  // 筛选条件变化时重新计算数据 - 关键修复点
+  useEffect(() => {
+    const data = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
+    setFilteredData(data);
+  }, [users, activeTab, searchKeyword, columnFilters]);
+
+  // 处理筛选条件变化 - 关键修复点
+  const handleColumnFilter = (filterKey, values) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [filterKey]: values
+    }));
+  };
+
+  // 处理搜索关键词变化
+  const handleSearch = (value) => {
+    setSearchKeyword(value);
+  };
+
+  // 示例回调函数（实际使用时替换为真实逻辑）
+  const handleEdit = (record) => {
+    console.log("编辑用户:", record);
+  };
+
+  const handleResetPassword = (record) => {
+    console.log("重置密码:", record);
+  };
+
+  const handleDelete = (id) => {
+    console.log("删除用户ID:", id);
+  };
+
+  // 获取表格列配置
+  const columns = getTableColumns(
+    isStudent,
+    handleEdit,
+    handleResetPassword,
+    () => {}, // 简化示例，实际需实现
+    handleDelete,
+    columnFilters,
+    handleColumnFilter,
+    users,
+    searchKeyword
+  );
+
+  return (
+    <div>
+      {/* 搜索框 - 实际项目中可使用Antd的Input.Search */}
+      <input
+        type="text"
+        placeholder="搜索姓名、学号/工号、邮箱..."
+        value={searchKeyword}
+        onChange={(e) => handleSearch(e.target.value)}
+        style={{ marginBottom: 16, padding: 8, width: 300 }}
+      />
+      
+      <Table
+        dataSource={filteredData}
+        columns={columns}
+        rowKey="id" // 确保每条数据有唯一的id
+        pagination={{ pageSize: 10 }}
+      />
+    </div>
+  );
 };
 
 /**
@@ -63,10 +161,10 @@ export const getTableColumns = (
   handleDelete,
   columnFilters,
   handleColumnFilter,
-  users,  // 新增：用户数据
-  searchKeyword  // 新增：搜索关键词
+  users,
+  searchKeyword
 ) => {
-  // 修复：获取当前标签页的用户数据用于生成筛选选项
+  // 获取当前标签页的用户数据用于生成筛选选项
   const currentTab = isStudent ? "students" : "teachers";
   const filteredUsers = getFilteredUsers(users, currentTab, searchKeyword, columnFilters);
 
@@ -91,14 +189,6 @@ export const getTableColumns = (
       title: "姓名",
       dataIndex: "name",
       key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      // 修复：使用正确过滤后的用户数据生成筛选选项
-      filters: [
-        ...Array.from(new Set(filteredUsers.map(user => user.name)))
-          .slice(0, 10)
-          .map(name => ({ text: name, value: name }))
-      ],
-      onFilter: (value, record) => record.name === value,
     },
     {
       title: isStudent ? "学号" : "工号",
@@ -112,9 +202,12 @@ export const getTableColumns = (
       key: isStudent ? "className" : "title",
       filters: [
         ...Array.from(new Set(filteredUsers.map(user => user[isStudent ? "className" : "title"])))
+          .filter(item => item) // 过滤空值
           .map(item => ({ text: item, value: item }))
       ],
+      filteredValue: columnFilters[isStudent ? "className" : "title"],
       onFilter: (value, record) => record[isStudent ? "className" : "title"] === value,
+      onFilterChange: (values) => handleColumnFilter(isStudent ? "className" : "title", values),
     },
     {
       title: isStudent ? "专业" : "学院",
@@ -122,6 +215,7 @@ export const getTableColumns = (
       key: isStudent ? "major" : "department",
       filters: [
         ...Array.from(new Set(filteredUsers.map(user => user[isStudent ? "major" : "department"])))
+          .filter(item => item) // 过滤空值
           .map(item => ({ text: item, value: item }))
       ],
       onFilter: (value, record) => record[isStudent ? "major" : "department"] === value,
@@ -176,13 +270,7 @@ export const getTableColumns = (
           >
             重置密码
           </Button>
-          <Button
-            danger={record.status === "active"}
-            type="link"
-            onClick={() => handleToggleStatus(record)}
-          >
-            {record.status === "active" ? "禁用" : "启用"}
-          </Button>
+
           <Popconfirm
             title="确定删除此用户？"
             onConfirm={() => handleDelete(record.id)}
