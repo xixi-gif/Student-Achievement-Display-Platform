@@ -180,8 +180,12 @@ export const adminApi = {
 
   //分类设置接口
   getCategoryList: () => service.get('/admin/categories',),
-  createCategory: (data) => service.post('/admin/categories/add', data),
-  // deleteCategory: (id) => service.delete(`/admin/categories/delete`,id),
+  createCategory: (categoryName) => {
+    const params = new URLSearchParams();
+    params.append('name', categoryName); 
+    return service.post(`/admin/categories/add?${params}`); 
+  },
+
   deleteCategory: (id) => service.post(
     '/admin/categories/delete',
     null, 
@@ -193,7 +197,12 @@ export const adminApi = {
 
   //标签设置接口
   getTagList: () => service.get('/tags/tags'),
-  createTag: (data) => service.post('/tags/add', data),
+  // createTag: (data) => service.post('/tags/add', data),
+  createTag: (tagName) => {
+    const params = new URLSearchParams();
+    params.append('name', tagName); 
+    return service.post(`/tags/add?${params}`); 
+  },
   deleteTag: (id) => service.delete(`/tags/${id}`),
   
   // 系统设置接口
@@ -204,6 +213,11 @@ export const adminApi = {
   getAllAchievements: (params) => service.get('/admin/achievements', { params }),
   deleteAchievement: (id) => service.delete(`/admin/achievements/${id}`),
   updateAchievementStatus: (id, status) => service.post(`/admin/achievements/${id}/status`, { status }),
+
+  //轮播图接口
+  addCarousel:(data) => service.post('/carousel',data),
+  updateCarouselOrder: (data) => service.put('/carousel/order',data),
+  deleteCarousel:(id) => service.delete(`/carousel/${id}`),
   
   // 批量操作接口
   batchImportUsers: (data) => {
@@ -217,6 +231,7 @@ export const adminApi = {
   },
   batchDeleteUsers: (ids) => service.post('/admin/users/batch-delete', { ids }),
 };
+
 
 export default {
   authApi,

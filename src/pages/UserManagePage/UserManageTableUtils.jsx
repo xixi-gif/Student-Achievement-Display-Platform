@@ -5,12 +5,11 @@ import { getAvatarUrl } from "./UserManageHelpers";
 import { useState, useEffect } from "react";
 
 /**
- * 过滤用户数据（根据搜索关键词、筛选条件等）
- * @param {Object} users - 用户数据（students/teachers）
- * @param {string} activeTab - 当前激活的标签页（students/teachers）
- * @param {string} searchKeyword - 搜索关键词
- * @param {Object} columnFilters - 列筛选条件
- * @returns {Array} 过滤后的用户列表
+ * @param {Object} users 
+ * @param {string} activeTab 
+ * @param {string} searchKeyword 
+ * @param {Object} columnFilters
+ * @returns {Array} 
  */
 export const getFilteredUsers = (users, activeTab, searchKeyword, columnFilters) => {
   const { students, teachers } = users || { students: [], teachers: [] };
@@ -111,7 +110,7 @@ export const UserTable = ({
     isStudent,
     handleEdit,
     handleResetPassword,
-    () => {}, // 简化示例，实际需实现
+    () => {}, 
     handleDelete,
     columnFilters,
     handleColumnFilter,
