@@ -91,7 +91,6 @@ const MyAchievements = () => {
   const fetchCategories = async () => {
     setCategoriesLoading(true);
     try {
-      // 假设分类接口为 /category/list（根据后端CategoryService逻辑调整）
       const response = await adminApi.getCategoryList(); 
       if (response.code === 0) {
         // 后端分类字段为id和name，映射为前端需要的value和label

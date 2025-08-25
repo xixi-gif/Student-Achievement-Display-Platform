@@ -118,8 +118,8 @@ export const authorApi = {
 
 
 export const achievementApi = {
-  getList: () => service.get('/achievements'),
-  getDetail: (id) => service.get(`/achievements/${id}`),
+  getList: (params) => service.get('/student/achievements',{params}),
+  getDetail: (id) => service.get(`/student/achievements/${id}`),
   getMyAchievements: () => service.get('/achievement/my/achievements'),
   createAchievement: (data) => service.post('/achievement/add', data,{
     headers: {
@@ -138,7 +138,7 @@ export const achievementApi = {
   // 审核通过
   approve: (id) => service.post(`/teacher/review/approve`,null,{ params: { id } }),
   // 审核驳回
-  reject: (id, reason) => service.post(`/teacher/review/reject`, { reason },{ params: { id } }),
+  reject: (id, reason) => service.post(`/teacher/review/reject`, {id, reason }),
   //获取推荐列表
   getRecommendList: (params) => service.get('/teacher/recommend', { params }),
   // 切换推荐状态
@@ -161,7 +161,7 @@ export const studentApi = {
 
 export const teacherApi = {
   getProfile: () => service.get('/teacher/profile'),
-  updateProfile: (data) => service.put('/teacher/update/profile', data),
+  updateProfile: (data) => service.post('/teacher/profile', data),
   listReviewAchievements: () => service.get('/teacher/review'),
   listRecommendations: () => service.get('/teacher/recommend')
 };

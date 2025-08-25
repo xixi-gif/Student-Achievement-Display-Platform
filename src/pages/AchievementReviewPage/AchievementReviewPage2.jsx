@@ -15,7 +15,7 @@ import {
   message,
   Select,
   Spin,
-  Popover
+  Popover,
 } from "antd";
 import {
   CheckOutlined,
@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
-import { achievementApi } from "../../service/api";
+import { achievementApi, adminApi } from "../../service/api";
 
 const { Content, Footer } = Layout;
 const { Search } = Input;
@@ -48,6 +48,9 @@ const AchievementReviewPage = () => {
   const [searchText, setSearchText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all"); // all, pending, approved, rejected
   const navigate = useNavigate();
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("");
 
   // 状态映射：后端text -> 页面显示文本
   const statusMap = {
@@ -76,6 +79,7 @@ const AchievementReviewPage = () => {
         keyword: searchText,
         // 转换筛选状态
         status: filterStatus === "all" ? null : filterStatus,
+        category: filterCategory,
       };
 
       // const res = await achievementApi.getPendingList(params);
@@ -118,6 +122,28 @@ const AchievementReviewPage = () => {
     }
   };
 
+  //获取分类数据
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const response = await adminApi.getCategoryList();
+      if (response.code === 0) {
+        // 后端分类字段为id和name，映射为前端需要的value和label
+        setCategories(
+          response.data.map((item) => ({
+            value: item.name, // 与后端返回的category名称匹配
+            label: item.name,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("获取分类失败:", error);
+      message.error("获取分类数据失败");
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
   useEffect(() => {
     // 加载用户信息
     const role = localStorage.getItem("user_role") || "teacher";
@@ -127,25 +153,41 @@ const AchievementReviewPage = () => {
     }/200/200`;
     setCurrentUser({ role, username, avatar });
 
-    // 加载审核数据
-    fetchData();
-  }, [pagination.current, pagination.pageSize, filterStatus, searchText]);
+    // 加载审核数据和分类数据
+    const hide = message.loading("正在加载审核成果数据...", 0);
+    Promise.all([fetchData(), fetchCategories()]).finally(hide);
+  }, [
+    pagination.current,
+    pagination.pageSize,
+    filterStatus,
+    searchText,
+    filterCategory,
+  ]);
 
   // 处理分页变化
   const handleTableChange = (pag) => {
     setPagination(pag);
+    // message.loading('加载中...', 0.5); // 0.5秒后自动消失
   };
 
   // 审核通过
-  const handleApprove = async (id) => {
-    try {
-      await achievementApi.approve(id);
-      message.success("老师审核通过");
-      fetchData(); // 重新加载数据
-    } catch (error) {
-      console.error("审核通过失败:", error);
-      message.error("操作失败，请重试");
-    }
+  const handleApprove = async (id, title) => {
+    Modal.confirm({
+      title: "确认通过审核",
+      content: `确定要通过成果《${title}》的审核吗？`,
+      okText: "确认通过",
+      cancelText: "取消",
+      onOk: async () => {
+        try {
+          await achievementApi.approve(id);
+          message.success("老师审核通过");
+          fetchData(); // 重新加载数据
+        } catch (error) {
+          console.error("审核通过失败:", error);
+          message.error("操作失败，请重试");
+        }
+      },
+    });
   };
 
   // 审核驳回
@@ -154,9 +196,13 @@ const AchievementReviewPage = () => {
       message.warning("请填写驳回理由");
       return;
     }
+    if (rejectReason.trim().length < 10) {
+      message.warning("驳回理由至少需要10个字");
+      return;
+    }
     try {
       await achievementApi.reject(selectedItem.id, rejectReason);
-      message.success("已驳回该成果");
+      message.success(`已驳回成果:《${selectedItem.title}》`);
       setReviewModalVisible(false);
       setRejectReason("");
       fetchData(); // 重新加载数据
@@ -182,7 +228,7 @@ const AchievementReviewPage = () => {
             <Tag color="error">{statusMap.rejected}</Tag>
           </Tooltip>
         );
-      case 'published':
+      case "published":
         return <Tag color="blue">{statusMap.published}</Tag>;
       default:
         return <Tag color="processing">{statusMap.pending}</Tag>;
@@ -198,16 +244,26 @@ const AchievementReviewPage = () => {
         <Popover
           content={
             <div style={{ width: 300 }}>
-              <p><strong>学生：</strong>{record.userName}</p>
-              <p><strong>类型：</strong>{record.category || '未分类'}</p>
-              <p><strong>关键词：</strong>
-              {typeof record.keyword === 'string' 
-                ? record.keyword 
-                : Array.isArray(record.keyword) 
-                  ? record.keyword.join(', ') 
-                  : '无'}
-            </p>
-              <p><strong>成果描述：</strong>{record.description}</p>
+              <p>
+                <strong>学生：</strong>
+                {record.userName}
+              </p>
+              <p>
+                <strong>类型：</strong>
+                {record.category || "未分类"}
+              </p>
+              <p>
+                <strong>关键词：</strong>
+                {typeof record.keyword === "string"
+                  ? record.keyword
+                  : Array.isArray(record.keyword)
+                  ? record.keyword.join(", ")
+                  : "无"}
+              </p>
+              <p>
+                <strong>成果描述：</strong>
+                {record.description}
+              </p>
             </div>
           }
         >
@@ -215,7 +271,7 @@ const AchievementReviewPage = () => {
             {text}
           </a>
         </Popover>
-      )
+      ),
     },
     {
       title: "学生姓名",
@@ -250,7 +306,7 @@ const AchievementReviewPage = () => {
               <Button
                 type="primary"
                 icon={<CheckOutlined />}
-                onClick={() => handleApprove(record.id)}
+                onClick={() => handleApprove(record.id, record.title)}
               >
                 通过
               </Button>
@@ -305,8 +361,26 @@ const AchievementReviewPage = () => {
                   </Option>
                 ))}
               </Select>
+              <Select
+                placeholder="成果类型"
+                allowClear
+                style={{ width: 120 }}
+                loading={categoriesLoading}
+                value={filterCategory}
+                onChange={(val) => {
+                  setFilterCategory(val);
+                  setPagination({ ...pagination, current: 1 }); // 重置到第一页
+                }}
+              >
+                <Option value={""}>全部类型</Option>
+                {categories.map((c) => (
+                  <Option key={c.value} value={c.value}>
+                    {c.label}
+                  </Option>
+                ))}
+              </Select>
               <Search
-                placeholder="搜索成果/关键词"
+                placeholder="搜索成果/关键词/学生"
                 allowClear
                 enterButton={<SearchOutlined />}
                 style={{ width: 250 }}
@@ -320,6 +394,25 @@ const AchievementReviewPage = () => {
             rowKey="id"
             dataSource={data}
             loading={loading}
+            locale={{
+              emptyText:
+                searchText || filterStatus !== "all" ? (
+                  <div>
+                    <p>没有找到匹配的成果</p>
+                    <Button
+                      type="link"
+                      onClick={() => {
+                        setSearchText("");
+                        setFilterStatus("all");
+                      }}
+                    >
+                      清除筛选条件
+                    </Button>
+                  </div>
+                ) : (
+                  <p>暂无待审核的成果</p>
+                ),
+            }}
             pagination={{
               ...pagination,
               showSizeChanger: true,
@@ -359,9 +452,18 @@ const AchievementReviewPage = () => {
               rows={4}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
+              minLength={10}
               placeholder="请详细说明驳回原因（至少10字）"
               showCount
-              maxLength={200}
+              onBlur={(e) => {
+                if (
+                  e.target.value.trim().length < 10 &&
+                  e.target.value.length > 0
+                ) {
+                  message.warning("驳回理由至少需要10个字");
+                }
+              }}
+              // maxLength={200}
             />
           </Modal>
         </Card>

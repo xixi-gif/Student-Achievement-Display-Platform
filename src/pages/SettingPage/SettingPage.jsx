@@ -151,7 +151,10 @@ const AccountSettingsPage = () => {
             extra={
               <Button 
                 type="link" 
-                onClick={() => navigate('/profile')}
+                onClick={() => {
+                  const role = userInfo?.userRole || 'visitor';
+                  navigate(`/${role}/profile`)
+                }}
               >
                 返回个人资料
               </Button>

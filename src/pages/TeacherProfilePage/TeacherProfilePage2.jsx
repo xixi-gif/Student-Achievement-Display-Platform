@@ -78,7 +78,7 @@ const TeacherProfile = () => {
           researchField: profileResponse.researchField,
           email: profileResponse.email,
           phone: profileResponse.phone,
-          bio: "",
+          bio: profileResponse.bio,
           avatar: profileResponse.avatar,
         };
 
@@ -166,13 +166,14 @@ const TeacherProfile = () => {
     try {
       const values = await form.validateFields();
       const updatedData = {
-        username: values.realName,
+        realName: values.realName,
         department: values.department,
         title: values.title,
         researchField: values.researchField,
         email: values.email,
         phone: values.phone,
         bio: values.bio,
+        teacherId: currentUser.teacherId,
       };
 
       await teacherApi.updateProfile(updatedData);
@@ -471,9 +472,11 @@ const TeacherProfile = () => {
                 >
                   {currentUser.avatar ? (
                     <Avatar
-                      size={160}
+                    shape="square" // 正方形头像
+                      size={100}
                       src={currentUser.avatar}
                       icon={<UserOutlined />}
+                      style={{ objectFit: 'cover' }}  // 防止图片被拉伸
                     />
                   ) : (
                     <div>
@@ -548,7 +551,7 @@ const TeacherProfile = () => {
                       { required: true },
                       { type: "email" },
                       {
-                        pattern: /@(edu\.cn|school\.edu)$/,
+                        pattern: /@(stu.edu\.cn|school\.edu)$/,
                         message: "请使用学校邮箱",
                       },
                     ]}
@@ -645,65 +648,6 @@ const TeacherProfile = () => {
                     </Button>
                   </div>
                 </Spin>
-              </TabPane>
-
-              <TabPane
-                tab={
-                  <span>
-                    <LockOutlined /> 账号安全
-                  </span>
-                }
-                key="security"
-              >
-                <Space direction="vertical" style={{ width: "100%" }}>
-                  <Card title="修改密码" bordered={false}>
-                    <Form layout="vertical" style={{ maxWidth: 600 }}>
-                      <Form.Item label="原密码" name="oldPassword">
-                        <Input.Password />
-                      </Form.Item>
-                      <Form.Item label="新密码" name="newPassword">
-                        <Input.Password />
-                      </Form.Item>
-                      <Form.Item>
-                        <Button
-                          type="primary"
-                          onClick={async () => {
-                            try {
-                              const values = await form.validateFields();
-                              await authApi.changePassword(
-                                values.oldPassword,
-                                values.newPassword
-                              );
-                              message.success("密码修改成功");
-                            } catch (error) {
-                              message.error(error.message || "密码修改失败");
-                            }
-                          }}
-                        >
-                          确认修改
-                        </Button>
-                      </Form.Item>
-                    </Form>
-                  </Card>
-
-                  <div style={{ textAlign: "center", marginTop: 24 }}>
-                    <Popconfirm
-                      title="确定要退出登录吗？"
-                      onConfirm={async () => {
-                        try {
-                          await authApi.logout();
-                        } finally {
-                          localStorage.clear();
-                          navigate("/login");
-                        }
-                      }}
-                    >
-                      <Button danger icon={<LogoutOutlined />}>
-                        退出登录
-                      </Button>
-                    </Popconfirm>
-                  </div>
-                </Space>
               </TabPane>
             </Tabs>
           </Card>
