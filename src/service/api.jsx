@@ -175,7 +175,7 @@ export const adminApi = {
   createUser: (data) => service.post('/admin/add', data),
   updateUser: (data) => service.post(`/admin/update/`, data),
  
- deleteUser: (params) => service.post('/admin/delete', params),
+  deleteUser: (params) => service.post('/admin/delete', params),
 
   resetUserPassword: (id, password) => service.put(`/admin/password`, { password } ,{ params: { id } }),
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
@@ -187,7 +187,7 @@ export const adminApi = {
   getUserStats: () => service.get('/admin/statistics/users'),
 
   //分类设置接口
-  getCategoryList: () => service.get('/admin/categories',),
+  getCategoryList: () => service.get('/admin/categories'),
   createCategory: (categoryName) => {
     const params = new URLSearchParams();
     params.append('name', categoryName); 
@@ -222,10 +222,28 @@ export const adminApi = {
   deleteAchievement: (id) => service.delete(`/admin/achievements/${id}`),
   updateAchievementStatus: (id, status) => service.post(`/admin/achievements/${id}/status`, { status }),
 
-  //轮播图接口
-  addCarousel:(data) => service.post('/carousel',data),
-  updateCarouselOrder: (data) => service.put('/carousel/order',data),
+  // 轮播图
+  addCarousel: (formData) => {
+    return service.post('/carousel/upload', formData, {
+      headers: { 'Content-Type': undefined }
+    });
+  },
+
+  updateCarousel: (formData) => {
+    return service.put(`/carousel/update`, formData, {
+      headers: { 'Content-Type': undefined }
+    });
+  },
+  
   deleteCarousel:(id) => service.delete(`/carousel/${id}`),
+  getCarousel:(params) => service.get('/carousel',{params}),
+  //轮播图顺序
+  adjustSequence: (id, direction) => service.put(
+    `/carousel/${id}/sequence`,
+    null, 
+    { params: { direction } } 
+  ),
+  
   
   // 批量操作接口
   batchImportUsers: (data) => {

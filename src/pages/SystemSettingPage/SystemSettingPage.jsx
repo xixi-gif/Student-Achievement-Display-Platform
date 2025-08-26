@@ -14,7 +14,7 @@ const mockCarouselItems = [
     description: '展示本年度学生优秀科研成果',
     imageUrl: 'https://example.com/banner1.jpg',
     link: '/achievements',
-    order: 1
+    sequence: 1
   }
 ];
 
@@ -92,10 +92,15 @@ const SystemSettingsPage = () => {
           message.error('获取标签失败：' + (tagRes.message || '接口返回错误'));
         }
 
-        // 加载轮播图数据
+        // 加载轮播图数据 - 修改为使用getCarousel接口
         try {
-          const carouselRes = await adminApi.getCarouselList();
-          setCarouselItems(carouselRes.code === 0 ? carouselRes.data : mockCarouselItems);
+          const carouselRes = await adminApi.getCarousel();
+          if (carouselRes.code === 0) {
+            setCarouselItems(carouselRes.data || []);
+          } else {
+            message.warning('轮播图数据获取失败，使用默认数据');
+            setCarouselItems(mockCarouselItems);
+          }
         } catch (error) {
           console.log('获取轮播图数据失败，使用模拟数据', error);
           setCarouselItems(mockCarouselItems);
@@ -248,78 +253,154 @@ const handleAddCategory = async () => {
     setDeleteId(id);
     setDeleteModalVisible(true);
   };
-
-
   const confirmDelete = async () => {
-    if (!deleteId) {
-      message.warning('未获取到ID，请重试');
-      setDeleteModalVisible(false);
-      return;
-    }
+  if (!deleteId) {
+    message.warning('未获取到ID，请重试');
+    setDeleteModalVisible(false);
+    return;
+  }
 
-    try {
-      if (activeTab === 'categories') {
-        setLoading(true);
-        const response = await adminApi.deleteCategory(deleteId);
-        if (response.code === 0) {
-          message.success('分类删除成功');
-          const res = await adminApi.getCategoryList();
-          if (res.code === 0) {
-            setCategories(res.data.map(item => ({
-              id: item.id || item.categoryId,
-              name: item.name || item.categoryName || ''
-            })));
-          }
-          if (currentEditId === deleteId) {
-            categoryForm.resetFields();
-            setCurrentEditId(null);
-          }
-        } else {
-          message.error('删除失败：' + (response.message || '服务器处理错误'));
+  try {
+    // 1. 分类删除（原逻辑不变）
+    if (activeTab === 'categories') {
+      setLoading(true);
+      const response = await adminApi.deleteCategory(deleteId);
+      if (response.code === 0) {
+        message.success('分类删除成功');
+        const res = await adminApi.getCategoryList();
+        if (res.code === 0) {
+          setCategories(res.data.map(item => ({
+            id: item.id || item.categoryId,
+            name: item.name || item.categoryName || ''
+          })));
         }
-      } else if (activeTab === 'tags') {
-        setTagLoading(true);
-        const response = await adminApi.deleteTag(deleteId);
-        if (response.code === 0) {
-          message.success('标签删除成功');
-          const res = await adminApi.getTagList();
-          if (res.code === 0) {
-            setTags(res.data.filter(item => !item.isDeleted).map(item => ({
-              id: item.id || item.tagId,
-              name: item.name || item.tagName || ''
-            })));
-          }
-        } else if (activeTab === 'carousel') {
-          // 轮播图删除逻辑
-          setCarouselLoading(true);
-          const response = await adminApi.deleteCarousel(deleteId);
-          if (response.code === 0) {
-            message.success('轮播图删除成功');
-            const res = await adminApi.getCarouselList();
-            if (res.code === 0) {
-              setCarouselItems(res.data || []);
-            }
-            if (currentEditCarousel?.id === deleteId) {
-              carouselForm.resetFields();
-              setCurrentEditCarousel(null);
-              setTempImage(null);
-            }
-          } else {
-            message.error('删除失败：' + (response.message || '服务器处理错误'));
-          }
+        if (currentEditId === deleteId) {
+          categoryForm.resetFields();
+          setCurrentEditId(null);
         }
+      } else {
+        message.error('删除失败：' + (response.message || '服务器处理错误'));
       }
-    } catch (error) {
-      console.error('删除异常：', error);
-      message.error('删除失败：' + (error.message || '网络异常'));
-    } finally {
-      setDeleteModalVisible(false);
-      setDeleteId(null);
-      setLoading(false);
-      setTagLoading(false);
-      setCarouselLoading(false);
+    } 
+    // 2. 标签删除（原逻辑不变，注意这里是独立的 else if）
+    else if (activeTab === 'tags') {
+      setTagLoading(true);
+      const response = await adminApi.deleteTag(deleteId);
+      if (response.code === 0) {
+        message.success('标签删除成功');
+        const res = await adminApi.getTagList();
+        if (res.code === 0) {
+          setTags(res.data.filter(item => !item.isDeleted).map(item => ({
+            id: item.id || item.tagId,
+            name: item.name || item.tagName || ''
+          })));
+        }
+      } else {
+        message.error('删除失败：' + (response.message || '服务器处理错误'));
+      }
+    } 
+    // 3. 轮播图删除（关键：单独拎出来作为独立分支，不再嵌套）
+    else if (activeTab === 'carousel') {
+      setCarouselLoading(true);
+      const response = await adminApi.deleteCarousel(deleteId);
+      if (response.code === 0) {
+        message.success('轮播图删除成功');
+        const res = await adminApi.getCarousel();
+        if (res.code === 0) {
+          setCarouselItems(res.data || []);
+        }
+        if (currentEditCarousel?.id === deleteId) {
+          carouselForm.resetFields();
+          setCurrentEditCarousel(null);
+          setTempImage(null);
+        }
+      } else {
+        message.error('删除失败：' + (response.message || '服务器处理错误'));
+      }
     }
-  };
+  } catch (error) {
+    console.error('删除异常：', error);
+    message.error('删除失败：' + (error.message || '网络异常'));
+  } finally {
+    setDeleteModalVisible(false);
+    setDeleteId(null);
+    setLoading(false);
+    setTagLoading(false);
+    setCarouselLoading(false);
+  }
+};
+
+
+  // const confirmDelete = async () => {
+  //   if (!deleteId) {
+  //     message.warning('未获取到ID，请重试');
+  //     setDeleteModalVisible(false);
+  //     return;
+  //   }
+
+  //   try {
+  //     if (activeTab === 'categories') {
+  //       setLoading(true);
+  //       const response = await adminApi.deleteCategory(deleteId);
+  //       if (response.code === 0) {
+  //         message.success('分类删除成功');
+  //         const res = await adminApi.getCategoryList();
+  //         if (res.code === 0) {
+  //           setCategories(res.data.map(item => ({
+  //             id: item.id || item.categoryId,
+  //             name: item.name || item.categoryName || ''
+  //           })));
+  //         }
+  //         if (currentEditId === deleteId) {
+  //           categoryForm.resetFields();
+  //           setCurrentEditId(null);
+  //         }
+  //       } else {
+  //         message.error('删除失败：' + (response.message || '服务器处理错误'));
+  //       }
+  //     } else if (activeTab === 'tags') {
+  //       setTagLoading(true);
+  //       const response = await adminApi.deleteTag(deleteId);
+  //       if (response.code === 0) {
+  //         message.success('标签删除成功');
+  //         const res = await adminApi.getTagList();
+  //         if (res.code === 0) {
+  //           setTags(res.data.filter(item => !item.isDeleted).map(item => ({
+  //             id: item.id || item.tagId,
+  //             name: item.name || item.tagName || ''
+  //           })));
+  //         }
+  //       } else if (activeTab === 'carousel') {
+  //         // 轮播图删除逻辑
+  //         setCarouselLoading(true);
+  //         const response = await adminApi.deleteCarousel(deleteId);
+  //         if (response.code === 0) {
+  //           message.success('轮播图删除成功');
+  //           const res = await adminApi.getCarousel();
+  //           if (res.code === 0) {
+  //             setCarouselItems(res.data || []);
+  //           }
+  //           if (currentEditCarousel?.id === deleteId) {
+  //             carouselForm.resetFields();
+  //             setCurrentEditCarousel(null);
+  //             setTempImage(null);
+  //           }
+  //         } else {
+  //           message.error('删除失败：' + (response.message || '服务器处理错误'));
+  //         }
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('删除异常：', error);
+  //     message.error('删除失败：' + (error.message || '网络异常'));
+  //   } finally {
+  //     setDeleteModalVisible(false);
+  //     setDeleteId(null);
+  //     setLoading(false);
+  //     setTagLoading(false);
+  //     setCarouselLoading(false);
+  //   }
+  // };
 
   const cancelDelete = () => {
     setDeleteModalVisible(false);
@@ -327,35 +408,24 @@ const handleAddCategory = async () => {
   };
 
 
-  // 轮播图功能完善 - 调整为本地缓存图片
-  const beforeUpload = (file) => {
-    const isImage = file.type.startsWith('image/');
-    const isLt2M = file.size / 1024 / 1024 < 2;
-    
-    if (!isImage) {
-      message.error('只能上传图片文件!');
-      return false;
-    }
-    if (!isLt2M) {
-      message.error('图片大小不能超过2MB!');
-      return false;
-    }
-    
-    // 本地读取图片并显示预览，不立即上传到服务器
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (e) => {
-      setTempImage({
-        file,
-        base64Url: e.target.result,
-        fileType: file.type
-      });
-      // 设置表单字段用于验证，但不包含实际的base64数据
-      carouselForm.setFieldsValue({ imageUrl: 'local-preview' });
-    };
-    
-    return false; // 阻止自动上传
+const beforeUpload = (file) => {
+  const isImage = file.type.startsWith('image/');
+  const isLt2M = file.size / 1024 / 1024 < 2;
+  if (!isImage) { message.error('只能上传图片文件!'); return false; }
+  if (!isLt2M) { message.error('图片大小不能超过2MB!'); return false; }
+
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = (e) => {
+    setTempImage({
+      file: file, 
+      base64Url: e.target.result,
+      fileType: file.type
+    });
+    carouselForm.setFieldsValue({ imageUrl: 'local-preview' });
   };
+  return false; 
+};
 
   // 移除临时图片
   const removeTempImage = () => {
@@ -363,71 +433,65 @@ const handleAddCategory = async () => {
     carouselForm.setFieldsValue({ imageUrl: '' });
   };
 
-const handleAddOrEditCarousel = async () => {
-    try {
-      // 1. 验证表单
-      const values = await carouselForm.validateFields();
-      
-      // 2. 处理图片数据 - 放入imageUrl字段
-      let imageUrl = values.imageUrl;
-      if (tempImage) {
-        // 提取base64数据部分（去除data:image/xxx;base64,前缀）
-        imageUrl = tempImage.base64Url;
-      } else if (currentEditCarousel) {
-        // 编辑状态且未上传新图片，保留原图片URL
-        imageUrl = currentEditCarousel.imageUrl;
-      }
 
-      // 3. 组装完整 payload - 只包含后端需要的字段
-      const payload = {
-        description: values.description || '',
-        link: values.link,
-        title: values.title,
-        imageUrl: imageUrl  // 使用后端期望的字段名
-      };
-
-      setCarouselLoading(true);
-      
-      if (currentEditCarousel) {
-        // 编辑模式
-        const res = await adminApi.updateCarousel(currentEditCarousel.id, payload);
-        if (res.code === 0) {
-          message.success('轮播图更新成功');
-          // 更新本地列表
-          const updatedItems = carouselItems.map(item => 
-            item.id === currentEditCarousel.id ? { 
-              ...item, 
-              ...payload
-            } : item
-          );
-          setCarouselItems(updatedItems);
-          resetCarouselForm();
-        } else {
-          message.error('更新失败：' + (res.message || '服务器错误'));
-        }
-      } else {
-        // 添加模式
-        const res = await adminApi.addCarousel(payload);
-        if (res.code === 0) {
-          message.success('轮播图添加成功');
-          // 添加到本地列表
-          setCarouselItems([...carouselItems, { 
-            ...payload, 
-            id: res.data.id
-          }]);
-          resetCarouselForm();
-        } else {
-          message.error('添加失败：' + (res.message || '服务器错误'));
-        }
-      }
-    } catch (error) {
-      if (error.name !== 'ValidateError') {
-        message.error('操作失败：' + (error.message || '网络异常'));
-      }
-    } finally {
-      setCarouselLoading(false);
+  const handleAddOrEditCarousel = async () => {
+  try {
+    const values = await carouselForm.validateFields();
+    
+    if (!currentEditCarousel && !tempImage) {
+      message.error('请上传轮播图图片');
+      return;
     }
-  };
+
+    const formData = new FormData();
+    // 关键：编辑场景必须传递id，且参数名必须为"id"（与后端@RequestParam("id")完全一致）
+    if (currentEditCarousel) {
+      // 强制转换为字符串，避免数字类型导致的解析问题
+      formData.append('id', String(currentEditCarousel.id)); 
+    }
+    formData.append('title', values.title);
+    formData.append('description', values.description || '');
+    formData.append('link', values.link);
+    if (tempImage) {
+      formData.append('imageFile', tempImage.file); 
+    }
+
+    setCarouselLoading(true);
+
+    if (currentEditCarousel) {
+      console.log('编辑轮播图ID:', currentEditCarousel.id);
+      const res = await adminApi.updateCarousel(formData);
+      if (res.code === 0) {
+        message.success('轮播图更新成功');
+        const res = await adminApi.getCarousel();
+        if (res.code === 0) {
+          setCarouselItems(res.data || []);
+        }
+        resetCarouselForm();
+      } else {
+        message.error('更新失败：' + (res.message || '服务器错误'));
+      }
+    } else {
+      const res = await adminApi.addCarousel(formData);
+      if (res.code === 0) {
+        message.success('轮播图添加成功');
+        const res = await adminApi.getCarousel();
+        if (res.code === 0) {
+          setCarouselItems(res.data || []);
+        }
+        resetCarouselForm();
+      } else {
+        message.error('添加失败：' + (res.message || '服务器错误'));
+      }
+    }
+  } catch (error) {
+    if (error.name !== 'ValidateError') {
+      message.error('操作失败：' + (error.message || '网络异常'));
+    }
+  } finally {
+    setCarouselLoading(false);
+  }
+};
 
   const resetCarouselForm = () => {
     carouselForm.resetFields();
@@ -446,37 +510,72 @@ const handleAddOrEditCarousel = async () => {
     setTempImage(null);
   };
 
-  const moveCarouselItem = async (id, direction) => {
-    const index = carouselItems.findIndex(item => item.id === id);
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === carouselItems.length - 1)) return;
+  // 修改轮播图顺序调整方法
+const moveCarouselItem = async (id, direction) => {
+  const currentIndex = carouselItems.findIndex(item => item.id === id);
+  if ((direction === 'up' && currentIndex === 0) || 
+      (direction === 'down' && currentIndex === carouselItems.length - 1)) {
+    message.warning('已到达边界，无法继续移动');
+    return;
+  }
+
+  const newItems = [...carouselItems];
+  const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+  try {
+    setCarouselLoading(true);
+    const res = await adminApi.adjustSequence(id, direction);
     
-    const newItems = [...carouselItems];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    const swappedId = newItems[newIndex].id;
-
-    try {
-      setCarouselLoading(true);
-      // 调整排序接口
-      const res = await adminApi.updateCarouselOrder({
-        id,
-        targetId: swappedId,
-        direction
-      });
-
-      if (res.code === 0) {
-        // 交换前端数据
-        [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
-        setCarouselItems(newItems);
-        message.success('顺序调整成功');
-      } else {
-        message.error('排序失败：' + (res.message || '服务器错误'));
-      }
-    } catch (error) {
-      message.error('排序操作失败：' + error.message);
-    } finally {
-      setCarouselLoading(false);
+    if (res.code === 0) {
+      [newItems[currentIndex], newItems[targetIndex]] = [newItems[targetIndex], newItems[currentIndex]];
+      setCarouselItems(newItems);
+      message.success('顺序调整成功');
+    } else {
+      message.error('排序失败：' + (res.message || '服务器错误'));
     }
-  };
+  } catch (error) {
+    message.error('排序操作失败：' + (error.message || '网络异常'));
+  } finally {
+    setCarouselLoading(false);
+  }
+};
+
+  // const moveCarouselItem = async (id, direction) => {
+  //   const currentIndex = carouselItems.findIndex(item => item.id === id);
+  //   if ((direction === 'up' && currentIndex === 0) || 
+  //       (direction === 'down' && currentIndex === carouselItems.length - 1)) {
+  //     message.warning('已到达边界，无法继续移动');
+  //     return;
+  //   }
+
+  //   const newItems = [...carouselItems];
+  //   const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+  //   const targetItem = newItems[targetIndex];
+
+  //   try {
+  //     setCarouselLoading(true);
+  //     // 调整排序接口
+  //     const res = await adminApi.updateCarouselOrder({
+  //       id: id,
+  //       targetId: targetItem.id,
+  //       currentSequence: newItems[currentIndex].sequence,
+  //       targetSequence: targetItem.sequence
+  //     });
+
+  //     if (res.code === 0) {
+  //       // 交换前端数据
+  //       [newItems[currentIndex], newItems[targetIndex]] = [newItems[targetIndex], newItems[currentIndex]];
+  //       setCarouselItems(newItems);
+  //       message.success('顺序调整成功');
+  //     } else {
+  //       message.error('排序失败：' + (res.message || '服务器错误'));
+  //     }
+  //   } catch (error) {
+  //     message.error('排序操作失败：' + error.message);
+  //   } finally {
+  //     setCarouselLoading(false);
+  //   }
+  // };
 
   const handleDeleteCarouselItem = (id) => {
     setDeleteId(id);
@@ -616,7 +715,7 @@ const handleAddOrEditCarousel = async () => {
                 </div>
               </TabPane>
 
-              {/* 首页轮播标签页（修改后） */}
+              {/* 首页轮播标签页 */}
               <TabPane tab="首页轮播" key="carousel">
                 <div style={{ marginBottom: 24, padding: 16, background: '#fff', borderRadius: 4 }}>
                   <h3 style={{ marginBottom: 16 }}>
@@ -746,7 +845,13 @@ const handleAddOrEditCarousel = async () => {
                   rowKey="id"
                   columns={[
                     {
-                      title: '排序',
+                      title: '排序序号',
+                      width: 100,
+                      dataIndex: 'sequence',
+                      sorter: (a, b) => a.sequence - b.sequence
+                    },
+                    {
+                      title: '排序调整',
                       width: 120,
                       render: (_, record) => (
                         <Space>
@@ -754,13 +859,13 @@ const handleAddOrEditCarousel = async () => {
                             size="small" 
                             icon={<ArrowUpOutlined />} 
                             onClick={() => moveCarouselItem(record.id, 'up')}
-                            disabled={carouselLoading || carouselItems.indexOf(record) === 0}
+                            disabled={carouselLoading || carouselItems.findIndex(item => item.id === record.id) === 0}
                           />
                           <Button 
                             size="small" 
                             icon={<ArrowDownOutlined />} 
                             onClick={() => moveCarouselItem(record.id, 'down')}
-                            disabled={carouselLoading || carouselItems.indexOf(record) === carouselItems.length - 1}
+                            disabled={carouselLoading || carouselItems.findIndex(item => item.id === record.id) === carouselItems.length - 1}
                           />
                         </Space>
                       ),
@@ -848,3 +953,4 @@ const handleAddOrEditCarousel = async () => {
 };
 
 export default SystemSettingsPage;
+

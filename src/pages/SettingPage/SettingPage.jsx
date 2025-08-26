@@ -21,6 +21,8 @@ const AccountSettingsPage = () => {
   const [fetchingUser, setFetchingUser] = useState(true); 
   const storedToken = localStorage.getItem('token') || '';
 
+  
+
   useEffect(() => {
     const fetchUserInfo = async () => {
       if (!storedToken) {
