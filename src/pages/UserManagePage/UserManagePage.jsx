@@ -3,11 +3,10 @@ import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Row,
   Col, Popconfirm, Tabs, Layout, Form, Radio,
   Table, Checkbox, Spin, InputNumber, Progress, Upload } from "antd";
 import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined, 
-  UserOutlined, TeamOutlined, PlusOutlined, CheckCircleOutlined, 
-  CloseCircleOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
+  UserOutlined, TeamOutlined, PlusOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
-import { adminApi , authApi } from "../../service/api";
+import { adminApi, authApi } from "../../service/api";
 import { getAvatarUrl, importTemplateColumns, handleFileUploadHelper, exportTemplateHelper } from "./UserManageHelpers";
 import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
 
@@ -16,7 +15,6 @@ const { TabPane } = Tabs;
 const { Header, Content, Footer } = Layout;
 
 const UserManage = () => {
-  // 状态管理
   const [users, setUsers] = useState({ students: [], teachers: [] });
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +46,6 @@ const UserManage = () => {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
-  // 头像上传相关状态
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -57,13 +54,12 @@ const UserManage = () => {
   const fileDataRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // 获取用户列表
   const fetchUserList = async () => {
     setLoading(true);
     try {
       const params = {
-        page: currentPage,
-        size: pageSize,
+        current: currentPage,
+        pageSize: pageSize,
         role: activeTab === "students" ? "student" : "teacher",
         keyword: searchKeyword || undefined,
         status: columnFilters.status.length > 0 ? columnFilters.status.join(",") : undefined,
@@ -113,7 +109,6 @@ const UserManage = () => {
     }
   };
 
-  // 初始化
   useEffect(() => {
     const init = async () => {
       const role = localStorage.getItem("user_role") || "visitor";
@@ -129,21 +124,18 @@ const UserManage = () => {
     init();
   }, [currentPage, pageSize, activeTab, searchKeyword, columnFilters]);
 
-  // 搜索处理
   const handleSearch = (value) => {
     setSearchKeyword(value.toLowerCase());
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
-  // 列筛选处理
   const handleColumnFilter = (columnKey, values) => {
     setColumnFilters(prev => ({ ...prev, [columnKey]: values }));
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
-  // 行选择配置
   const rowSelection = {
     selectedRowKeys: selectedIds,
     onChange: (keys) => setSelectedIds(keys),
@@ -152,7 +144,6 @@ const UserManage = () => {
     },
   };
 
-  // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -186,7 +177,6 @@ const UserManage = () => {
     }
   };
 
-  // 批量删除
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -212,7 +202,6 @@ const UserManage = () => {
           fetchUserList();
         } catch (error) {
           console.error("批量删除错误：", error);
-          // 兼容HTTP状态码异常但业务成功的情况
           const errorResponse = error.response?.data;
           if (errorResponse?.code === 0) {
             message.success("成功删除选中用户");
@@ -228,7 +217,6 @@ const UserManage = () => {
     });
   };
 
-  // 批量重置密码
   const handleBatchResetPassword = async () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -274,7 +262,7 @@ const UserManage = () => {
         userRole: selectedUser.role || (activeTab === "students" ? "student" : "teacher"),
         userName: selectedUser.userName,
         status: values.status === "active" ? 0 : 1,  
-        realName: values.name,
+        realName: values.realname,
         email: values.email,
         phone: values.phone || "",
       
@@ -289,8 +277,6 @@ const UserManage = () => {
           teacherNo: values.teacherId
         })
       };
-
-      console.log("最终提交参数：", updateData); 
 
       const response = await adminApi.updateUser(updateData);
       if (response.code === 0) {
@@ -337,21 +323,19 @@ const UserManage = () => {
     }
   };
 
-  // 添加用户
   const handleAddUser = async () => {
     setAdding(true);
     try {
       const values = await newUserForm.validateFields();
       const userData = {
         userAccount: newUserType === "student" ? values.studentId : values.teacherId,
-        userAvatar: "",
         realName: values.realname,
         userRole: newUserType,
         email: values.email,
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          className: values.className,
+          grade: values.className,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -382,36 +366,33 @@ const UserManage = () => {
     }
   };
 
-const handleDelete = async (id) => {
-  try {
+  const handleDelete = async (id) => {
+    try {
+      const response = await adminApi.deleteUser({ id });
+      console.log("删除接口原始响应：", response);
 
-    const response = await adminApi.deleteUser({ id });
-    console.log("删除接口原始响应：", response);
+      if (response.code === 0) {
+        message.success("用户已删除");
+        fetchUserList();
+        setSelectedIds(prev => prev.filter(item => item !== id));
+      } else {
+        message.error(`删除失败: ${response.message || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error("删除请求错误：", error);
+      
+      const errorData = error?.response?.data || {};
 
-    if (response.code === 0) {
-      message.success("用户已删除");
-      fetchUserList();
-      setSelectedIds(prev => prev.filter(item => item !== id));
-    } else {
-
-      message.error(`删除失败: ${response.message || '未知错误'}`);
+      if (errorData.code === 0) {
+        message.success("用户已删除");
+        fetchUserList();
+        setSelectedIds(prev => prev.filter(item => item !== id));
+      } else {
+        message.error(`删除失败: ${errorData.message || '网络错误'}`);
+      }
     }
-  } catch (error) {
-    console.error("删除请求错误：", error);
-    
-    const errorData = error?.response?.data || {};
+  };
 
-    if (errorData.code === 0) {
-      message.success("用户已删除");
-      fetchUserList();
-      setSelectedIds(prev => prev.filter(item => item !== id));
-    } else {
-      message.error(`删除失败: ${errorData.message || '网络错误'}`);
-    }
-  }
-};
-
-  // 验证学号唯一性
   const validateStudentId = async (_, value) => {
     try {
       const response = await adminApi.checkIdExists({ type: 'student', id: value });
@@ -424,7 +405,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 验证工号唯一性
   const validateTeacherId = async (_, value) => {
     try {
       const response = await adminApi.checkIdExists({ type: 'teacher', id: value });
@@ -437,12 +417,10 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 文件上传处理
   const handleFileUpload = (file) => {
     return handleFileUploadHelper(file, importType, users, setImportData);
   };
 
-  // 导入用户数据
   const handleImport = async () => {
     const validData = importData.filter(item => item._valid);
     if (validData.length === 0) {
@@ -455,34 +433,31 @@ const handleDelete = async (id) => {
       let successCount = 0;
       for (const item of validData) {
         const userData = {
-          userAccount: importType === "student" ? item.studentId : item.teacherId,
-          userAvatar: "",
-          realName: item.name,
+          userAccount: item[importType === "student" ? "学号" : "工号"],
+          realName: item.姓名,
           userRole: importType,
-          email: item.email,
-          phone: item.phone || "",
-          password: item.password || "123456789",
-          status: 0,
+          email: item.邮箱,
+          phone: item.电话 || "",
+          password: item.登录密码 || "123456789",
+          status: 0, 
+
           ...(importType === "student" && {
-            studentId: item.studentId,
-            className: item.className,
-            major: item.major
+            studentId: item.学号, 
+            grade: item.年级, 
+            major: item.专业 
           }),
           ...(importType === "teacher" && {
-            teacherId: item.teacherId,
-            department: item.department,
-            title: item.title
+            teacherId: item.工号, 
+            department: item.学院, 
+            title: item.职称 
           })
         };
+
         const response = await adminApi.createUser(userData);
         if (response.code === 0) successCount++;
       }
       message.success(`成功导入 ${successCount}/${validData.length} 条数据`);
-      setImportResult({
-        total: validData.length,
-        success: successCount,
-        failed: validData.length - successCount
-      });
+      setImportResult({ total: validData.length, success: successCount, failed: validData.length - successCount });
       fetchUserList();
     } catch (error) {
       console.error("导入用户错误：", error);
@@ -492,13 +467,11 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 处理重置密码
   const handleResetPassword = (user) => {
     setSelectedUser(user);
     setResetPwdModalVisible(true);
   };
 
-  // 处理编辑用户
   const handleEdit = (user) => {
     if (!user) {
       message.warning("未找到用户数据");
@@ -506,7 +479,6 @@ const handleDelete = async (id) => {
     }
     
     setSelectedUser(user);
-    // 根据用户角色设置表单字段值
     editForm.setFieldsValue({
       name: user.name,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
@@ -519,7 +491,6 @@ const handleDelete = async (id) => {
     setEditModalVisible(true);
   };
 
-  // 确认重置密码
   const confirmResetPassword = async () => {
     if (!selectedUser) return;
     
@@ -564,7 +535,6 @@ const handleDelete = async (id) => {
     reader.readAsDataURL(file);
   };
 
-  // 触发文件选择
   const triggerFileSelect = () => {
     if (avatarUploading) return;
     if (currentUser?.role !== 'admin') {
@@ -576,7 +546,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 取消上传
   const cancelUpload = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -593,7 +562,6 @@ const handleDelete = async (id) => {
     message.info('已取消上传');
   };
 
-  // 更新头像到用户信息
   const handleAvatarUpdate = async (avatarUrl) => {
     if (!selectedUser) return;
     
@@ -610,7 +578,6 @@ const handleDelete = async (id) => {
       
       const updateResponse = await adminApi.updateUser(updateData);
       if (updateResponse.code === 0) {
-        // 更新本地状态
         setUsers(prev => ({
           ...prev,
           [activeTab]: prev[activeTab].map(user => 
@@ -628,7 +595,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 确认头像上传
   const confirmAvatarUpload = async () => {
     if (!selectedUser) {
       message.warning("未选择用户");
@@ -660,7 +626,6 @@ const handleDelete = async (id) => {
         throw new Error('服务器返回的头像URL无效，请重试');
       }
 
-      // 更新用户头像信息
       await handleAvatarUpdate(avatarUrl);
       
       setUploadProgress(100);
@@ -691,7 +656,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 渲染头像上传组件
   const renderAvatarUpload = () => (
     <Form.Item label="头像">
       <Avatar
@@ -776,11 +740,9 @@ const handleDelete = async (id) => {
     </Form.Item>
   );
 
-  // 当前表格数据
   const currentTableData = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
   const isStudentTab = activeTab === "students";
 
-  // 清理函数
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -875,22 +837,6 @@ const handleDelete = async (id) => {
               <Space>
                 <Button
                   type="text"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleBatchToggleStatus(true)}
-                  loading={batchActionLoading}
-                >
-                  批量启用
-                </Button>
-                <Button
-                  type="text"
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => handleBatchToggleStatus(false)}
-                  loading={batchActionLoading}
-                >
-                  批量禁用
-                </Button>
-                <Button
-                  type="text"
                   icon={<LockOutlined />}
                   onClick={handleBatchResetPassword}
                   loading={batchActionLoading}
@@ -964,13 +910,10 @@ const handleDelete = async (id) => {
                     total: total,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条记录`,
-                    onChange: (page, ps) => {
-                      setCurrentPage(page);
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_, ps) => {
                       setPageSize(ps);
-                    },
-                    onShowSizeChange: (page, ps) => {
-                      setCurrentPage(page);
-                      setPageSize(ps);
+                      setCurrentPage(1);
                     }
                   }}
                   scroll={{ x: 1200 }}
@@ -1022,13 +965,10 @@ const handleDelete = async (id) => {
                     total: total,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条记录`,
-                    onChange: (page, ps) => {
-                      setCurrentPage(page);
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_, ps) => {
                       setPageSize(ps);
-                    },
-                    onShowSizeChange: (page, ps) => {
-                      setCurrentPage(page);
-                      setPageSize(ps);
+                      setCurrentPage(1);
                     }
                   }}
                   scroll={{ x: 1200 }}
@@ -1051,7 +991,6 @@ const handleDelete = async (id) => {
             </Tabs>
           </Card>
 
-          {/* 批量导入模态框 */}
           <Modal
             title={`批量导入${importType === "student" ? "学生" : "教师"}数据`}
             visible={importModalVisible}
@@ -1152,7 +1091,6 @@ const handleDelete = async (id) => {
             )}
           </Modal>
 
-          {/* 添加用户模态框 */}
           <Modal
             title={`添加${newUserType === "student" ? "学生" : "教师"}`}
             visible={addModalVisible}
@@ -1183,7 +1121,7 @@ const handleDelete = async (id) => {
                   <Row gutter={16}>
                     <Col span={12}>
                       <Form.Item
-                        name="name"
+                        name="realname"
                         label="学生姓名"
                         rules={[{ required: true, message: "请输入学生姓名" }]}
                       >
@@ -1196,7 +1134,6 @@ const handleDelete = async (id) => {
                         label="学号"
                         rules={[
                           { required: true, message: "请输入学号" },
-                          { validator: validateStudentId },
                         ]}
                       >
                         <Input placeholder="如：2023611001" />
@@ -1234,10 +1171,6 @@ const handleDelete = async (id) => {
                         label="邮箱"
                         rules={[
                           { required: true, message: "请输入学生邮箱" },
-                          {
-                            pattern: /^[a-zA-Z0-9._%+-]+@(stu\.)?edu\.cn$/,
-                            message: "邮箱格式应为@edu.cn或@stu.edu.cn",
-                          },
                         ]}
                       >
                         <Input placeholder="如：25zhangsan@stu.edu.cn" />
@@ -1257,6 +1190,16 @@ const handleDelete = async (id) => {
                       >
                         <Input placeholder="如：13800138000" />
                       </Form.Item>
+                      <Form.Item
+                        name="password"
+                        label="登录密码"
+                        rules={[
+                          { required: true, message: "请设置登录密码" },
+                          { min: 8, message: "密码长度不能少于8位" } 
+                        ]}
+                      >
+                        <Input.Password placeholder="请设置8位及以上的登录密码" />
+                      </Form.Item>
                     </Col>
                   </Row>
                 </>
@@ -1265,7 +1208,7 @@ const handleDelete = async (id) => {
                   <Row gutter={16}>
                     <Col span={12}>
                       <Form.Item
-                        name="name"
+                        name="realname"
                         label="教师姓名"
                         rules={[{ required: true, message: "请输入教师姓名" }]}
                       >
@@ -1278,8 +1221,6 @@ const handleDelete = async (id) => {
                         label="工号"
                         rules={[
                           { required: true, message: "请输入工号" },
-                          { pattern: /^T\d{4}$/, message: "工号格式为T+4位数字" },
-                          { validator: validateTeacherId },
                         ]}
                       >
                         <Input placeholder="如：T1001" />
@@ -1317,10 +1258,6 @@ const handleDelete = async (id) => {
                         label="邮箱"
                         rules={[
                           { required: true, message: "请输入邮箱" },
-                          {
-                            pattern: /^[a-zA-Z0-9._%+-]+@edu\.cn$/,
-                            message: "邮箱格式应为@edu.cn",
-                          },
                         ]}
                       >
                         <Input placeholder="如：wang@edu.cn" />
@@ -1340,6 +1277,16 @@ const handleDelete = async (id) => {
                       >
                         <Input placeholder="如：13800138000" />
                       </Form.Item>
+                      <Form.Item
+                        name="password"
+                        label="登录密码"
+                        rules={[
+                          { required: true, message: "请设置登录密码" },
+                          { min: 8, message: "密码长度不能少于8位" } 
+                        ]}
+                      >
+                        <Input.Password placeholder="请设置8位及以上的登录密码" />
+                      </Form.Item>
                     </Col>
                   </Row>
                 </>
@@ -1347,7 +1294,6 @@ const handleDelete = async (id) => {
             </Form>
           </Modal>
 
-          {/* 重置密码模态框 */}
           <Modal
             title="确认重置密码"
             visible={resetPwdModalVisible}
@@ -1364,7 +1310,6 @@ const handleDelete = async (id) => {
             <p>重置后密码将变为123456789，请提醒用户及时修改。</p>
           </Modal>
 
-          {/* 编辑用户模态框 */}
           <Modal
             title={`编辑用户 - ${selectedUser?.realName}`}
             visible={editModalVisible}
@@ -1516,7 +1461,6 @@ const handleDelete = async (id) => {
           )}
         </Modal>
 
-        {/* 批量操作提示框 */}
         <Modal
           title="批量操作进行中"
           visible={batchActionLoading}

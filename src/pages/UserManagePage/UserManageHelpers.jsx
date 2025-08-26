@@ -2,23 +2,32 @@ import * as XLSX from "xlsx";
 import { message } from "antd";
 
 export const importTemplateColumns = {
-  student: [
-    { title: '姓名', dataIndex: 'name', required: true },
-    { title: '学号', dataIndex: 'studentId', required: true },
-    { title: '年级', dataIndex: 'className', required: true },
-    { title: '专业', dataIndex: 'major', required: true },
-    { title: '邮箱', dataIndex: 'email', required: true },
-    { title: '电话', dataIndex: 'phone', required: false },
-    { title: '登录密码', dataIndex: 'password', required: true }
+    student: [
+    { title: '姓名', dataIndex: '姓名', required: true },
+    { title: '学号', dataIndex: '学号', required: true },
+    { title: '年级', dataIndex: '年级', required: true },
+    { title: '专业', dataIndex: '专业', required: true },
+    { title: '邮箱', dataIndex: '邮箱', required: true },
+    { title: '电话', dataIndex: '电话', required: false },
+    { title: '登录密码', dataIndex: '登录密码', required: true }
   ],
+  // student: [
+  //   { title: '姓名', dataIndex: 'name', required: true },
+  //   { title: '学号', dataIndex: 'studentId', required: true },
+  //   { title: '年级', dataIndex: 'className', required: true },
+  //   { title: '专业', dataIndex: 'major', required: true },
+  //   { title: '邮箱', dataIndex: 'email', required: true },
+  //   { title: '电话', dataIndex: 'phone', required: false },
+  //   { title: '登录密码', dataIndex: 'password', required: true }
+  // ],
   teacher: [
-    { title: '姓名', dataIndex: 'name', required: true },
-    { title: '工号', dataIndex: 'teacherId', required: true },
-    { title: '学院', dataIndex: 'department', required: true },
-    { title: '职称', dataIndex: 'title', required: true },
-    { title: '邮箱', dataIndex: 'email', required: true },
-    { title: '电话', dataIndex: 'phone', required: false },
-    { title: '登录密码', dataIndex: 'password', required: true },
+    { title: '姓名', dataIndex: '姓名', required: true },
+    { title: '工号', dataIndex: '工号', required: true },
+    { title: '学院', dataIndex: '学院', required: true },
+    { title: '职称', dataIndex: '职称', required: true },
+    { title: '邮箱', dataIndex: '邮箱', required: true },
+    { title: '电话', dataIndex: '电话', required: false },
+    { title: '登录密码', dataIndex: '登录密码', required: true },
   ]
 };
 
