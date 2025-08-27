@@ -228,7 +228,7 @@ const MyAchievements = () => {
             <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)} />
           </Tooltip>
           <Tooltip title="编辑成果">
-            <Button type="link" icon={<EditOutlined />} onClick={() => navigate(`/student/achievements/edit?id=${record.id}`)} />
+            <Button type="link" icon={<EditOutlined />} onClick={() => navigate(`/student/achievements/edit/${record.id}`)} />
           </Tooltip>
           {record.status !== 1 && ( // 审核中（状态1）不可删除
             <Popconfirm

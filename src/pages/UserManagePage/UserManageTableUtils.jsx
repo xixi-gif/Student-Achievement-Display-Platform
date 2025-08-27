@@ -1,4 +1,4 @@
-import { Badge, Tag, Space, Button, Avatar, Popconfirm, Table } from "antd";
+import { Badge, Tag, Space, Button, Avatar, Popconfirm, Table, Input } from "antd";
 import { EditOutlined, DeleteOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import { getAvatarUrl } from "./UserManageHelpers";
@@ -8,91 +8,60 @@ import { useState, useEffect } from "react";
  * @param {Object} users 
  * @param {string} activeTab 
  * @param {string} searchKeyword 
- * @param {Object} columnFilters
  * @returns {Array} 
  */
-export const getFilteredUsers = (users, activeTab, searchKeyword, columnFilters) => {
+export const getFilteredUsers = (users, activeTab, searchKeyword) => {
   const { students, teachers } = users || { students: [], teachers: [] };
   const keyword = searchKeyword.toLowerCase();
   const isStudentTab = activeTab === "students";
   const currentData = isStudentTab ? students : teachers;
 
-  // 空数据处理
   if (!currentData || currentData.length === 0) return [];
 
   const filterFn = (user) => {
-    // 关键词匹配（姓名/学号/工号/邮箱）
-    const keywordMatch = keyword 
-      ? user.name.toLowerCase().includes(keyword) ||
-        (user.studentId && user.studentId.includes(keyword)) ||
-        (user.teacherId && user.teacherId.includes(keyword)) ||
-        (user.email && user.email.toLowerCase().includes(keyword))
-      : true;
+    // 基础搜索条件：姓名、学号/工号、邮箱（通用）
+    const baseMatch = user.name.toLowerCase().includes(keyword) ||
+      (user.studentId && user.studentId.includes(keyword)) ||
+      (user.teacherId && user.teacherId.includes(keyword)) ||
+      (user.email && user.email.toLowerCase().includes(keyword));
 
-    // 状态筛选匹配
-    const statusMatch = columnFilters.status?.length > 0
-      ? columnFilters.status.includes(user.status)
-      : true;
-
-    // 专业/学院筛选匹配
-    const categoryMatch = isStudentTab 
-      ? (columnFilters.major?.length > 0 ? columnFilters.major.includes(user.major) : true)
-      : (columnFilters.department?.length > 0 ? columnFilters.department.includes(user.department) : true);
-
-    // 年级/职称筛选匹配
-    const gradeTitleMatch = isStudentTab
-      ? (columnFilters.className?.length > 0 
-          ? columnFilters.className.includes(user.className) 
-          : true)
-      : (columnFilters.title?.length > 0
-          ? columnFilters.title.includes(user.title)
-          : true);
-
-    return keywordMatch && statusMatch && categoryMatch && gradeTitleMatch;
+    if (isStudentTab) {
+      return baseMatch ||
+        (user.className && user.className.toLowerCase().includes(keyword)) ||
+        (user.major && user.major.toLowerCase().includes(keyword));
+    } else {
+      return baseMatch ||
+        (user.title && user.title.toLowerCase().includes(keyword)) ||
+        (user.department && user.department.toLowerCase().includes(keyword));
+    }
   };
 
   return currentData.filter(filterFn);
 };
 
 /**
- * 用户表格组件 - 包含完整的筛选逻辑和状态管理
+ * 用户表格组件 - 包含搜索和排序功能
  */
 export const UserTable = ({ 
   users, 
   activeTab, 
   isStudent 
 }) => {
-  // 状态管理 - 关键修复点
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [columnFilters, setColumnFilters] = useState({
-    status: [],
-    major: [],
-    department: [],
-    className: [],
-    title: []
-  });
   const [filteredData, setFilteredData] = useState([]);
 
-  // 筛选条件变化时重新计算数据 - 关键修复点
+  
   useEffect(() => {
-    const data = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
+    const data = getFilteredUsers(users, activeTab, searchKeyword);
     setFilteredData(data);
-  }, [users, activeTab, searchKeyword, columnFilters]);
+  }, [users, activeTab, searchKeyword]);
 
-  // 处理筛选条件变化 - 关键修复点
-  const handleColumnFilter = (filterKey, values) => {
-    setColumnFilters(prev => ({
-      ...prev,
-      [filterKey]: values
-    }));
-  };
 
-  // 处理搜索关键词变化
   const handleSearch = (value) => {
     setSearchKeyword(value);
   };
 
-  // 示例回调函数（实际使用时替换为真实逻辑）
+
   const handleEdit = (record) => {
     console.log("编辑用户:", record);
   };
@@ -105,34 +74,29 @@ export const UserTable = ({
     console.log("删除用户ID:", id);
   };
 
-  // 获取表格列配置
   const columns = getTableColumns(
     isStudent,
     handleEdit,
     handleResetPassword,
-    () => {}, 
-    handleDelete,
-    columnFilters,
-    handleColumnFilter,
-    users,
-    searchKeyword
+    handleDelete
   );
 
   return (
     <div>
-      {/* 搜索框 - 实际项目中可使用Antd的Input.Search */}
-      <input
-        type="text"
-        placeholder="搜索姓名、学号/工号、邮箱..."
+      <Input
+        placeholder={isStudent 
+          ? "搜索姓名、学号、邮箱" 
+          : "搜索姓名、工号、邮箱"}
         value={searchKeyword}
         onChange={(e) => handleSearch(e.target.value)}
-        style={{ marginBottom: 16, padding: 8, width: 300 }}
+        style={{ marginBottom: 16, padding: 8, width: 450 }}
+        allowClear
       />
       
       <Table
         dataSource={filteredData}
         columns={columns}
-        rowKey="id" // 确保每条数据有唯一的id
+        rowKey="id"
         pagination={{ pageSize: 10 }}
       />
     </div>
@@ -140,33 +104,14 @@ export const UserTable = ({
 };
 
 /**
- * 获取表格列配置（根据学生/教师类型动态生成）
- * @param {boolean} isStudent - 是否为学生表格
- * @param {Function} handleEdit - 编辑回调
- * @param {Function} handleResetPassword - 重置密码回调
- * @param {Function} handleToggleStatus - 状态切换回调
- * @param {Function} handleDelete - 删除回调
- * @param {Object} columnFilters - 列筛选条件
- * @param {Function} handleColumnFilter - 列筛选回调
- * @param {Object} users - 用户数据（用于生成筛选选项）
- * @param {string} searchKeyword - 搜索关键词（用于生成筛选选项）
- * @returns {Array} 表格列配置
+ * 获取表格列配置（包含排序功能）
  */
 export const getTableColumns = (
   isStudent,
   handleEdit,
   handleResetPassword,
-  handleToggleStatus,
-  handleDelete,
-  columnFilters,
-  handleColumnFilter,
-  users,
-  searchKeyword
+  handleDelete
 ) => {
-  // 获取当前标签页的用户数据用于生成筛选选项
-  const currentTab = isStudent ? "students" : "teachers";
-  const filteredUsers = getFilteredUsers(users, currentTab, searchKeyword, columnFilters);
-
   const baseColumns = [
     {
       title: "头像",
@@ -188,6 +133,7 @@ export const getTableColumns = (
       title: "姓名",
       dataIndex: "name",
       key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
     },
     {
       title: isStudent ? "学号" : "工号",
@@ -199,43 +145,28 @@ export const getTableColumns = (
       title: isStudent ? "年级" : "职称",
       dataIndex: isStudent ? "className" : "title",
       key: isStudent ? "className" : "title",
-      filters: [
-        ...Array.from(new Set(filteredUsers.map(user => user[isStudent ? "className" : "title"])))
-          .filter(item => item) // 过滤空值
-          .map(item => ({ text: item, value: item }))
-      ],
-      filteredValue: columnFilters[isStudent ? "className" : "title"],
-      onFilter: (value, record) => record[isStudent ? "className" : "title"] === value,
-      onFilterChange: (values) => handleColumnFilter(isStudent ? "className" : "title", values),
+      sorter: (a, b) => (a[isStudent ? "className" : "title"] || "").localeCompare(b[isStudent ? "className" : "title"] || ""),
     },
     {
       title: isStudent ? "专业" : "学院",
       dataIndex: isStudent ? "major" : "department",
       key: isStudent ? "major" : "department",
-      filters: [
-        ...Array.from(new Set(filteredUsers.map(user => user[isStudent ? "major" : "department"])))
-          .filter(item => item) // 过滤空值
-          .map(item => ({ text: item, value: item }))
-      ],
-      onFilter: (value, record) => record[isStudent ? "major" : "department"] === value,
-      filteredValue: columnFilters[isStudent ? "major" : "department"],
-      onFilterChange: (values) => handleColumnFilter(isStudent ? "major" : "department", values),
+      sorter: (a, b) => (a[isStudent ? "major" : "department"] || "").localeCompare(b[isStudent ? "major" : "department"] || ""),
     },
     {
       title: "邮箱",
       dataIndex: "email",
       key: "email",
+      sorter: (a, b) => (a.email || "").localeCompare(b.email || ""),
     },
     {
       title: "状态",
       dataIndex: "status",
       key: "status",
-      filters: [
-        { text: "正常", value: "active" },
-        { text: "已禁用", value: "inactive" }
-      ],
-      filteredValue: columnFilters.status,
-      onFilterChange: (values) => handleColumnFilter("status", values),
+      sorter: (a, b) => {
+        const statusOrder = { "active": 0, "inactive": 1 };
+        return (statusOrder[a.status] || 2) - (statusOrder[b.status] || 2);
+      },
       render: (status) => (
         <Badge 
           status={status === "active" ? "success" : "error"} 
@@ -247,7 +178,8 @@ export const getTableColumns = (
       title: "上次登录",
       dataIndex: "lastLogin",
       key: "lastLogin",
-      sorter: (a, b) => new Date(b.lastLogin) - new Date(a.lastLogin),
+      sorter: (a, b) => new Date(b.lastLogin || 0) - new Date(a.lastLogin || 0),
+      render: (time) => time ? new Date(time).toLocaleString() : "未登录",
     },
     {
       title: "操作",
@@ -287,14 +219,14 @@ export const getTableColumns = (
     },
   ];
 
-  // 学生表格添加"成果数"列
+
   if (isStudent) {
     baseColumns.splice(6, 0, {
       title: "成果数",
       dataIndex: "achievementCount",
       key: "achievementCount",
-      sorter: (a, b) => b.achievementCount - a.achievementCount,
-      render: (count) => <Tag color="blue">{count}</Tag>,
+      sorter: (a, b) => (b.achievementCount || 0) - (a.achievementCount || 0),
+      render: (count) => <Tag color="blue">{count || 0}</Tag>,
     });
   }
 
@@ -303,15 +235,10 @@ export const getTableColumns = (
 
 /**
  * 导出数据到Excel
- * @param {Array} data - 要导出的数据
- * @param {boolean} isStudent - 是否为学生数据
- * @param {Function} onSuccess - 成功回调
- * @param {Function} onError - 失败回调
  */
 export const exportToExcel = (data, isStudent, onSuccess, onError) => {
   const fileName = `${isStudent ? "学生" : "教师"}名单_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
   
-  // 定义导出列配置
   const exportColumns = isStudent 
     ? [
         { header: '姓名', key: 'name' },
@@ -320,8 +247,8 @@ export const exportToExcel = (data, isStudent, onSuccess, onError) => {
         { header: '专业', key: 'major' },
         { header: '邮箱', key: 'email' },
         { header: '状态', key: 'status', formatter: v => v === 'active' ? '正常' : '已禁用' },
-        { header: '成果数', key: 'achievementCount' },
-        { header: '上次登录', key: 'lastLogin' }
+        { header: '成果数', key: 'achievementCount', formatter: v => v || 0 },
+        { header: '上次登录', key: 'lastLogin', formatter: v => v ? new Date(v).toLocaleString() : "未登录" }
       ]
     : [
         { header: '姓名', key: 'name' },
@@ -330,14 +257,13 @@ export const exportToExcel = (data, isStudent, onSuccess, onError) => {
         { header: '职称', key: 'title' },
         { header: '邮箱', key: 'email' },
         { header: '状态', key: 'status', formatter: v => v === 'active' ? '正常' : '已禁用' },
-        { header: '上次登录', key: 'lastLogin' }
+        { header: '上次登录', key: 'lastLogin', formatter: v => v ? new Date(v).toLocaleString() : "未登录" }
       ];
 
-  // 格式化导出数据
   const formattedData = data.map(item => {
     const formatted = {};
     exportColumns.forEach(col => {
-      formatted[col.header] = col.formatter ? col.formatter(item[col.key]) : item[col.key] || '';
+      formatted[col.header] = col.formatter ? col.formatter(item[col.key]) : (item[col.key] || '');
     });
     return formatted;
   });
@@ -353,3 +279,4 @@ export const exportToExcel = (data, isStudent, onSuccess, onError) => {
     onError("导出失败: " + error.message);
   }
 };
+    

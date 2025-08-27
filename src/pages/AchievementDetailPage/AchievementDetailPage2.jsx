@@ -227,7 +227,7 @@ const AchievementDetailPage = () => {
                         type="primary" 
                         icon={<EditOutlined />} 
                         size="small"
-                        onClick={() => navigate(`/achievement/edit/${achievement.id}`)}
+                        onClick={() => navigate(`/student/achievements/edit/${achievement.id}`)}
                       >
                         编辑
                       </Button>
