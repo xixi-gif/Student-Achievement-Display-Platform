@@ -11,7 +11,15 @@ export const importTemplateColumns = {
     { title: '电话', dataIndex: '电话', required: false },
     { title: '登录密码', dataIndex: '登录密码', required: true }
   ],
-
+  // student: [
+  //   { title: '姓名', dataIndex: 'name', required: true },
+  //   { title: '学号', dataIndex: 'studentId', required: true },
+  //   { title: '年级', dataIndex: 'className', required: true },
+  //   { title: '专业', dataIndex: 'major', required: true },
+  //   { title: '邮箱', dataIndex: 'email', required: true },
+  //   { title: '电话', dataIndex: 'phone', required: false },
+  //   { title: '登录密码', dataIndex: 'password', required: true }
+  // ],
   teacher: [
     { title: '姓名', dataIndex: '姓名', required: true },
     { title: '工号', dataIndex: '工号', required: true },
@@ -39,48 +47,46 @@ export const getAvatarUrl = (dbUrl, userName = "未知用户") => {
   return `https://picsum.photos/id/${randomId}/200/200`;
 };
 
-
 export const validateImportData = (data, type, users) => {
-  const columns = importTemplateColumns[type];
-  const requiredFields = columns
+  const requiredFields = importTemplateColumns[type]
     .filter(col => col.required)
-    .map(col => col.dataIndex); 
-
-  const idField = type === "student" ? "学号" : "工号";
+    .map(col => col.dataIndex);
 
   return data.map((item, index) => {
     const errors = [];
     requiredFields.forEach(field => {
-      if (!item[field] || (typeof item[field] === 'string' && item[field].trim() === '')) {
-        errors.push(`缺少必填字段: ${field}`);
-      }
+      if (!item[field]) errors.push(`缺少必填字段: ${field}`);
     });
 
+    const idField = type === "student" ? "studentId" : "teacherId";
     if (item[idField]) {
-      const existingUser = users[`${type}s`]?.find(u => 
-
-        u[type === "student" ? "studentId" : "teacherId"] === item[idField]
-      );
-      if (existingUser) errors.push(`${type === "student" ? "学号" : "工号"}已存在`);
-    }
-
-
-    if (item.电话) {
-      const phoneRegex = /^1[3-9]\d{9}$/;
-      if (!phoneRegex.test(item.电话.trim())) {
-        errors.push("手机号格式不正确（需为11位有效手机号）");
-      }
-    }
-
-    if (item.邮箱) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(item.邮箱.trim())) {
-        errors.push("邮箱格式不正确");
-      }
+      const existingUser = users[`${type}s`].find(u => u[idField] === item[idField]);
+      if (existingUser) errors.push(`${idField === "studentId" ? "学号" : "工号"}已存在`);
     }
 
     return { ...item, _id: `import-${index}`, _errors: errors.length > 0 ? errors : null, _valid: errors.length === 0 };
   });
+};
+
+export const handleFileUploadHelper = (file, importType, users, setImportData) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+      const validatedData = validateImportData(jsonData, importType, users);
+      setImportData(validatedData);
+      message.success(`成功解析 ${jsonData.length} 条数据`);
+    } catch (error) {
+      console.error("Excel解析错误:", error);
+      message.error("文件解析失败: " + error.message);
+    }
+  };
+  reader.onerror = () => message.error("文件读取失败");
+  reader.readAsArrayBuffer(file);
+  return false;
 };
 
 export const exportTemplateHelper = (type) => {
