@@ -17,24 +17,6 @@ import Navbar from '../Navbar/Navbar';
 import { achievementApi,adminApi } from '../../service/api';
 import moment from 'moment';
 
-const carouselData = [
-  {
-    title: '2023届优秀毕业论文展',
-    description: '展示本年度最具代表性的学术研究成果',
-    image: 'https://picsum.photos/id/26/1200/400'
-  },
-  {
-    title: '一级项目成果展示',
-    description: '我校重点科研项目取得突破性进展',
-    image: 'https://picsum.photos/id/28/1200/400'
-  },
-  {
-    title: '竞赛获奖作品集锦',
-    description: '在国家级、省级学科竞赛中屡获佳绩',
-    image: 'https://picsum.photos/id/29/1200/400'
-  }
-];
-
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -81,6 +63,7 @@ const HomePage = () => {
   const [allAchievements, setAllAchievements] = useState([]);
   const [categories, setCategories] = useState([]);
   const [statistics, setStatistics] = useState([]);
+  const [carouselItems, setCarouselItems] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +75,15 @@ const HomePage = () => {
         const role = token ? localStorage.getItem('user_role') : 'visitor';
         const username = token ? localStorage.getItem('username') : '访客';
         setCurrentUser({ role, username });
+
+        // 获取轮播图数据
+        const carouselResponse = await adminApi.getCarousel();
+        if (carouselResponse.code === 0) {
+          setCarouselItems(carouselResponse.data);
+        } else {
+          throw new Error(carouselResponse.message || '获取轮播图数据失败');
+        }
+
 
         // 获取统计数据
         const statsResponse = await adminApi.getStatistics();
@@ -180,10 +172,10 @@ const HomePage = () => {
         ) : (
           <>
             <Carousel autoplay effect="fade" style={{ maxHeight: 400, overflow: 'hidden' }}>
-              {carouselData.map((item, index) => (
+              {carouselItems.map((item, index) => (
                 <div key={index}>
                   <div style={{ 
-                    background: `url(${item.image}) center/cover no-repeat`,
+                    background: `url(${item.imageUrl}) center/cover no-repeat`,
                     height: 400,
                     display: 'flex',
                     alignItems: 'center',
@@ -203,7 +195,7 @@ const HomePage = () => {
                         type="primary" 
                         size="large" 
                         style={{ marginTop: 16 }}
-                        onClick={() => navigate(`/achievements?category=featured`)}
+                        onClick={() => navigate(item.link || `/achievements?category=featured`)}
                       >
                         查看详情 <ArrowRightOutlined />
                       </Button>

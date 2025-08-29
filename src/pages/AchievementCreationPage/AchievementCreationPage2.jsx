@@ -35,7 +35,8 @@ const { TextArea } = Input;
 
 const AchievementCreationPage = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { string_id } = useParams();
+  const id = string_id ? Number(string_id) : undefined; //给后端传整数型的id而不是字符串类型
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -169,7 +170,7 @@ const AchievementCreationPage = () => {
 
         if (id) {
           // 如果是编辑模式，获取已有成果数据
-          const response = await achievementApi.getDetail(id);
+          const response = await achievementApi.getDetail(Number(id));
           if (response.code === 0) {
             const achievement = response.data;
             form.setFieldsValue({

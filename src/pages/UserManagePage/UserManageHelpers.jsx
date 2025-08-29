@@ -20,6 +20,13 @@ export const importTemplateColumns = {
     { title: '邮箱', dataIndex: '邮箱', required: true },
     { title: '电话', dataIndex: '电话', required: false },
     { title: '登录密码', dataIndex: '登录密码', required: true },
+    { title: '姓名', dataIndex: '姓名', required: true },
+    { title: '工号', dataIndex: '工号', required: true },
+    { title: '学院', dataIndex: '学院', required: true },
+    { title: '职称', dataIndex: '职称', required: true },
+    { title: '邮箱', dataIndex: '邮箱', required: true },
+    { title: '电话', dataIndex: '电话', required: false },
+    { title: '登录密码', dataIndex: '登录密码', required: true },
   ]
 };
 
