@@ -221,6 +221,7 @@ export const adminApi = {
   getAllAchievements: (params) => service.get('/admin/achievements', { params }),
   deleteAchievement: (id) => service.delete(`/admin/achievements/${id}`),
   updateAchievementStatus: (id, status) => service.post(`/admin/achievements/${id}/status`, { status }),
+  
 
   // 轮播图
   addCarousel: (formData) => {

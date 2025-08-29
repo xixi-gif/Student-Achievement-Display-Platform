@@ -61,7 +61,7 @@ function App() {
               <Route path="/student/profile" element={<ProfilePage />} />
               <Route path="/student/my-achievements" element={<MyAchievements />} />
               <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
-              <Route path="/student/achievements/edit" element={<AchievementForm />} />
+              <Route path="/student/achievements/edit/:id" element={<AchievementForm />} />
               
               {/* 公共功能路由 */}
               <Route path="/author" element={<AuthorDetailPage/>} />
