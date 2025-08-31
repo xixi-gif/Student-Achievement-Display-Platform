@@ -96,7 +96,9 @@ export const authApi = {
   //发布请求
   addRequirement:(data)=> service.post('/requirements',data),
   //获取请求列表
-  getRequirement:(params)=> service.get('/requirements',{params})
+  getRequirement:(params)=> service.get('/requirements',{params}),
+  //需求详情
+  getRequirementByid:(id)=>service.get(`/requirements/${id}`),
 };
 
 export const announcementApi = {

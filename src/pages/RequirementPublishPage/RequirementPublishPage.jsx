@@ -14,32 +14,34 @@ const RequirementPublishPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  // 修改为直接使用中文作为value
   const requirementTypes = [
-    { value: 'project', label: '项目合作' },
-    { value: 'tutor', label: '学业辅导' },
-    { value: 'research', label: '科研协助' },
-    { value: 'competition', label: '竞赛组队' },
-    { value: 'other', label: '其他需求' }
+    { value: '项目合作', label: '项目合作' },
+    { value: '学业辅导', label: '学业辅导' },
+    { value: '科研协助', label: '科研协助' },
+    { value: '竞赛组队', label: '竞赛组队' },
+    { value: '其他需求', label: '其他需求' }
   ];
 
+  // 紧急程度也使用中文作为value
   const urgencyOptions = [
-    { value: 'low', label: '低' },
-    { value: 'normal', label: '中' },
-    { value: 'high', label: '高' }
+    { value: '低', label: '低' },
+    { value: '中', label: '中' },
+    { value: '高', label: '高' }
   ];
 
   const handleSubmit = async (values) => {
     setSubmitting(true);
     try {
-
+      // 直接使用表单中的中文值，无需映射
       const requestData = {
         budget: values.budget || '',
         contact: values.contact,
         deadline: values.deadline ? moment(values.deadline).format('YYYY-MM-DDTHH:mm:ss') : '',
         description: values.description,
-        requireType: values.type,
+        requireType: values.type,  // 这里现在是中文值
         title: values.title,  
-        urgency: values.urgency
+        urgency: values.urgency    // 这里现在是中文值
       };
       
       await authApi.addRequirement(requestData);
@@ -62,8 +64,8 @@ const RequirementPublishPage = () => {
             layout="vertical"
             onFinish={handleSubmit}
             initialValues={{
-              type: 'project',
-              urgency: 'normal'
+              type: '项目合作',  // 初始值改为中文
+              urgency: '中'       // 初始值改为中文
             }}
           >
             <Form.Item
@@ -164,4 +166,3 @@ const RequirementPublishPage = () => {
 };
 
 export default RequirementPublishPage;
-    
