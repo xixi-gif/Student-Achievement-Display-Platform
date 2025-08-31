@@ -8,7 +8,7 @@ import MyAchievements from './pages/MyAchievements/MyAchievements2';
 import AnnouncementList from './pages/AnnouncementList/AnnouncementList2';
 import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail2';
 import AchievementsPage from './pages/AchievementsPage/AchievementsPage2';
-import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage2';
+// import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage2';创建成果与编辑成果页面合并
 import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage2';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
@@ -22,7 +22,7 @@ import TeacherProfilePage from './pages/TeacherProfilePage/TeacherProfilePage2';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
-import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage';
+import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage2';
 import AnnouncementPublish from './pages/AnnouncementPublish/AnnouncementPublish';
 import AccountSettingsPage from './pages/SettingPage/SettingPage'
 
@@ -60,11 +60,11 @@ function App() {
               {/* 学生相关路由 */}
               <Route path="/student/profile" element={<ProfilePage />} />
               <Route path="/student/my-achievements" element={<MyAchievements />} />
-              <Route path="/student/achievement/create" element={<AchievementCreationPage />} />
+              <Route path="/student/achievement/create" element={<AchievementForm />} />
               <Route path="/student/achievements/edit/:id" element={<AchievementForm />} />
               
               {/* 公共功能路由 */}
-              <Route path="/author" element={<AuthorDetailPage/>} />
+              <Route path="/author/:userId" element={<AuthorDetailPage/>} />
               <Route path="/achievements" element={<AchievementsPage />} />
               <Route path="/achievement/detail/:id" element={<AchievementDetailPage />} />
               <Route path="/chat" element={<ChatPage />} />

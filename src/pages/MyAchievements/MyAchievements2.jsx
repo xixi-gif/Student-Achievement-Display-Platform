@@ -72,13 +72,15 @@ const MyAchievements = () => {
       // 对接后端 /achievement/my/achievements 接口
       const response = await achievementApi.getMyAchievements();
       // 转换接口返回数据格式以适配前端
-      const formattedData = response.data.map(item => ({
+      if(response.code === 0){
+        const formattedData = response.data.map(item => ({
         ...item,
         date: item.date || null,
         createTime: item.createTime ? moment(item.createTime) : null,
         updateTime: item.updateTime ? moment(item.updateTime) : null
       }));
       setAchievements(formattedData);
+      }
     } catch (error) {
       console.error('获取成果列表失败:', error);
       message.error(error.message || '获取成果列表失败');

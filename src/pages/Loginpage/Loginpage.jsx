@@ -53,6 +53,7 @@ const LoginPage = () => {
       localStorage.setItem('username', values.username);
       localStorage.setItem('userInfo', JSON.stringify(userInfo || {}));
       localStorage.setItem('userId', userInfo.userId); //存储用户id，发布公告需传用户id给后端
+      localStorage.setItem('realName', userInfo.realName);
       
       // 调试：确认存储成功
       console.log('登录后存储的 Token:', localStorage.getItem('token'));

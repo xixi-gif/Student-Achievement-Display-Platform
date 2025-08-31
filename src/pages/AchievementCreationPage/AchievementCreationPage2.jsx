@@ -85,7 +85,7 @@ const AchievementCreationPage = () => {
         if (response.code === 0) {
           setTags(
             response.data.map((tag) => ({
-              value: tag.id || tag.tagId,
+              value: tag.name || tag.tagName,
               label: tag.name || tag.tagName,
             }))
           );

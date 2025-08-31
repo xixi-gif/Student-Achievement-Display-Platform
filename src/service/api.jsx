@@ -113,25 +113,39 @@ export const announcementApi = {
 
 
 export const authorApi = {
-  getDetail: (id) => service.get(`/authors/${id}`),
+  // 获取用户公开信息
+  getUserPublicInfo: (userId) => service.get(`/user/public/info/?userId=${userId}`),
 };
 
+// 在api.js中添加评论相关的接口
+export const commentApi = {
+  // 添加评论
+  addComment: (data) => service.post('/comment/add', data),
+  // 获取评论列表
+  getCommentList: (params) => service.get('/comment/list', { params })
+};
 
 export const achievementApi = {
   getList: (params) => service.get('/student/achievements',{params}),
   getDetail: (id) => service.get(`/student/achievements/${id}`),
   getMyAchievements: () => service.get('/achievement/my/achievements'),
   createAchievement: (data) => service.post('/achievement/add', data,{
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  }),
-  updateAchievement: (data) => service.post(`/achievement/update`,data, {
-    headers: {
-      'Content-Type': 'multipart/form-data' // 支持文件上传
-    }
-  }),
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+}),
+  updateAchievement: (data) => service.post(`/achievement/update`,data,{
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+}),
   deleteAchievement: (id) => service.post('/achievement/delete',{ id }),
+  // 搜索学生或指导教师
+  searchStudents: (params) => service.get('/student/search', { params }),
+  searchTeachers: (params) => service.post('/teacher/search', null, { params }),
+  // 点赞接口
+  likeAchievement: (data) => service.post('/achievement/like/add', data),
+  cancelLikeAchievement: (data) => service.post('/achievement/like/cancel', data),
 
   // 获取待审核成果列表
   getPendingList: (params) => service.get(`/teacher/review`, { params }),
@@ -267,5 +281,6 @@ export default {
   achievementApi,
   studentApi,
   teacherApi,
-  adminApi
+  adminApi,
+  commentApi
 };

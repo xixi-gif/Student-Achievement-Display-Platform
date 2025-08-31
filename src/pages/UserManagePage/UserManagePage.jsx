@@ -7,7 +7,8 @@ import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined,
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
 import { adminApi, authApi } from "../../service/api";
-import { getAvatarUrl, importTemplateColumns, handleFileUploadHelper, exportTemplateHelper } from "./UserManageHelpers";
+import { getAvatarUrl, importTemplateColumns, exportTemplateHelper,validateImportData } from "./UserManageHelpers";
+// handleFileUploadHelper 没在helpers中定义
 import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
 
 const { Search } = Input;
@@ -418,7 +419,7 @@ const UserManage = () => {
   };
 
   const handleFileUpload = (file) => {
-    return handleFileUploadHelper(file, importType, users, setImportData);
+    return validateImportData(file, importType, users, setImportData);
   };
 
   const handleImport = async () => {
