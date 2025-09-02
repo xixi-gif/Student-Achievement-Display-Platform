@@ -43,6 +43,26 @@ const MessageCenterPage = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  const formatMessageTime = (timeStr) => {
+    const date = new Date(timeStr);
+    if (isNaN(date.getTime())) return '未知时间';
+    
+    const padZero = (num) => num.toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const month = padZero(date.getMonth() + 1);
+    const day = padZero(date.getDate());
+    const hour = padZero(date.getHours());
+    const minute = padZero(date.getMinutes());
+    
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
+
   const fetchUnreadCount = async (conversationId) => {
     const convIdStr = String(conversationId);
     if (!convIdStr) {
@@ -536,12 +556,6 @@ const MessageCenterPage = () => {
     document.querySelector('textarea.ant-input')?.focus();
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Navbar>
@@ -622,10 +636,7 @@ const MessageCenterPage = () => {
                       }
                     />
                     <div style={{ fontSize: 11, color: '#999' }}>
-                      {new Date(conversation.lastMessage.time).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
+                      {formatMessageTime(conversation.lastMessage.time)}
                     </div>
                   </List.Item>
                 );
@@ -660,7 +671,6 @@ const MessageCenterPage = () => {
                     </Tag>
                   </div>
                 </Space>
-
               </div>
               
               <div style={{ 
@@ -747,10 +757,7 @@ const MessageCenterPage = () => {
                                   textAlign: 'right',
                                   marginTop: '4px'
                                 }}>
-                                  {new Date(msg.time).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
+                                  {formatMessageTime(msg.time)}
                                 </div>
                               </div>
                             </div>
@@ -817,10 +824,7 @@ const MessageCenterPage = () => {
                                   justifyContent: 'flex-end',
                                   alignItems: 'center'
                                 }}>
-                                  {new Date(msg.time).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
-                                  })}
+                                  {formatMessageTime(msg.time)}
                                   {msg.status === 'sending' && (
                                     <Tooltip title="发送中">
                                       <span style={{ marginLeft: '4px' }}>🕒</span>
