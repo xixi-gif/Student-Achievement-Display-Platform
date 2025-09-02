@@ -53,7 +53,6 @@ const RequirementListPage = () => {
       
       const response = await authApi.getuserlogin({ params: {} });
       if (response.code === 0 && response.data) {
-        console.log('当前用户信息:', response.data); 
         setCurrentUser(response.data);
         return response.data;
       }
@@ -141,7 +140,24 @@ const RequirementListPage = () => {
     return <Tag color={statusMap[status]?.color || 'gray'}>{statusMap[status]?.text || '未知状态'}</Tag>;
   };
 
-  // 搜索、状态变更、分页等方法
+  // 检查是否已登录，如果未登录则跳转到登录页
+  const checkLoginStatus = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      message.warning('请先登录');
+      navigate('/login');
+      return false;
+    }
+    return true;
+  };
+
+  // 联系发布者 - 跳转到消息页面并创建会话
+  const handleContactPublisher = (publisherId, publisherName) => {
+    if (!checkLoginStatus()) return;
+    navigate(`/messages?toUserId=${publisherId}&toUserName=${encodeURIComponent(publisherName)}`);
+  };
+
+  // 工具方法
   const handleSearch = (value) => {
     setSearchKeyword(value);
     setPagination(prev => ({ ...prev, current: 1 }));
@@ -159,21 +175,10 @@ const RequirementListPage = () => {
     navigate('/requirements/create');
   };
 
-  // 🔥 核心修复：使用正确的角色字段名userRole
+  // 判断是否有权限删除需求
   const canDeleteRequirement = (publisherId) => {
-    console.log('删除权限判断:', {
-      currentUserRole: currentUser?.userRole, // 现在会正确显示"admin"
-      currentUserId: currentUser?.id,
-      publisherId: publisherId
-    });
-    
-    // 1. 若用户信息未加载，返回false
     if (!currentUser) return false;
-    
-    // 2. 管理员（userRole=admin）直接有权限删除所有需求
     if (currentUser.userRole === 'admin') return true;
-    
-    // 3. 教师仅能删除自己发布的需求（角色是teacher且ID匹配）
     return currentUser.userRole === 'teacher' && currentUser.id === publisherId;
   };
 
@@ -192,106 +197,198 @@ const RequirementListPage = () => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
       <Navbar />
-      <div style={{ padding: '24px', background: '#f7f8fa' }}>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space>
-            <Search
-              placeholder="搜索需求"
-              allowClear
-              enterButton={<SearchOutlined />}
-              style={{ width: 300 }}
-              onSearch={handleSearch}
-            />
-            <Select 
-              defaultValue="all" 
-              style={{ width: 120 }}
-              onChange={handleStatusChange}
-              value={statusFilter}
-            >
-              <Option value="all">全部状态</Option>
-              <Option value="pending">待接单</Option>
-              <Option value="in_progress">进行中</Option>
-              <Option value="completed">已完成</Option>
-            </Select>
-          </Space>
+      
+      {/* 主容器：固定宽度+居中，内部内容按需对齐 */}
+      <div style={{ 
+        maxWidth: 1200, 
+        margin: '0 auto', 
+        padding: '20px 16px', 
+        width: '100%', 
+        boxSizing: 'border-box' 
+      }}>
+        {/* 1. 搜索筛选区 - 搜索靠左，发布按钮靠右 */}
+        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Search
+            placeholder="搜索需求标题/描述"
+            allowClear
+            enterButton={<SearchOutlined />}
+            style={{ width: 380 }}
+            onSearch={handleSearch}
+            size="middle"
+          />
+          <Select 
+            defaultValue="all" 
+            style={{ width: 150 }}
+            onChange={handleStatusChange}
+            value={statusFilter}
+            size="middle"
+          >
+            <Option value="all">全部状态</Option>
+            <Option value="pending">待接单</Option>
+            <Option value="in_progress">进行中</Option>
+            <Option value="completed">已完成</Option>
+          </Select>
           
-
+          <div style={{ marginLeft: 'auto' }}>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={handleCreateRequirement}
+              size="middle"
+            >
+              发布需求
+            </Button>
+          </div>
         </div>
         
+        {/* 2. 加载状态 */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '50px 0' }}>
-            <Spin size="large" tip="正在加载需求列表..." />
+          <div style={{ 
+            backgroundColor: '#fff', 
+            borderRadius: 6, 
+            padding: '60px 0', 
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)' 
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <Spin size="large" tip="正在加载需求列表..." />
+            </div>
           </div>
         ) : (
           <>
-            <List
-              itemLayout="vertical"
-              size="large"
-              dataSource={filteredRequirements}  
-              renderItem={(item) => (
-                <List.Item
-                  key={item.id}
-                  extra={
-                    <Space direction="vertical" align="end">
-                      <div>{getStatusTag(item.status)}</div>
-                      <div>
-                        <Tag icon={<ClockCircleOutlined />}>
-                          {new Date(item.publishTime).toLocaleDateString()}
-                        </Tag>
-                      </div>
-                    </Space>
-                  }
-                >
-                  <List.Item.Meta
-                    avatar={
+            {/* 3. 需求列表容器 */}
+            <div style={{ 
+              backgroundColor: '#fff', 
+              borderRadius: 6, 
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)', 
+              overflow: 'hidden' 
+            }}>
+              <List
+                itemLayout="vertical"
+                size="large"
+                dataSource={filteredRequirements}  
+                bordered={false}
+                renderItem={(item, index) => (
+                  <div style={{ 
+                    padding: '16px 20px', 
+                    borderBottom: index < filteredRequirements.length - 1 ? '1px solid #f0f2f5' : 'none',
+                    textAlign: 'left'
+                  }}>
+                    {/* 3.1 状态+时间 - 靠左 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      {getStatusTag(item.status)}
+                      <span style={{ color: '#888', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ClockCircleOutlined style={{ fontSize: 12 }} />
+                        {new Date(item.publishTime).toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* 3.2 标题+发布者信息 - 靠左 */}
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
                       <Avatar 
                         src={item.publisher.avatar || `https://randomuser.me/api/portraits/${
                           item.publisher.role === 'student' ? 'men' : 
                           item.publisher.role === 'teacher' ? 'women' : 'lego'
                         }/${Math.floor(Math.random() * 10)}.jpg`} 
                         alt={item.publisher.name}
+                        size="large"
                       />
-                    }
-                    title={<a onClick={() => handleDetail(item.id)}>{item.title}</a>}
-                    description={
-                      <Space>
-                        <span>发布者: {item.publisher.name}</span>
-                        <Tag color={roleColorMap[item.publisher.role] || 'gray'}>
-                          {roleMap[item.publisher.role] || '未知角色'}
-                        </Tag>
-                        <Tag>{item.type}</Tag>
-                      </Space>
-                    }
-                  />
-                  <div style={{ margin: '12px 0' }}>
-                    {item.description.length > 100 ? `${item.description.substring(0, 100)}...` : item.description}
-                  </div>
-                  <Space>
-                    <Tag icon={<DollarOutlined />}>{item.budget}</Tag>
-                    {item.applicants > 0 && <span><UserOutlined /> {item.applicants}人申请</span>}
-                  </Space>
-                  <div style={{ textAlign: 'right', marginTop: 12 }}>
-                    <Button type="text" icon={<MessageOutlined />} onClick={() => navigate('/messages')}>
-                      联系发布者
-                    </Button>
-                    <Button type="primary" onClick={() => handleDetail(item.id)} style={{ marginLeft: 8 }}>
-                      查看详情
-                    </Button>
-                    {/* 权限判断正确，管理员会显示删除按钮 */}
-                    {canDeleteRequirement(item.publisher.id) && (
-                      <Button danger onClick={() => handleDelete(item.id)} style={{ marginLeft: 8 }}>
-                        删除
+                      
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ 
+                          margin: 0, 
+                          fontSize: 16, 
+                          fontWeight: 500, 
+                          cursor: 'pointer' 
+                        }}>
+                          <a onClick={() => handleDetail(item.id)} style={{ color: '#1890ff' }}>
+                            {item.title}
+                          </a>
+                        </h3>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                          <span style={{ color: '#666', fontSize: 13 }}>发布者: {item.publisher.name}</span>
+                          <Tag color={roleColorMap[item.publisher.role] || 'gray'} size="small">
+                            {roleMap[item.publisher.role] || '未知角色'}
+                          </Tag>
+                          <Tag size="small">{item.type}</Tag>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3.3 需求描述 - 靠左 */}
+                    <div style={{ 
+                      color: '#555', 
+                      fontSize: 14, 
+                      lineHeight: 1.5, 
+                      marginBottom: 14,
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {item.description.length > 120 ? `${item.description.substring(0, 120)}...` : item.description}
+                    </div>
+
+                    {/* 3.4 预算+申请人 - 靠左 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#666', fontSize: 13 }}>
+                        <DollarOutlined style={{ fontSize: 13 }} />
+                        <span>{item.budget}</span>
+                      </div>
+                      {item.applicants > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#666', fontSize: 13 }}>
+                          <UserOutlined style={{ fontSize: 13 }} />
+                          <span>{item.applicants}人申请</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3.5 操作按钮 - 靠右对齐 核心修改点 */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                      <Button 
+                        type="default" 
+                        icon={<MessageOutlined />} 
+                        onClick={() => handleContactPublisher(item.publisher.id, item.publisher.name)}
+                        size="small"
+                        style={{ padding: '0 12px' }}
+                      >
+                        联系发布者
                       </Button>
-                    )}
+                      <Button 
+                        type="primary" 
+                        onClick={() => handleDetail(item.id)}
+                        size="small"
+                        style={{ padding: '0 12px' }}
+                      >
+                        查看详情
+                      </Button>
+                      {canDeleteRequirement(item.publisher.id) && (
+                        <Button 
+                          danger 
+                          onClick={() => handleDelete(item.id)}
+                          size="small"
+                          style={{ padding: '0 12px' }}
+                        >
+                          删除
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </List.Item>
-              )}
-              locale={{ emptyText: '没有找到匹配的需求' }}
-            />
+                )}
+                locale={{ emptyText: (
+                  <div style={{ 
+                    padding: '40px 20px', 
+                    textAlign: 'left', 
+                    color: '#999', 
+                    fontSize: 14 
+                  }}>
+                    没有找到匹配的需求
+                  </div>
+                )}}
+              />
+            </div>
             
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
+            {/* 4. 分页 - 居中 */}
+            <div style={{ textAlign: 'center', marginTop: 20 }}>
               <Pagination 
                 current={pagination.current}
                 pageSize={pagination.pageSize}
@@ -301,6 +398,7 @@ const RequirementListPage = () => {
                 showTotal={total => `共 ${total} 条需求`}
                 onChange={handleTableChange}
                 onShowSizeChange={(current, size) => handleTableChange(1, size)}
+                size="small"
               />
             </div>
           </>

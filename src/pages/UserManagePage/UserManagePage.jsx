@@ -336,7 +336,7 @@ const UserManage = () => {
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          grade: values.className,
+          grade: values.grade,
           major: values.major
         }),
         ...(newUserType === "teacher" && {

@@ -6,16 +6,17 @@ import {
 import { 
   MessageOutlined, PaperClipOutlined, 
   SmileOutlined, CloseOutlined, LoadingOutlined, 
-  CheckOutlined, FileTextOutlined, DeleteOutlined,
-  EyeOutlined, EyeInvisibleOutlined
+  CheckOutlined, FileTextOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import EmojiPicker from 'emoji-picker-react';
 import Navbar from '../Navbar/Navbar';
 import { authApi } from '../../service/api';
 
 const { TextArea } = Input;
+// 默认头像（兜底使用）
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 const loadingIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
+
 
 const ROLE_CONFIG = {
   student: { text: '学生', color: 'green' },
@@ -37,122 +38,28 @@ const MessageCenterPage = () => {
   const [uploadingFiles, setUploadingFiles] = useState([]);
   const [targetUser, setTargetUser] = useState({ id: null, name: null });
   const [creatingConversation, setCreatingConversation] = useState(false);
+  
+  // 当前登录用户的头像（从个人信息接口获取，用于发送新消息时）
   const [currentUserAvatar, setCurrentUserAvatar] = useState(DEFAULT_AVATAR);
-  const [unreadTotal, setUnreadTotal] = useState(0);
-
+  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const fetchUnreadCount = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('获取未读计数失败：会话ID无效');
-      return 0;
-    }
+  // 监控头像状态
+  useEffect(() => {
+    console.log('当前用户头像:', currentUserAvatar);
+  }, [currentUserAvatar]);
 
-    try {
-      const res = await authApi.getUnreadCount(convIdStr);
-      if (res.code === 0) {
-        return res.data || 0;
-      } else {
-        message.warning(`获取未读计数失败：${res.message || '服务器处理错误'}`);
-        return 0;
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`获取未读计数失败：${errorMsg}`);
-      return 0;
-    }
+  // 获取角色配置
+  const getRoleConfig = (role) => {
+    return ROLE_CONFIG[role] || ROLE_CONFIG.default;
   };
 
-  const updateTotalUnread = () => {
-    const total = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
-    setUnreadTotal(total);
-  };
-
-  const markAsRead = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('标记已读失败：会话ID无效');
-      return false;
-    }
-
-    try {
-      const res = await authApi.markAsRead(convIdStr);
-      
-      if (res.code === 0) {
-        setConversations(prev => 
-          prev.map(conv => 
-            String(conv.conversationId) === convIdStr
-              ? { 
-                  ...conv, 
-                  unreadCount: 0,
-                  lastMessage: { ...conv.lastMessage, unread: false } 
-                }
-              : conv
-          )
-        );
-        
-        if (activeConversation && String(activeConversation.conversationId) === convIdStr) {
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.status === 'sent' ? { ...msg, status: 'read' } : msg
-            )
-          );
-        }
-        
-        updateTotalUnread();
-        return res.data;
-      } else {
-        message.error(`标记已读失败：${res.message || '服务器处理错误'}`);
-        return false;
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`标记已读失败：${errorMsg}`);
-      return false;
-    }
-  };
-
-  const markAsUnread = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('标记未读失败：会话ID无效');
-      return;
-    }
-
-    try {
-      const res = await authApi.markAsUnread(convIdStr);
-      
-      if (res.code === 0) {
-        const unreadCount = await fetchUnreadCount(conversationId);
-        setConversations(prev => 
-          prev.map(conv => 
-            String(conv.conversationId) === convIdStr
-              ? { 
-                  ...conv, 
-                  unreadCount: unreadCount,
-                  lastMessage: { ...conv.lastMessage, unread: true } 
-                }
-              : conv
-          )
-        );
-        
-        updateTotalUnread();
-        message.success('已标记为未读');
-      } else {
-        message.error(`标记未读失败：${res.message || '服务器处理错误'}`);
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`标记未读失败：${errorMsg}`);
-    }
-  };
-
-  const getRoleConfig = (role) => ROLE_CONFIG[role] || ROLE_CONFIG.default;
-
+  // 处理头像的工具函数（优先使用接口返回值，失败时用默认头像）
   const getAvatar = (avatarUrl) => {
+    // 检查头像链接是否有效
     if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('/'))) {
+      // 当头像加载失败时，显示默认头像
       return <img 
                src={avatarUrl} 
                onError={(e) => e.target.src = DEFAULT_AVATAR} 
@@ -162,6 +69,7 @@ const MessageCenterPage = () => {
     return DEFAULT_AVATAR;
   };
 
+  // 消息更新时自动滚动到底部
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -179,20 +87,20 @@ const MessageCenterPage = () => {
   }, []);
 
   useEffect(() => {
-    updateTotalUnread();
-  }, [conversations]);
-
-  useEffect(() => {
     const initData = async () => {
       try {
-        setPageLoading(true);
+        // 1. 获取当前登录用户信息（用于发送新消息时的头像）
         const userRes = await authApi.getuserlogin();
+        console.log('个人信息接口返回:', userRes);
         if (userRes.code === 0 && userRes.data?.id) {
           setCurrentUserId(String(userRes.data.id));
+          // 保存我方头像（用于发送新消息）
           setCurrentUserAvatar(getAvatar(userRes.data.avatar) || DEFAULT_AVATAR);
           
+          // 2. 获取会话列表
           await fetchConversations();
           
+          // 3. 处理目标用户会话
           if (targetUser.id && currentUserId) {
             await handleTargetUserConversation();
           }
@@ -207,7 +115,8 @@ const MessageCenterPage = () => {
       }
     };
     initData();
-  }, [targetUser]);
+  }, [targetUser, currentUserId]);
+
 
   const handleTargetUserConversation = async () => {
     if (targetUser.id === currentUserId) {
@@ -216,7 +125,7 @@ const MessageCenterPage = () => {
     }
 
     const existingConv = conversations.find(
-      conv => String(conv.withUser.id) === String(targetUser.id)
+      conv => conv.withUser.id === targetUser.id
     );
 
     if (existingConv) {
@@ -235,43 +144,42 @@ const MessageCenterPage = () => {
 
         if (sendRes.code === 0 && sendRes.data) {
           await fetchConversations();
-          const updatedConvsRes = await authApi.getConversationRecords({ params: { current: 1, pageSize: 20 } });
+          const updatedConvs = await authApi.getConversationRecords({ 
+            params: { current: 1, pageSize: 20 }
+          });
           
-          if (updatedConvsRes.code === 0 && updatedConvsRes.data) {
-            const formattedConvs = await Promise.all(updatedConvsRes.data.map(async (conv) => {
-              const unreadCount = await fetchUnreadCount(conv.id);
-              return {
-                id: String(conv.id),
-                withUser: {
-                  id: String(conv.withUser.id),
-                  name: conv.withUser.name || '未知用户',
-                  avatar: getAvatar(conv.withUser.avatar),
-                  role: conv.withUser.role || 'default'
-                },
-                lastMessage: {
-                  content: conv.lastMessage?.content || initMessage,
-                  time: conv.lastMessage?.createTime || new Date().toISOString(),
-                  unread: unreadCount > 0,
-                  id: String(conv.lastMessage?.id || '')
-                },
-                conversationId: String(conv.id),
-                unreadCount: unreadCount
-              };
+          if (updatedConvs.code === 0 && updatedConvs.data) {
+            const formattedConvs = updatedConvs.data.map(conv => ({
+              id: conv.id.toString(),
+              withUser: {
+                id: String(conv.withUser.id),
+                name: conv.withUser.name || '未知用户',
+                avatar: getAvatar(conv.withUser.avatar),
+                role: conv.withUser.role || 'default'
+              },
+              lastMessage: {
+                content: conv.lastMessage?.content || initMessage,
+                time: conv.lastMessage?.createTime || new Date().toISOString(),
+                unread: false,
+                id: conv.lastMessage?.id?.toString() || ''
+              },
+              conversationId: conv.id
             }));
             
             setConversations(formattedConvs);
             const newConv = formattedConvs.find(
-              conv => String(conv.withUser.id) === String(targetUser.id)
+              conv => conv.withUser.id === targetUser.id
             );
             
             if (newConv) {
               setActiveConversation(newConv);
               const initialMessages = [{
-                id: String(sendRes.data.id),
+                id: sendRes.data.id.toString(),
                 senderId: currentUserId,
                 content: initMessage,
                 time: sendRes.data.createTime || new Date().toISOString(),
                 status: 'sent',
+                // 使用当前用户头像（新消息）
                 senderAvatar: currentUserAvatar,
                 files: []
               }];
@@ -293,31 +201,28 @@ const MessageCenterPage = () => {
 
   const fetchConversations = async () => {
     try {
-      const res = await authApi.getConversationRecords({ params: { current: 1, pageSize: 20 } });
+      setPageLoading(true);
+      const res = await authApi.getConversationRecords({ 
+        params: { current: 1, pageSize: 20 }
+      });
 
       if (res.code === 0 && res.data) {
-        const formattedConversations = await Promise.all(
-          res.data.map(async (conv) => {
-            const unreadCount = await fetchUnreadCount(conv.id);
-            return {
-              id: String(conv.id),
-              withUser: {
-                id: String(conv.withUser.id),
-                name: conv.withUser.name || '未知用户',
-                avatar: getAvatar(conv.withUser.avatar),
-                role: conv.withUser.role || 'default'
-              },
-              lastMessage: {
-                content: conv.lastMessage?.content || '',
-                time: conv.lastMessage?.createTime || new Date().toISOString(),
-                unread: unreadCount > 0,
-                id: String(conv.lastMessage?.id || '')
-              },
-              conversationId: String(conv.id),
-              unreadCount: unreadCount
-            };
-          })
-        );
+        const formattedConversations = res.data.map(conv => ({
+          id: conv.id.toString(),
+          withUser: {
+            id: String(conv.withUser.id),
+            name: conv.withUser.name || '未知用户',
+            avatar: getAvatar(conv.withUser.avatar),
+            role: conv.withUser.role || 'default'
+          },
+          lastMessage: {
+            content: conv.lastMessage?.content || '',
+            time: conv.lastMessage?.createTime || new Date().toISOString(),
+            unread: conv.lastMessage?.status === 0 && String(conv.lastMessage?.senderId) !== currentUserId,
+            id: conv.lastMessage?.id?.toString() || ''
+          },
+          conversationId: conv.id
+        }));
 
         setConversations(formattedConversations);
         if (!targetUser.id && !activeConversation && formattedConversations.length > 0) {
@@ -329,25 +234,35 @@ const MessageCenterPage = () => {
     } catch (err) {
       console.error('加载会话失败：', err);
       message.error('加载会话失败，请重试');
+    } finally {
+      setPageLoading(false);
     }
   };
 
+  // 修改 fetchConversationMessages 函数，增加 conversationId 过滤
   const fetchConversationMessages = async (conversationId) => {
-    const convIdStr = String(conversationId);
     try {
       setPageLoading(true);
-      const res = await authApi.getConversationMessages(convIdStr);
+      const res = await authApi.getConversationMessages(conversationId);
+      console.log('原始消息列表接口返回:', res);
       
       if (res.code === 0 && res.data?.records) {
+        // 🌟 关键修复：只保留与当前会话ID匹配的消息
         const validRecords = res.data.records.filter(
-          msg => String(msg.conversationId) === convIdStr
+          msg => msg.conversationId === conversationId
         );
         
-        const sortedRecords = [...validRecords].sort((a, b) => 
-          new Date(a.createTime) - new Date(b.createTime)
-        );
+        // 打印过滤前后的数量，确认过滤效果
+        console.log(`消息过滤：原始${res.data.records.length}条，有效${validRecords.length}条`);
         
+        // 按时间升序排序
+        const sortedRecords = [...validRecords].sort((a, b) => {
+          return new Date(a.createTime) - new Date(b.createTime);
+        });
+        
+        // 格式化消息
         const formattedMessages = sortedRecords.map(msg => {
+          // 确定头像（优先用当前用户头像或对方头像）
           let avatar = DEFAULT_AVATAR;
           if (String(msg.senderId) === currentUserId) {
             avatar = currentUserAvatar;
@@ -356,7 +271,7 @@ const MessageCenterPage = () => {
           }
 
           return {
-            id: String(msg.id),
+            id: msg.id.toString(),
             senderId: String(msg.senderId),
             content: msg.content || '',
             time: msg.createTime || new Date().toISOString(),
@@ -369,11 +284,7 @@ const MessageCenterPage = () => {
         });
 
         setMessages(formattedMessages);
-        const markSuccess = await markAsRead(convIdStr);
-        if (markSuccess) {
-          const newCount = await fetchUnreadCount(convIdStr);
-          console.log(`当前会话未读计数更新为: ${newCount}`);
-        }
+        await markAsRead(conversationId);
       } else {
         message.error(res.message || '加载消息失败');
       }
@@ -385,10 +296,25 @@ const MessageCenterPage = () => {
     }
   };
 
+
+  const markAsRead = async (conversationId) => {
+    try {
+      await authApi.markAsRead(conversationId);
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.conversationId === conversationId 
+            ? { ...conv, lastMessage: { ...conv.lastMessage, unread: false } } 
+            : conv
+        )
+      );
+    } catch (err) {
+      console.error('标记已读失败：', err);
+    }
+  };
+
   const handleFileUpload = async (file) => {
-    const fileId = `file-${Date.now()}`;
     setUploadingFiles(prev => [...prev, {
-      id: fileId,
+      id: `file-${Date.now()}`,
       name: file.name,
       size: file.size,
       type: file.type,
@@ -403,15 +329,15 @@ const MessageCenterPage = () => {
       const res = await authApi.uploadFile(formData);
       if (res.code === 0 && res.data?.url) {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === fileId 
+          f.id === `file-${Date.now()}` 
             ? { ...f, status: 'done', url: res.data.url } 
             : f
         ));
         message.success('文件上传成功');
-        setMessageContent(prev => `${prev}\n[文件] ${file.name}`);
+        setMessageContent(prev => `${prev}\n[文件] ${file.name} (${res.data.url})`);
       } else {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === fileId 
+          f.id === `file-${Date.now()}` 
             ? { ...f, status: 'error' } 
             : f
         ));
@@ -419,7 +345,7 @@ const MessageCenterPage = () => {
       }
     } catch (err) {
       setUploadingFiles(prev => prev.map(f => 
-        f.id === fileId 
+        f.id === `file-${Date.now()}` 
           ? { ...f, status: 'error' } 
           : f
       ));
@@ -432,6 +358,7 @@ const MessageCenterPage = () => {
     setUploadingFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
+  // 发送消息时，使用当前用户头像（与接口返回的senderAvatar保持一致）
   const handleSendMessage = async () => {
     const content = messageContent.trim();
     if (!content || !activeConversation || !currentUserId) {
@@ -440,14 +367,16 @@ const MessageCenterPage = () => {
     }
 
     setSendingLoading(true);
+    // 临时消息使用当前用户头像（与接口最终返回的senderAvatar一致）
     const tempMsg = {
       id: `temp-${Date.now()}`,
       senderId: currentUserId,
       content,
       time: new Date().toISOString(),
       status: 'sending',
-      senderAvatar: currentUserAvatar,
+      senderAvatar: currentUserAvatar, // 确保与接口返回的我方头像一致
     };
+    console.log('发送临时消息（头像）:', tempMsg.senderAvatar);
     setMessages(prev => [...prev, tempMsg]);
 
     try {
@@ -459,6 +388,7 @@ const MessageCenterPage = () => {
       });
 
       if (res.code === 0 && res.data) {
+        // 正式消息优先使用接口返回的senderAvatar，否则用当前用户头像
         const finalAvatar = res.data.senderAvatar ? getAvatar(res.data.senderAvatar) : currentUserAvatar;
         setMessages(prev => 
           prev.map(msg => 
@@ -469,7 +399,7 @@ const MessageCenterPage = () => {
                   content: res.data.content,
                   time: res.data.createTime,
                   status: 'sent',
-                  senderAvatar: finalAvatar,
+                  senderAvatar: finalAvatar, // 与接口返回保持一致
                   files: res.data.files || []
                 }
               : msg
@@ -544,17 +474,7 @@ const MessageCenterPage = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <Navbar>
-        <Badge 
-          count={unreadTotal} 
-          showZero={false}
-          size="small"
-          style={{ marginLeft: 16 }}
-        >
-          <span style={{ fontSize: 14, fontWeight: 500 }}>消息中心</span>
-        </Badge>
-      </Navbar>
-
+      <Navbar />
       {pageLoading && (
         <div style={{ 
           position: 'fixed', 
@@ -591,7 +511,7 @@ const MessageCenterPage = () => {
                   >
                     <List.Item.Meta
                       avatar={
-                        <Badge count={conversation.unreadCount} showZero={false}>
+                        <Badge dot={conversation.lastMessage.unread}>
                           <Avatar src={conversation.withUser.avatar} size={40} />
                         </Badge>
                       }
@@ -660,7 +580,16 @@ const MessageCenterPage = () => {
                     </Tag>
                   </div>
                 </Space>
-
+                <Space>
+                  <Tooltip title="静音会话">
+                    <Button 
+                      type="text" 
+                      icon={<MessageOutlined />}
+                      size="small"
+                    />
+                  </Tooltip>
+                  <Button type="text" icon={<CloseOutlined />} size="small" />
+                </Space>
               </div>
               
               <div style={{ 
@@ -673,6 +602,9 @@ const MessageCenterPage = () => {
                   dataSource={messages}
                   renderItem={(msg) => {
                     const isCurrentUser = msg.senderId === currentUserId;
+                    // 打印渲染时的头像信息，确认是否正确
+                    console.log(`渲染消息ID: ${msg.id}, 是否我方: ${isCurrentUser}, 头像: ${msg.senderAvatar}`);
+                    
                     return (
                       <List.Item
                         style={{
@@ -684,6 +616,7 @@ const MessageCenterPage = () => {
                         }}
                       >
                         {!isCurrentUser ? (
+                          // 对方的消息：使用接口返回的senderAvatar
                           <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
                             <Avatar 
                               src={msg.senderAvatar} 
@@ -756,6 +689,7 @@ const MessageCenterPage = () => {
                             </div>
                           </div>
                         ) : (
+                          // 我方的消息：使用接口返回的senderAvatar（或currentUserAvatar）
                           <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
                             <div
                               style={{ 
@@ -846,6 +780,7 @@ const MessageCenterPage = () => {
                                 </div>
                               </div>
                             </div>
+                            {/* 我方头像：使用消息中的senderAvatar */}
                             <Avatar 
                               src={msg.senderAvatar} 
                               size={36} 
@@ -996,3 +931,4 @@ const MessageCenterPage = () => {
 };
 
 export default MessageCenterPage;
+    

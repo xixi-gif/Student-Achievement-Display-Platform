@@ -39,12 +39,11 @@ const LoginPage = () => {
         role: role                     
       });
 
-      // 关键修改：从 response.data 中获取 token（而非直接从 response 中获取）
       const token = response.data?.token;
       const userInfo = response.data?.userInfoVO;
       
       if (!token) {
-        throw new Error('登录成功但未返回 Token');
+        throw new Error('账号密码有误');
       }
 
       // 正确存储 Token 和用户信息

@@ -99,6 +99,23 @@ export const authApi = {
   getRequirement:(params)=> service.get('/requirements',{params}),
   //需求详情
   getRequirementByid:(id)=>service.get(`/requirements/${id}`),
+  //会话
+  getConversationRecords:()=>service.get('/conversations'),
+  sendMessage:(data)=>service.post('/conversations',data),
+  deleteConversation:(conversationId)=>service.delete(`/conversations/${conversationId}`),
+  muteConversation:(conversationId)=>service.put(`/conversations/${conversationId}/mute`),
+  pinConversation:(conversationId)=>service.put(`/conversations/${conversationId}/pin`),
+  unmuteConversation:(conversationId)=>service.put(`/conversations/${conversationId}/unmute`),
+  unpinConversation:(conversationId)=>service.put(`/conversations/${conversationId}/unpin`),
+  //消息
+  getConversationMessages:(conversationId)=>service.get(`/messages/conversation/${conversationId}`),
+  markAsRead:(conversationId)=>service.put(`/messages/conversation/${conversationId}/read`),
+  getUnreadCount:(conversationId)=>service.get(`/messages/conversation/${conversationId}/unread-count`),
+  searchMessages:(data)=>service.get('/messages/search',data),
+  getTotalUnreadCount:(data)=>service.get('/messages/total-unread-count',data),
+  deleteMesaage:(messageId)=>service.delete(`/messages/${messageId}`),
+  recallMessage:(messageId)=>service.put(`/messages/${messageId}/recall`),
+
 };
 
 export const announcementApi = {
