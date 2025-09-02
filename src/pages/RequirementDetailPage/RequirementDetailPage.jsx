@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Descriptions, Tag, Button, Space, Avatar, Card, message,
-  List, Tabs, Layout, Spin, Alert
+  List, Tabs, Layout, Spin, Alert, Modal, Input
 } from 'antd';
 import { 
-  MessageOutlined, DollarOutlined, ClockCircleOutlined, ReloadOutlined
+  MessageOutlined, DollarOutlined, ClockCircleOutlined, ReloadOutlined,
+  PlusOutlined, CheckOutlined
 } from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
 import { authApi } from '../../service/api'; 
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
+const { TextArea } = Input;
 
 const RequirementDetailPage = () => {
   const { id } = useParams();
@@ -20,6 +22,10 @@ const RequirementDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('detail');
+  const [applyModalVisible, setApplyModalVisible] = useState(false);
+  const [introduction, setIntroduction] = useState('');
+  const [applyLoading, setApplyLoading] = useState(false);
+  const hasAppliedRef = useRef(false);
 
   const fetchRequirement = async () => {
     if (!id || typeof id !== 'string') {
@@ -44,7 +50,10 @@ const RequirementDetailPage = () => {
       }
 
       if (response.code === 0 && response.data) {
-        setRequirement(transformBackendData(response.data));
+        const transformedData = transformBackendData(response.data);
+        setRequirement(transformedData);
+        const appliedRequirements = JSON.parse(localStorage.getItem('appliedRequirements') || '[]');
+        hasAppliedRef.current = appliedRequirements.includes(id);
       } else {
         setError(response.message || '获取需求失败：后端返回业务错误');
         message.error(response.message || '获取需求失败');
@@ -65,7 +74,6 @@ const RequirementDetailPage = () => {
     fetchRequirement();
   }, [id]);
 
-  // 转换后端数据 - 直接使用数据库返回的role字段
   const transformBackendData = (data) => {
     return {
       id: data.id,
@@ -78,7 +86,6 @@ const RequirementDetailPage = () => {
       publisher: {
         id: data.publisher?.id || '',
         name: data.publisher?.userName || '未知发布者',
-        // 直接使用后端返回的role字段，不做前端推测
         role: data.publisher?.role ?? 'unknown',
         avatar: data.publisher?.userAvatar || 'https://picsum.photos/200/200?random=1'
       },
@@ -96,13 +103,11 @@ const RequirementDetailPage = () => {
     };
   };
 
-  // 映射状态码到文本
   const mapStatus = (statusCode) => {
     const statusMap = { 1: 'pending', 2: 'in_progress', 3: 'completed' };
     return statusMap[statusCode] || 'pending';
   };
 
-  // 获取状态标签
   const getStatusTag = (status) => {
     const statusMap = {
       pending: { color: 'orange', text: '待接单' },
@@ -112,7 +117,6 @@ const RequirementDetailPage = () => {
     return <Tag color={statusMap[status].color}>{statusMap[status].text}</Tag>;
   };
 
-  
   const getRoleText = (role) => {
     const roleMap = {
       'admin': '超级管理员',
@@ -122,7 +126,6 @@ const RequirementDetailPage = () => {
     };
     return roleMap[role] || role;
   };
-
 
   const getRoleColor = (role) => {
     const colorMap = {
@@ -135,19 +138,66 @@ const RequirementDetailPage = () => {
   };
 
   const handleContact = () => {
-    navigate('/messages');
+    if (requirement?.publisher?.id) {
+      navigate(`/messages?toUserId=${requirement.publisher.id}&toUserName=${encodeURIComponent(requirement.publisher.name)}`);
+    } else {
+      message.warning('无法获取发布者信息，无法发起联系');
+    }
   };
 
-  const handleApply = async () => {
-    if (!requirement?.id) return;
+  const handleOpenApplyModal = () => {
+    if (hasAppliedRef.current) {
+      message.info('你已申请过该需求，请勿重复申请');
+      return;
+    }
+    if (requirement?.status !== 'pending') {
+      message.warning('只有"待接单"状态的需求可以申请');
+      return;
+    }
+    setIntroduction('');
+    setApplyModalVisible(true);
+  };
+
+  const handleCloseApplyModal = () => {
+    setApplyModalVisible(false);
+  };
+
+  const handleSubmitApply = async () => {
+    if (!introduction.trim()) {
+      message.warning('请输入申请说明');
+      return;
+    }
+    if (!requirement?.id) {
+      message.error('需求ID不存在，无法申请');
+      return;
+    }
+
     try {
-      await authApi.applyRequirement(requirement.id, {
-        introduction: '我想申请这个需求'
-      });
-      message.success('申请已提交，请等待发布者确认');
+      setApplyLoading(true);
+      const applyParams = {
+        introduction: introduction.trim()
+      };
+      
+      const response = await authApi.addApplication(requirement.id, applyParams);
+      
+      if (response?.code === 0) {
+        message.success('申请提交成功！请等待发布者确认');
+        const appliedRequirements = JSON.parse(localStorage.getItem('appliedRequirements') || '[]');
+        localStorage.setItem('appliedRequirements', JSON.stringify([...appliedRequirements, id]));
+        hasAppliedRef.current = true;
+        handleCloseApplyModal();
+        fetchRequirement();
+      } else {
+        message.error(response?.message || '申请提交失败，请稍后重试');
+      }
     } catch (err) {
-      console.error('申请失败:', err);
-      message.error(err.message || '申请提交失败，请重试');
+      console.error('申请接单失败:', err);
+      const errorMsg = err.message.includes('Failed to fetch') 
+        ? '网络错误：无法连接到服务器'
+        : err.message || '申请失败，请重试';
+      message.error(errorMsg);
+    } finally {
+      setApplyLoading(false);
     }
   };
 
@@ -201,117 +251,173 @@ const RequirementDetailPage = () => {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh', margin: 0, padding: 0 }}>
-      <Navbar />
-      <Content style={{ 
-        background: '#f0f2f5', 
-        padding: '24px 5%',
-        minHeight: 'calc(100vh - 64px)'
-      }}>
-        <Card
-          title="需求详情"
-          extra={
-            <Space>
-              <Button onClick={() => navigate('/requirements')}>返回列表</Button>
-            </Space>
-          }
-          style={{ margin: 0, borderRadius: 4 }}
-        >
-          <Tabs activeKey={activeTab} onChange={setActiveTab}>
-            <TabPane tab="基本信息" key="detail">
-              <Descriptions column={1} bordered>
-                <Descriptions.Item label="需求标题">
-                  {requirement.title}
-                  <Tag color="blue" style={{ marginLeft: 8 }}>
-                    {requirement.type}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="发布者">
-                  <Space>
-                    <Avatar src={requirement.publisher.avatar} />
-                    {requirement.publisher.name}
-                    <Tag color={getRoleColor(requirement.publisher.role)}>
-                      {getRoleText(requirement.publisher.role)}
+    <>
+      <Layout style={{ minHeight: '100vh', margin: 0, padding: 0 }}>
+        <Navbar />
+        <Content style={{ 
+          background: '#f0f2f5', 
+          padding: '24px 5%',
+          minHeight: 'calc(100vh - 64px)'
+        }}>
+          <Card
+            title="需求详情"
+            extra={
+              <Space>
+                <Button onClick={() => navigate('/requirements')}>返回列表</Button>
+              </Space>
+            }
+            style={{ margin: 0, borderRadius: 4 }}
+          >
+            <Tabs activeKey={activeTab} onChange={setActiveTab}>
+              <TabPane tab="基本信息" key="detail">
+                <Descriptions column={1} bordered>
+                  <Descriptions.Item label="需求标题">
+                    {requirement.title}
+                    <Tag color="blue" style={{ marginLeft: 8 }}>
+                      {requirement.type}
                     </Tag>
-                  </Space>
-                </Descriptions.Item>
-                <Descriptions.Item label="状态">
-                  {getStatusTag(requirement.status)}
-                  <Tag color={requirement.urgency === '高' ? 'red' : 
-                             requirement.urgency === 'normal' ? 'blue' : 'green'}>
-                    {requirement.urgency}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="预算">
-                  <Tag icon={<DollarOutlined />}>{requirement.budget}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="截止时间">
-                  <Tag icon={<ClockCircleOutlined />}>
-                    {new Date(requirement.deadline).toLocaleString()}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="联系方式">
-                  {requirement.contact}
-                </Descriptions.Item>
-                <Descriptions.Item label="详细描述">
-                  {requirement.description}
-                </Descriptions.Item>
-              </Descriptions>
-              <div style={{ marginTop: 24, textAlign: 'right' }}>
-                <Space>
-                  <Button icon={<MessageOutlined />} onClick={handleContact}>
-                    联系发布者
-                  </Button>
-                  {requirement.status === 'pending' && (
-                    <Button type="primary" onClick={handleApply}>
-                      申请接单
+                  </Descriptions.Item>
+                  <Descriptions.Item label="发布者">
+                    <Space>
+                      <Avatar src={requirement.publisher.avatar} />
+                      {requirement.publisher.name}
+                      <Tag color={getRoleColor(requirement.publisher.role)}>
+                        {getRoleText(requirement.publisher.role)}
+                      </Tag>
+                    </Space>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="状态">
+                    {getStatusTag(requirement.status)}
+                    <Tag color={
+                      requirement.urgency === '高' ? 'red' : 
+                      requirement.urgency === 'normal' ? 'blue' : 'green'
+                    } style={{ marginLeft: 8 }}>
+                      {requirement.urgency === 'normal' ? '普通' : requirement.urgency}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="预算">
+                    <Tag icon={<DollarOutlined />}>{requirement.budget}</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="截止时间">
+                    <Tag icon={<ClockCircleOutlined />}>
+                      {new Date(requirement.deadline).toLocaleString()}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="联系方式">
+                    {requirement.contact}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="详细描述">
+                    <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                      {requirement.description}
+                    </div>
+                  </Descriptions.Item>
+                </Descriptions>
+                <div style={{ marginTop: 24, textAlign: 'right' }}>
+                  <Space>
+                    <Button icon={<MessageOutlined />} onClick={handleContact}>
+                      联系发布者
                     </Button>
-                  )}
-                </Space>
-              </div>
-            </TabPane>
-
-            {requirement.applicants.length > 0 && (
-              <TabPane tab={`申请者 (${requirement.applicants.length})`} key="applicants">
-                <List
-                  dataSource={requirement.applicants}
-                  renderItem={(applicant) => (
-                    <List.Item
-                      actions={[
-                        <Button type="link" onClick={() => {}}>
-                          选择
-                        </Button>,
-                        <Button type="link" onClick={handleContact}>
-                          联系
+                    {requirement.status === 'pending' ? (
+                      hasAppliedRef.current ? (
+                        <Button type="primary" disabled icon={<CheckOutlined />}>
+                          已申请
                         </Button>
-                      ]}
-                    >
-                      <List.Item.Meta
-                        avatar={<Avatar src={applicant.avatar} />}
-                        title={
-                          <Space>
-                            {applicant.name}
-                            <Tag color={getRoleColor(applicant.role)}>
-                              {getRoleText(applicant.role)}
-                            </Tag>
-                          </Space>
-                        }
-                        description={
-                          <Space direction="vertical" size={0}>
-                            <span>{applicant.introduction}</span>
-                            <span>申请时间: {new Date(applicant.applyTime).toLocaleString()}</span>
-                          </Space>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
+                      ) : (
+                        <Button type="primary" onClick={handleOpenApplyModal} icon={<PlusOutlined />}>
+                          申请接单
+                        </Button>
+                      )
+                    ) : (
+                      <Button type="primary" disabled>
+                        申请接单
+                      </Button>
+                    )}
+                  </Space>
+                </div>
               </TabPane>
-            )}
-          </Tabs>
-        </Card>
-      </Content>
-    </Layout>
+
+              {requirement.applicants.length > 0 && (
+                <TabPane tab={`申请者 (${requirement.applicants.length})`} key="applicants">
+                  <List
+                    dataSource={requirement.applicants}
+                    renderItem={(applicant) => (
+                      <List.Item
+                        actions={[
+                          (requirement.publisher.id === localStorage.getItem('userId') || localStorage.getItem('userRole') === 'admin') && (
+                            <Button type="link" onClick={() => {
+                              message.info(`已选择申请者: ${applicant.name}`);
+                            }}>
+                              选择
+                            </Button>
+                          ),
+                          <Button type="link" onClick={handleContact}>
+                            联系
+                          </Button>
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={<Avatar src={applicant.avatar} />}
+                          title={
+                            <Space>
+                              {applicant.name}
+                              <Tag color={getRoleColor(applicant.role)}>
+                                {getRoleText(applicant.role)}
+                              </Tag>
+                            </Space>
+                          }
+                          description={
+                            <Space direction="vertical" size="small">
+                              <div style={{ whiteSpace: 'pre-line', color: '#666' }}>
+                                申请说明: {applicant.introduction}
+                              </div>
+                              <div style={{ color: '#999', fontSize: 12 }}>
+                                申请时间: {new Date(applicant.applyTime).toLocaleString()}
+                              </div>
+                            </Space>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </TabPane>
+              )}
+            </Tabs>
+          </Card>
+        </Content>
+      </Layout>
+
+      <Modal
+        title="申请接单"
+        open={applyModalVisible}
+        onCancel={handleCloseApplyModal}
+        footer={[
+          <Button key="cancel" onClick={handleCloseApplyModal}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" loading={applyLoading} onClick={handleSubmitApply}>
+            提交申请
+          </Button>
+        ]}
+        destroyOnClose
+        maskClosable={false}
+        style={{ top: 20 }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <h4 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>申请说明</h4>
+          <TextArea
+            value={introduction}
+            onChange={(e) => setIntroduction(e.target.value)}
+            placeholder="请简要介绍你的能力/经验，说明你能如何完成该需求（至少10个字符）"
+            rows={4}
+            maxLength={500}
+            style={{ resize: 'none' }}
+          />
+          <div style={{ textAlign: 'right', color: '#999', fontSize: 12, marginTop: 8 }}>
+            {introduction.length}/500
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 };
 

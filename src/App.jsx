@@ -36,6 +36,8 @@ import ChatPage from './pages/ChatPage/ChatPage';
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
 import UserManage from './pages/UserManagePage/UserManagePage';
+import MyRequirementsPage from './pages/MyRequirements/MyRequirements';
+import MyApplicationsPage from './pages/MyApplicationsPage/MyApplicationPage';
 
 function App() {
   return (
@@ -53,7 +55,8 @@ function App() {
             <Route path="/announcement/detail/:id" element={<AnnouncementDetail/>} />
             <Route path="/requirements" element={<RequirementListPage />} />
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
-            <Route path="/setting" element={<AccountSettingsPage />}/>
+            <Route path="/setting" element={<AccountSettingsPage />} />
+            <Route path='my-applications' element={<MyApplicationsPage /> } />
 
             {/* 需要权限验证的路由 */}
             <Route element={<AuthRoute/>}>
@@ -70,6 +73,7 @@ function App() {
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/publish-requirement" element={<RequirementPublishPage />} />
               <Route path="/messages" element={<MessageCenterPage />} />
+              <Route path="/my-requirements" element={<MyRequirementsPage />} /> 
 
               {/* 教师相关路由 */}
               <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />

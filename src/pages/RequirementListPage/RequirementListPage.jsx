@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { List, Tag, Avatar, Button, Space, Input, Select, Pagination, Layout, Spin, message } from 'antd';
-import { SearchOutlined, MessageOutlined, DollarOutlined, UserOutlined, ClockCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { List, Tag, Avatar, Button, Input, Select, Pagination, Layout, Spin, message } from 'antd';
+import { SearchOutlined, MessageOutlined, DollarOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
 import { authApi } from '../../service/api';
 
@@ -14,7 +14,6 @@ const statusNumMap = {
   3: 'completed'
 };
 
-// 角色映射表
 const roleMap = {
   admin: '超级管理员',
   teacher: '教师',
@@ -22,7 +21,6 @@ const roleMap = {
   guest: '访客'
 };
 
-// 角色标签颜色映射
 const roleColorMap = {
   admin: 'red',
   teacher: 'orange',
@@ -45,7 +43,6 @@ const RequirementListPage = () => {
   
   const navigate = useNavigate();
 
-  // 获取当前用户信息
   const fetchCurrentUser = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -62,7 +59,6 @@ const RequirementListPage = () => {
     return null;
   };
 
-  // 获取所有需求列表
   const fetchAllRequirements = async () => {
     try {
       setLoading(true);
@@ -120,7 +116,6 @@ const RequirementListPage = () => {
     fetchAllRequirements();
   }, [pagination.current, pagination.pageSize, searchKeyword]);
 
-  // 筛选逻辑
   useEffect(() => {
     let result = [...allRequirements];
     if (statusFilter !== 'all') {
@@ -130,7 +125,6 @@ const RequirementListPage = () => {
     setFilteredRequirements(result);
   }, [allRequirements, statusFilter]);
 
-  // 状态标签
   const getStatusTag = (status) => {
     const statusMap = {
       pending: { color: 'orange', text: '待接单' },
@@ -140,7 +134,6 @@ const RequirementListPage = () => {
     return <Tag color={statusMap[status]?.color || 'gray'}>{statusMap[status]?.text || '未知状态'}</Tag>;
   };
 
-  // 检查是否已登录，如果未登录则跳转到登录页
   const checkLoginStatus = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -151,13 +144,11 @@ const RequirementListPage = () => {
     return true;
   };
 
-  // 联系发布者 - 跳转到消息页面并创建会话
   const handleContactPublisher = (publisherId, publisherName) => {
     if (!checkLoginStatus()) return;
     navigate(`/messages?toUserId=${publisherId}&toUserName=${encodeURIComponent(publisherName)}`);
   };
 
-  // 工具方法
   const handleSearch = (value) => {
     setSearchKeyword(value);
     setPagination(prev => ({ ...prev, current: 1 }));
@@ -171,18 +162,25 @@ const RequirementListPage = () => {
   const handleDetail = (id) => {
     navigate(`/requirements/${id}`);
   };
-  const handleCreateRequirement = () => {
-    navigate('/requirements/create');
+
+  const handleMyRequirements = () => {
+    if (checkLoginStatus()) {
+      navigate('/my-requirements');
+    }
   };
 
-  // 判断是否有权限删除需求
+  const handleMyApplications = () => {
+    if (checkLoginStatus()) {
+      navigate('/my-applications');
+    }
+  };
+
   const canDeleteRequirement = (publisherId) => {
     if (!currentUser) return false;
     if (currentUser.userRole === 'admin') return true;
     return currentUser.userRole === 'teacher' && currentUser.id === publisherId;
   };
 
-  // 删除需求
   const handleDelete = async (id) => {
     if (window.confirm('确定要删除这个需求吗？')) {
       try {
@@ -200,7 +198,6 @@ const RequirementListPage = () => {
     <Layout style={{ minHeight: '100vh', backgroundColor: '#f5f7fa' }}>
       <Navbar />
       
-      {/* 主容器：固定宽度+居中，内部内容按需对齐 */}
       <div style={{ 
         maxWidth: 1200, 
         margin: '0 auto', 
@@ -208,7 +205,6 @@ const RequirementListPage = () => {
         width: '100%', 
         boxSizing: 'border-box' 
       }}>
-        {/* 1. 搜索筛选区 - 搜索靠左，发布按钮靠右 */}
         <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
           <Search
             placeholder="搜索需求标题/描述"
@@ -231,19 +227,24 @@ const RequirementListPage = () => {
             <Option value="completed">已完成</Option>
           </Select>
           
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
             <Button 
               type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={handleCreateRequirement}
+              onClick={handleMyRequirements}
               size="middle"
             >
-              发布需求
+              我的需求
+            </Button>
+            <Button 
+              type="primary" 
+              onClick={handleMyApplications}
+              size="middle"
+            >
+              我的申请
             </Button>
           </div>
         </div>
         
-        {/* 2. 加载状态 */}
         {loading ? (
           <div style={{ 
             backgroundColor: '#fff', 
@@ -257,7 +258,6 @@ const RequirementListPage = () => {
           </div>
         ) : (
           <>
-            {/* 3. 需求列表容器 */}
             <div style={{ 
               backgroundColor: '#fff', 
               borderRadius: 6, 
@@ -275,7 +275,6 @@ const RequirementListPage = () => {
                     borderBottom: index < filteredRequirements.length - 1 ? '1px solid #f0f2f5' : 'none',
                     textAlign: 'left'
                   }}>
-                    {/* 3.1 状态+时间 - 靠左 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                       {getStatusTag(item.status)}
                       <span style={{ color: '#888', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -284,7 +283,6 @@ const RequirementListPage = () => {
                       </span>
                     </div>
 
-                    {/* 3.2 标题+发布者信息 - 靠左 */}
                     <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
                       <Avatar 
                         src={item.publisher.avatar || `https://randomuser.me/api/portraits/${
@@ -317,7 +315,6 @@ const RequirementListPage = () => {
                       </div>
                     </div>
 
-                    {/* 3.3 需求描述 - 靠左 */}
                     <div style={{ 
                       color: '#555', 
                       fontSize: 14, 
@@ -328,7 +325,6 @@ const RequirementListPage = () => {
                       {item.description.length > 120 ? `${item.description.substring(0, 120)}...` : item.description}
                     </div>
 
-                    {/* 3.4 预算+申请人 - 靠左 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#666', fontSize: 13 }}>
                         <DollarOutlined style={{ fontSize: 13 }} />
@@ -342,7 +338,6 @@ const RequirementListPage = () => {
                       )}
                     </div>
 
-                    {/* 3.5 操作按钮 - 靠右对齐 核心修改点 */}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                       <Button 
                         type="default" 
@@ -387,7 +382,6 @@ const RequirementListPage = () => {
               />
             </div>
             
-            {/* 4. 分页 - 居中 */}
             <div style={{ textAlign: 'center', marginTop: 20 }}>
               <Pagination 
                 current={pagination.current}

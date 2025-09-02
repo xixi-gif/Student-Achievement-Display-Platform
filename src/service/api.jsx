@@ -116,6 +116,9 @@ export const authApi = {
   deleteMesaage:(messageId)=>service.delete(`/messages/${messageId}`),
   recallMessage:(messageId)=>service.put(`/messages/${messageId}/recall`),
 
+  //需求申请
+  addApplication: (id, data) => service.post(`/application/${id}/apply`, data)
+
 };
 
 export const announcementApi = {
