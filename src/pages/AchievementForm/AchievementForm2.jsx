@@ -66,6 +66,11 @@ const AchievementFormPage = () => {
   const [instructors, setInstructors] = useState([]); // 存储多个指导教师
   const [instructorSearchKeyword, setInstructorSearchKeyword] = useState(""); // 教师搜索关键词
 
+  //判断是否是管理员
+  const isAdmin = () => {
+    return currentUser?.role === "admin";
+  };
+
   // 成果级别选项，与后端Achievement实体的level字段对应
   const levels = [
     { value: "校级", label: "校级" },
@@ -154,6 +159,8 @@ const AchievementFormPage = () => {
               description: achievement.description,
               keywords: achievement.keywords || [],
               price: achievement.price,
+              // 管理员编辑时可以设置状态
+              ...(isAdmin() && { status: achievement.status }),
             });
             setParticipants(achievement.participants || []);
             // 设置多个指导教师（从 instructor 改为 instructors）
@@ -226,21 +233,26 @@ const AchievementFormPage = () => {
               }));
               setAttachmentFiles(attachmentFileList);
             }
-          } else {
-            // 创建模式：设置默认值
-            form.setFieldsValue({
-              date: moment(),
-              level: levels[0].value,
-              keywords: [],
-            });
-            setParticipants([userInfo.realName || username]);
           }
-
-          setLoading(false);
+        } else {
+          // 创建模式：设置默认值
+          form.setFieldsValue({
+            date: moment(),
+            level: levels[0].value,
+            keywords: [],
+            // 管理员创建时可以设置默认状态
+            ...(isAdmin() && { status: 0 }), // 默认设置为草稿状态
+          });
+          if (!isAdmin()) {
+            setParticipants([userInfo.realName || username]);
+          } else {
+            setParticipants([]); // 管理员创建时参与者为空
+          }
         }
       } catch (error) {
         console.error("加载数据失败:", error);
         message.error("加载数据失败");
+      } finally {
         setLoading(false);
       }
     };
@@ -346,7 +358,6 @@ const AchievementFormPage = () => {
 
     try {
       setSearchingTeachers(true);
-      // 使用正确的API调用方式
       const response = await achievementApi.searchTeachers({
         keyword: instructorSearchKeyword.trim(),
         limit: 10,
@@ -417,7 +428,12 @@ const AchievementFormPage = () => {
       formData.append("description", values.description);
       formData.append("price", values.price);
 
-      // 2. 修正数组字段格式
+      // 管理员可以设置状态
+      if (isAdmin() && values.status) {
+        formData.append("status", values.status.toString());
+      }
+
+      // 数组字段格式
       // 处理参与人员
       const participantsList = participants.map((participant) =>
         typeof participant === "string" ? participant : participant.realName
@@ -504,21 +520,43 @@ const AchievementFormPage = () => {
         },
       };
 
-      if (isEditMode) {
-        response = await achievementApi.updateAchievement(formData, config);
+      if (isAdmin()) {
+        // 管理员使用管理员接口
+        if (isEditMode) {
+          // 管理员编辑 - 使用普通编辑接口或特殊的管理员编辑接口
+          response = await achievementApi.updateAchievement(formData, config);
+        } else {
+          // 管理员创建
+          response = await adminApi.addAchievement(formData, config);
+        }
       } else {
-        response = await achievementApi.addAchievement(formData, config);
+        // 学生使用普通接口
+        if (isEditMode) {
+          response = await achievementApi.updateAchievement(formData, config);
+        } else {
+          response = await achievementApi.createAchievement(formData, config);
+        }
       }
 
       if (response.code === 0) {
-        message.success(
-          isEditMode ? "成果更新成功，等待审核" : "成果发布成功，等待审核"
-        );
-        navigate("/student/my-achievements");
+        const successMessage = isAdmin()
+          ? isEditMode
+            ? "成果更新成功"
+            : "成果创建成功"
+          : isEditMode
+          ? "成果更新成功，等待审核"
+          : "成果发布成功，等待审核";
+
+        message.success(successMessage);
+
+        // 根据用户角色跳转到不同的页面
+        if (isAdmin()) {
+          navigate("/admin/achievements-manage"); // 管理员跳转到管理页面
+        } else {
+          navigate("/student/my-achievements"); // 学生跳转到我的成果页面
+        }
       } else {
-        message.error(
-          response.message || (isEditMode ? "更新失败" : "发布失败")
-        );
+        message.error(response.message || "操作失败");
       }
     } catch (error) {
       console.error("提交失败:", error);
@@ -537,8 +575,33 @@ const AchievementFormPage = () => {
 
   // 取消操作
   const handleCancel = () => {
-    navigate(
-      isEditMode ? `/achievement/detail/${id}` : "/student/my-achievements"
+    if (isAdmin()) {
+      navigate("/admin/achievements-manage");
+    } else if (isEditMode) {
+      navigate(`/achievement/detail/${id}`);
+    } else {
+      navigate("/student/my-achievements");
+    }
+  };
+
+  // 在表单中添加管理员专用的状态选择字段
+  const renderAdminStatusField = () => {
+    if (!isAdmin()) return null;
+
+    return (
+      <Form.Item
+        name="status"
+        label="成果状态"
+        rules={[{ required: true, message: "请选择成果状态" }]}
+      >
+        <Select placeholder="请选择成果状态">
+          <Option value={0}>草稿</Option>
+          <Option value={1}>审核中</Option>
+          <Option value={2}>已发布</Option>
+          <Option value={3}>已驳回</Option>
+          <Option value={4}>老师已通过</Option>
+        </Select>
+      </Form.Item>
     );
   };
 
@@ -583,7 +646,9 @@ const AchievementFormPage = () => {
                   返回
                 </Button>
                 <Title level={4} style={{ margin: 0 }}>
-                  {isEditMode ? "编辑成果" : "发布新成果"}
+                  {isEditMode
+                    ? `${isAdmin() ? "更新" : "编辑"}成果`
+                    : `${isAdmin() ? "创建" : "发布"}新成果`}
                 </Title>
               </Space>
             }
@@ -598,7 +663,7 @@ const AchievementFormPage = () => {
               }}
             >
               {/* 基本信息部分 */}
-              <Divider orientation="left" plain>
+              <Divider orientation="center" plain>
                 基本信息
               </Divider>
               <Row gutter={16}>
@@ -655,6 +720,9 @@ const AchievementFormPage = () => {
                     </Select>
                   </Form.Item>
                 </Col>
+
+                {/* 管理员状态选择字段 */}
+                {renderAdminStatusField()}
 
                 <Col span={24}>
                   <Form.Item
@@ -1018,7 +1086,9 @@ const AchievementFormPage = () => {
                     loading={submitting}
                     size="large"
                   >
-                    {isEditMode ? "更新成果" : "提交发布"}
+                    {isEditMode
+                      ? `${isAdmin() ? "更新" : "编辑"}成果`
+                      : `${isAdmin() ? "创建" : "发布"}新成果`}
                   </Button>
 
                   <Button
@@ -1032,7 +1102,7 @@ const AchievementFormPage = () => {
                 </Space>
               </Form.Item>
 
-              {!isEditMode && (
+              {!isEditMode && !isAdmin() && (
                 <div
                   style={{ textAlign: "center", color: "#666", fontSize: 12 }}
                 >

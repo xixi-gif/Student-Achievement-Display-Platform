@@ -197,10 +197,10 @@ export const adminApi = {
   toggleUserStatus: (id, status) => service.post(`/admin/users/${id}/status`, { status }),
   
   // 数据统计接口
-  getStatistics: () => service.get('/admin//stats/summary'),
+  getStatistics: () => service.get('/admin/stats/summary'),
   getStatsTrend: (params) => service.get('/stats/achievement-trends',{params}),
-  getAchievementStats: () => service.get('/admin/statistics/achievements'),
-  getUserStats: () => service.get('/admin/statistics/users'),
+  getAchievementStats: () => service.get('/stats/achievement-types'),
+  getUserStats: () => service.get('/stats/user-activity'),
 
   //分类设置接口
   getCategoryList: () => service.get('/admin/categories'),
@@ -234,9 +234,16 @@ export const adminApi = {
   updateSystemSettings: (data) => service.put('/admin/settings', data),
   
   // 成果管理接口
-  getAllAchievements: (params) => service.get('/admin/achievements', { params }),
-  deleteAchievement: (id) => service.delete(`/admin/achievements/${id}`),
-  updateAchievementStatus: (id, status) => service.post(`/admin/achievements/${id}/status`, { status }),
+  getAllAchievements: (data) => service.post('/admin/achievement/list', data),
+  addAchievement: (data) => service.post('/admin/achievement/add', data),
+  deleteAchievement: (ids) => service.post('/admin/achievement/batch-delete',ids),
+  updateAchievementStatus: (params) => {
+  const queryParams = new URLSearchParams(); // 将数组参数转换为查询字符串格式
+  params.achievementIds.forEach(id => queryParams.append('achievementIds', id));
+  queryParams.append('status', params.status);
+  
+  return service.post(`/admin/achievement/batch-update-status?${queryParams.toString()}`);
+},
   
 
   // 轮播图
