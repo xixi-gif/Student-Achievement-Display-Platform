@@ -117,7 +117,16 @@ export const authApi = {
   recallMessage:(messageId)=>service.put(`/messages/${messageId}/recall`),
 
   //需求申请
-  addApplication: (id, data) => service.post(`/application/${id}/apply`, data)
+  addApplication: (id, data) => service.post(`/application/${id}/apply`, data),
+  getApplicationList: (data) =>service.post('/application/list',data),
+  getMyApplicationList: (data) => service.get('/application/my',data),
+  agreeApplication:(data) => service.post('/application/status',data),
+  cancelApplication:(data) => service.post('/application/cancel',data),
+
+  //需求
+  getMyRequirements:(data)=>service.get('/requirements/my',data),
+  deleteRequirements:(id) => service.delete(`/requirements/${id}`),
+  updateRequirement:(data)=>service.put('/requirements/status',data),
 
 };
 
