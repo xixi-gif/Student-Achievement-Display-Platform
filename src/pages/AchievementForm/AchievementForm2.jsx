@@ -17,6 +17,8 @@ import {
   Col,
   Typography,
   AutoComplete,
+  Modal,
+  Image,
 } from "antd";
 import {
   UploadOutlined,
@@ -29,6 +31,8 @@ import {
   CloseOutlined,
   ArrowLeftOutlined,
   SearchOutlined,
+  EyeOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
@@ -54,24 +58,27 @@ const AchievementFormPage = () => {
   const [imageFiles, setImageFiles] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
-  const [oldFiles, setOldFiles] = useState([]); // 存储需要保留的旧文件
-  const [oldCoverUrl, setOldCoverUrl] = useState(""); // 存储旧封面图URL
+  const [oldFiles, setOldFiles] = useState([]);
+  const [deletedFiles, setDeletedFiles] = useState([]); // 新增：存储用户删除的文件ID
+  const [oldCoverUrl, setOldCoverUrl] = useState("");
   const [tags, setTags] = useState([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [studentOptions, setStudentOptions] = useState([]);
   const [teacherOptions, setTeacherOptions] = useState([]);
   const [searchingStudents, setSearchingStudents] = useState(false);
   const [searchingTeachers, setSearchingTeachers] = useState(false);
-  const [studentSearchKeyword, setStudentSearchKeyword] = useState(""); // 学生搜索关键词
-  const [instructors, setInstructors] = useState([]); // 存储多个指导教师
-  const [instructorSearchKeyword, setInstructorSearchKeyword] = useState(""); // 教师搜索关键词
+  const [studentSearchKeyword, setStudentSearchKeyword] = useState("");
+  const [instructors, setInstructors] = useState([]);
+  const [instructorSearchKeyword, setInstructorSearchKeyword] = useState("");
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState("");
 
-  //判断是否是管理员
+  // 判断是否是管理员
   const isAdmin = () => {
     return currentUser?.role === "admin";
   };
 
-  // 成果级别选项，与后端Achievement实体的level字段对应
+  // 成果级别选项
   const levels = [
     { value: "校级", label: "校级" },
     { value: "市级", label: "市级" },
@@ -80,7 +87,7 @@ const AchievementFormPage = () => {
     { value: "国际级", label: "国际级" },
   ];
 
-  // 获取分类数据，与后端CategoryService对应
+  // 获取分类数据
   useEffect(() => {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
@@ -105,7 +112,7 @@ const AchievementFormPage = () => {
     fetchCategories();
   }, []);
 
-  // 添加获取标签的数据
+  // 获取标签数据
   useEffect(() => {
     const fetchTags = async () => {
       setTagsLoading(true);
@@ -135,7 +142,7 @@ const AchievementFormPage = () => {
     const loadUserData = async () => {
       try {
         const role = localStorage.getItem("user_role") || "student";
-        const username = localStorage.getItem("username") || "访客";
+        const username = localStorage.getItem("username") || "用户";
         const userInfo = JSON.parse(
           localStorage.getItem("user_info") || "null"
         ) || {
@@ -159,79 +166,103 @@ const AchievementFormPage = () => {
               description: achievement.description,
               keywords: achievement.keywords || [],
               price: achievement.price,
-              // 管理员编辑时可以设置状态
               ...(isAdmin() && { status: achievement.status }),
             });
             setParticipants(achievement.participants || []);
-            // 设置多个指导教师（从 instructor 改为 instructors）
+
+            // 设置多个指导教师
             if (achievement.instructors && achievement.instructors.length > 0) {
               setInstructors(
-                achievement.instructors.map((inst) => inst.realName || inst)
+                achievement.instructors.map((inst) => inst.name || inst)
               );
             } else if (achievement.instructor) {
               // 兼容旧数据：单个指导教师
               setInstructors([
-                achievement.instructor.realName || achievement.instructor,
+                achievement.instructor.name || achievement.instructor,
               ]);
             }
 
             // 保存旧封面图URL
             setOldCoverUrl(achievement.cover);
 
-            // 加载已有图片（转换为上传组件需要的格式）
+            // 处理图片文件
             if (achievement.images && achievement.images.length > 0) {
-              const imageFileList = achievement.images.map((img, index) => ({
-                uid: `img-${index}`,
-                name: img.fileName || `image-${index}.jpg`,
-                url: img.fileUrl,
+              const imageFileList = achievement.images.map((img) => ({
+                uid: `image-${img.id}`,
+                id: img.id,
+                name: img.name || `image-${img.id}.jpg`,
+                url: img.url,
+                size: img.size,
                 status: "done",
                 isOld: true,
-                id: img.id, // 保存文件ID用于后端识别
+                thumbUrl: img.url,
               }));
               setImageFiles(imageFileList);
+
+              // 将旧图片添加到oldFiles中
+              setOldFiles((prev) => [
+                ...prev,
+                ...achievement.images.map((img) => ({
+                  id: img.id,
+                  fileUrl: img.url,
+                  fileName: img.name || `image-${img.id}.jpg`,
+                  fileType: "image",
+                  fileSize: img.size,
+                })),
+              ]);
             }
 
-            // 加载已有视频
-            if (achievement.videos) {
-              const videoFileList = [
-                {
-                  uid: "video-0",
-                  name: achievement.videos.fileName || "video.mp4",
-                  url: achievement.videos.fileUrl,
-                  status: "done",
-                  isOld: true,
-                  id: achievement.videos.id, // 保存文件ID用于后端识别
-                },
-              ];
-              setVideoFiles(videoFileList);
-            }
-
-            // 加载已有附件
-            if (achievement.files && achievement.files.length > 0) {
-              // 过滤掉可能为null或undefined的文件
-              const validFiles = achievement.files.filter(
-                (file) => file != null
-              );
-
-              setOldFiles(
-                validFiles.map((file) => ({
-                  id: file.id || 0,
-                  fileUrl: file.fileUrl || "",
-                  fileName: file.fileName || "",
-                  fileType: file.fileType || "",
-                  fileSize: file.fileSize || 0,
-                }))
-              );
-
-              const attachmentFileList = validFiles.map((file, index) => ({
-                uid: `file-${index}`,
-                name: file.fileName || `file-${index}`,
-                url: file.fileUrl,
+            // 处理视频文件
+            if (achievement.video && achievement.video.length > 0) {
+              const videoFile = {
+                uid: `video-${achievement.video[0].id}`,
+                id: achievement.video[0].id,
+                name: achievement.video[0].name || "video.mp4",
+                url: achievement.video[0].url,
+                size: achievement.video[0].size,
                 status: "done",
                 isOld: true,
-                id: file.id || 0,
+                type: "video",
+              };
+              setVideoFiles([videoFile]);
+
+              // 将旧视频添加到oldFiles中
+              setOldFiles((prev) => [
+                ...prev,
+                {
+                  id: achievement.video[0].id,
+                  fileUrl: achievement.video[0].url,
+                  fileName: achievement.video[0].name || "video.mp4",
+                  fileType: "video",
+                  fileSize: achievement.video[0].size,
+                },
+              ]);
+            }
+
+            // 处理附件文件
+            if (achievement.files && achievement.files.length > 0) {
+              const attachmentFileList = achievement.files.map((file) => ({
+                uid: `file-${file.id}`,
+                id: file.id,
+                name: file.name || `file-${file.id}`,
+                url: file.url,
+                size: file.size,
+                status: "done",
+                isOld: true,
               }));
               setAttachmentFiles(attachmentFileList);
+
+              // 将旧附件添加到oldFiles中
+              setOldFiles((prev) => [
+                ...prev,
+                ...achievement.files.map((file) => ({
+                  id: file.id,
+                  fileUrl: file.url,
+                  fileName: file.name || `file-${file.id}`,
+                  fileType: "attachment",
+                  fileSize: file.size,
+                })),
+              ]);
             }
           }
         } else {
@@ -240,13 +271,12 @@ const AchievementFormPage = () => {
             date: moment(),
             level: levels[0].value,
             keywords: [],
-            // 管理员创建时可以设置默认状态
-            ...(isAdmin() && { status: 0 }), // 默认设置为草稿状态
+            ...(isAdmin() && { status: 0 }),
           });
           if (!isAdmin()) {
             setParticipants([userInfo.realName || username]);
           } else {
-            setParticipants([]); // 管理员创建时参与者为空
+            setParticipants([]);
           }
         }
       } catch (error) {
@@ -260,44 +290,105 @@ const AchievementFormPage = () => {
     loadUserData();
   }, [form, id, isEditMode]);
 
-  // 图片上传配置修正
+  // 图片上传配置
   const uploadImageProps = {
     name: "images",
     multiple: true,
-    beforeUpload: () => false,
+    listType: "picture-card",
+    beforeUpload: (file) => {
+      // 检查文件类型和大小
+      const isImage = file.type.startsWith("image/");
+      if (!isImage) {
+        message.error("只能上传图片文件!");
+        return Upload.LIST_IGNORE;
+      }
+
+      const isLt10M = file.size / 1024 / 1024 < 10;
+      if (!isLt10M) {
+        message.error("图片必须小于10MB!");
+        return Upload.LIST_IGNORE;
+      }
+
+      return false;
+    },
     onChange: (info) => {
-      const { fileList } = info;
+      let fileList = [...info.fileList];
+
+      // 为本地文件生成预览URL
+      fileList = fileList.map((file) => {
+        if (file.originFileObj && !file.url) {
+          file.url = URL.createObjectURL(file.originFileObj);
+          file.thumbUrl = URL.createObjectURL(file.originFileObj);
+        }
+        return file;
+      });
+
       setImageFiles(fileList);
     },
     onRemove: (file) => {
-      setImageFiles(imageFiles.filter((item) => item && item.uid !== file.uid));
-      // 如果删除的是旧文件，从oldFiles中移除
       if (file.isOld && file.id) {
-        setOldFiles(oldFiles.filter((old) => old && old.id !== file.id));
+        // 记录被删除的旧文件ID
+        setDeletedFiles((prev) => [...prev, file.id]);
+        // 从oldFiles中移除
+        setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
+
+      // 从imageFiles中移除
+      setImageFiles(imageFiles.filter((item) => item.uid !== file.uid));
+
+      // 释放创建的URL
+      if (file.url && file.url.startsWith("blob:")) {
+        URL.revokeObjectURL(file.url);
+      }
+
+      return true;
+    },
+    onPreview: (file) => {
+      setPreviewImage(file.url || file.thumbUrl);
+      setPreviewVisible(true);
     },
     fileList: imageFiles,
   };
 
-  // 视频上传配置修正
+  // 视频上传配置
   const uploadVideoProps = {
     name: "videos",
     multiple: false,
-    beforeUpload: () => false,
+    beforeUpload: (file) => {
+      const isVideo = file.type.startsWith("video/");
+      if (!isVideo) {
+        message.error("只能上传视频文件!");
+        return Upload.LIST_IGNORE;
+      }
+
+      const isLt100M = file.size / 1024 / 1024 < 100;
+      if (!isLt100M) {
+        message.error("视频必须小于100MB!");
+        return Upload.LIST_IGNORE;
+      }
+
+      return false;
+    },
     onChange: (info) => {
       const { fileList } = info;
       setVideoFiles(fileList);
     },
     onRemove: (file) => {
-      setVideoFiles(videoFiles.filter((item) => item && item.uid !== file.uid));
       if (file.isOld && file.id) {
-        setOldFiles(oldFiles.filter((old) => old && old.id !== file.id));
+        // 记录被删除的旧文件ID
+        setDeletedFiles((prev) => [...prev, file.id]);
+        // 从oldFiles中移除
+        setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
+
+      setVideoFiles(videoFiles.filter((item) => item.uid !== file.uid));
+
+      return true;
     },
     fileList: videoFiles,
   };
 
-  // 附件上传配置修正
+  // 附件上传配置
   const uploadAttachmentProps = {
     name: "files",
     multiple: true,
@@ -307,16 +398,23 @@ const AchievementFormPage = () => {
       setAttachmentFiles(fileList);
     },
     onRemove: (file) => {
-      setAttachmentFiles(
-        attachmentFiles.filter((item) => item && item.uid !== file.uid)
-      );
       if (file.isOld && file.id) {
-        setOldFiles(oldFiles.filter((old) => old && old.id !== file.id));
+        // 记录被删除的旧文件ID
+        setDeletedFiles((prev) => [...prev, file.id]);
+        // 从oldFiles中移除
+        setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
+
+      setAttachmentFiles(
+        attachmentFiles.filter((item) => item.uid !== file.uid)
+      );
+
+      return true;
     },
     fileList: attachmentFiles,
   };
 
+  // 学生搜索函数
   const handleStudentSearch = async () => {
     if (!studentSearchKeyword.trim()) {
       setStudentOptions([]);
@@ -325,7 +423,6 @@ const AchievementFormPage = () => {
 
     try {
       setSearchingStudents(true);
-      // 使用正确的API调用方式
       const response = await achievementApi.searchStudents({
         keyword: studentSearchKeyword.trim(),
         limit: 10,
@@ -383,7 +480,6 @@ const AchievementFormPage = () => {
 
   // 教师选择处理函数
   const handleInstructorSelect = (teacherName) => {
-    // 检查是否已存在
     const alreadyExists = instructors.includes(teacherName);
     if (alreadyExists) {
       message.warning("该教师已在列表中");
@@ -433,7 +529,6 @@ const AchievementFormPage = () => {
         formData.append("status", values.status.toString());
       }
 
-      // 数组字段格式
       // 处理参与人员
       const participantsList = participants.map((participant) =>
         typeof participant === "string" ? participant : participant.realName
@@ -450,44 +545,52 @@ const AchievementFormPage = () => {
         formData.append("keywords", JSON.stringify([]));
       }
 
+      // 封面图处理
+      if (imageFiles.length > 0) {
+        const firstImage = imageFiles[0];
+        if (firstImage.url) {
+          formData.append("cover", firstImage.url);
+        }
+      } else if (oldCoverUrl) {
+        formData.append("cover", oldCoverUrl);
+      }
+
       // 3. 编辑模式特有字段
       if (isEditMode) {
         formData.append("id", id);
 
-        // 处理旧文件信息 - 添加安全检查
-        oldFiles.forEach((file, index) => {
-          // 安全检查：确保file对象存在
-          if (file) {
-            if (file.id) {
-              formData.append(`oldFiles[${index}].id`, file.id.toString());
-            }
-            if (file.fileUrl) {
-              formData.append(`oldFiles[${index}].fileUrl`, file.fileUrl);
-            }
-            if (file.fileName) {
-              formData.append(`oldFiles[${index}].fileName`, file.fileName);
-            }
-            if (file.fileType) {
-              formData.append(`oldFiles[${index}].fileType`, file.fileType);
-            }
-            if (file.fileSize) {
+        // 传递需要删除的文件ID列表
+        // 传递需要删除的文件ID列表
+      if (deletedFiles.length > 0) {
+        formData.append("deletedFileIds", JSON.stringify(deletedFiles));
+      }
+
+        // 传递需要保留的旧文件信息
+        if (oldFiles.length > 0) {
+          oldFiles.forEach((file, index) => {
+            if (file) {
+              if (file.id) {
+                formData.append(`oldFiles[${index}].id`, file.id.toString());
+              }
+              formData.append(`oldFiles[${index}].fileUrl`, file.fileUrl || "");
+              formData.append(
+                `oldFiles[${index}].fileName`,
+                file.fileName || ""
+              );
+              formData.append(
+                `oldFiles[${index}].fileType`,
+                file.fileType || ""
+              );
               formData.append(
                 `oldFiles[${index}].fileSize`,
-                file.fileSize.toString()
+                file.fileSize?.toString() || "0"
               );
-            } else {
-              formData.append(`oldFiles[${index}].fileSize`, "0");
             }
-          }
-        });
-
-        // 封面图处理
-        if (oldCoverUrl) {
-          formData.append("cover", oldCoverUrl);
+          });
         }
       }
 
-      // 4. 文件上传处理
+      // 4. 文件上传处理 - 只上传新文件
       // 图片文件
       imageFiles.forEach((file) => {
         if (file && file.originFileObj && !file.isOld) {
@@ -502,7 +605,7 @@ const AchievementFormPage = () => {
         videoFiles[0].originFileObj &&
         !videoFiles[0].isOld
       ) {
-        formData.append("videos", videoFiles[0].originFileObj);
+        formData.append("video", videoFiles[0].originFileObj);
       }
 
       // 附件文件
@@ -521,16 +624,12 @@ const AchievementFormPage = () => {
       };
 
       if (isAdmin()) {
-        // 管理员使用管理员接口
         if (isEditMode) {
-          // 管理员编辑 - 使用普通编辑接口或特殊的管理员编辑接口
           response = await achievementApi.updateAchievement(formData, config);
         } else {
-          // 管理员创建
           response = await adminApi.addAchievement(formData, config);
         }
       } else {
-        // 学生使用普通接口
         if (isEditMode) {
           response = await achievementApi.updateAchievement(formData, config);
         } else {
@@ -551,9 +650,9 @@ const AchievementFormPage = () => {
 
         // 根据用户角色跳转到不同的页面
         if (isAdmin()) {
-          navigate("/admin/achievements-manage"); // 管理员跳转到管理页面
+          navigate("/admin/achievements-manage");
         } else {
-          navigate("/student/my-achievements"); // 学生跳转到我的成果页面
+          navigate("/student/my-achievements");
         }
       } else {
         message.error(response.message || "操作失败");
@@ -602,6 +701,82 @@ const AchievementFormPage = () => {
           <Option value={4}>老师已通过</Option>
         </Select>
       </Form.Item>
+    );
+  };
+
+  // 自定义文件列表渲染
+  const renderFileList = (fileList, type) => {
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+        {fileList.map((file) => (
+          <div
+            key={file.uid}
+            style={{
+              border: "1px solid #d9d9d9",
+              borderRadius: "6px",
+              padding: "8px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              maxWidth: "300px",
+            }}
+          >
+            {type === "image" && file.url ? (
+              <img
+                src={file.url}
+                alt={file.name}
+                style={{ width: "50px", height: "50px", objectFit: "cover" }}
+              />
+            ) : (
+              <FileTextOutlined style={{ fontSize: "24px" }} />
+            )}
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontWeight: "bold",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {file.name}
+              </div>
+              {file.fileSize && (
+                <div style={{ fontSize: "12px", color: "#666" }}>
+                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB
+                </div>
+              )}
+            </div>
+
+            <Space>
+              {type === "image" && file.url && (
+                <Button
+                  type="text"
+                  icon={<EyeOutlined />}
+                  onClick={() => {
+                    setPreviewImage(file.url);
+                    setPreviewVisible(true);
+                  }}
+                />
+              )}
+              <Button
+                type="text"
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  if (type === "image") {
+                    uploadImageProps.onRemove(file);
+                  } else if (type === "video") {
+                    uploadVideoProps.onRemove(file);
+                  } else {
+                    uploadAttachmentProps.onRemove(file);
+                  }
+                }}
+              />
+            </Space>
+          </div>
+        ))}
+      </div>
     );
   };
 
@@ -759,6 +934,7 @@ const AchievementFormPage = () => {
                     showCount
                   />
                 </Form.Item>
+
                 <Form.Item label="参与人员">
                   <div>
                     <Space size="small" wrap style={{ marginBottom: 12 }}>
@@ -945,6 +1121,7 @@ const AchievementFormPage = () => {
                     )}
                   </div>
                 </Form.Item>
+
                 <Form.Item
                   name="keywords"
                   label="关键词"
@@ -1036,24 +1213,35 @@ const AchievementFormPage = () => {
                   }
                   extra="支持JPG/PNG格式，单张图片不超过10MB"
                 >
-                  <Upload {...uploadImageProps} listType="picture-card">
-                    <div>
-                      <UploadOutlined />
-                      <div style={{ marginTop: 8 }}>上传图片</div>
-                    </div>
-                  </Upload>
+                  <div>
+                    {renderFileList(imageFiles, "image")}
+                    <Upload {...uploadImageProps}>
+                      <Button
+                        icon={<UploadOutlined />}
+                        style={{ marginTop: 16 }}
+                      >
+                        上传图片
+                      </Button>
+                    </Upload>
+                  </div>
                 </Form.Item>
 
                 <Form.Item
                   name="videos"
                   label="成果视频"
-                  extra="支持MP4格式，单个文件不超过100MB"
+                  extra="最多上传一个视频，支持MP4格式，单个文件不超过100MB"
                 >
-                  <Upload {...uploadVideoProps} listType="text">
-                    <Button icon={<VideoCameraOutlined />}>
-                      上传视频（可选）
-                    </Button>
-                  </Upload>
+                  <div>
+                    {renderFileList(videoFiles, "video")}
+                    <Upload {...uploadVideoProps}>
+                      <Button
+                        icon={<VideoCameraOutlined />}
+                        style={{ marginTop: 16 }}
+                      >
+                        上传视频（可选）
+                      </Button>
+                    </Upload>
+                  </div>
                 </Form.Item>
 
                 <Form.Item
@@ -1061,11 +1249,17 @@ const AchievementFormPage = () => {
                   label="相关文件"
                   extra="支持PDF/Word/PPT等格式，单个文件不超过10MB"
                 >
-                  <Upload {...uploadAttachmentProps} listType="text">
-                    <Button icon={<UploadOutlined />}>
-                      上传相关文件（可选）
-                    </Button>
-                  </Upload>
+                  <div>
+                    {renderFileList(attachmentFiles, "attachment")}
+                    <Upload {...uploadAttachmentProps}>
+                      <Button
+                        icon={<UploadOutlined />}
+                        style={{ marginTop: 16 }}
+                      >
+                        上传相关文件（可选）
+                      </Button>
+                    </Upload>
+                  </div>
                 </Form.Item>
               </div>
 
@@ -1113,6 +1307,17 @@ const AchievementFormPage = () => {
             </Form>
           </Card>
         </div>
+
+        {/* 图片预览模态框 */}
+        <Modal
+          visible={previewVisible}
+          footer={null}
+          onCancel={() => setPreviewVisible(false)}
+          width="auto"
+          style={{ maxWidth: "90vw" }}
+        >
+          <img alt="预览" style={{ width: "100%" }} src={previewImage} />
+        </Modal>
       </Content>
     </Layout>
   );

@@ -164,11 +164,27 @@ export const achievementApi = {
   createAchievement: (data) => service.post('/achievement/add', data,{
   headers: {
     'Content-Type': 'multipart/form-data'
+  },
+  timeout: 60000, // 1分钟超时
+  onUploadProgress: (progressEvent) => {
+    // 添加上传进度显示
+    const percentCompleted = Math.round(
+      (progressEvent.loaded * 100) / progressEvent.total
+    );
+    console.log(`上传进度: ${percentCompleted}%`);
   }
 }),
   updateAchievement: (data) => service.post(`/achievement/update`,data,{
   headers: {
     'Content-Type': 'multipart/form-data'
+  },
+  timeout: 60000, // 1分钟超时
+  onUploadProgress: (progressEvent) => {
+    // 添加上传进度显示
+    const percentCompleted = Math.round(
+      (progressEvent.loaded * 100) / progressEvent.total
+    );
+    console.log(`上传进度: ${percentCompleted}%`);
   }
 }),
   deleteAchievement: (id) => service.post('/achievement/delete',{ id }),
