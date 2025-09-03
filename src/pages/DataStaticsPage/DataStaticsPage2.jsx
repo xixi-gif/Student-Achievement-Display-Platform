@@ -122,7 +122,7 @@ const DataStatisticsPage = () => {
         const formattedData = response.data.map((item) => ({
           type: item.type,
           count: item.count,
-          ratio: `${(item.ratio).toFixed(1)}%`, // 将小数转换为百分比字符串
+          ratio: `${item.ratio.toFixed(1)}%`, // 将小数转换为百分比字符串
         }));
 
         setAchievementStats((prev) => ({
@@ -138,14 +138,18 @@ const DataStatisticsPage = () => {
     }
   };
 
-  // 获取用户活跃度数据
+  // 获取用户活跃度数据（带排序）
   const fetchUserActivities = async (params = {}) => {
     setLoading(true);
     try {
-      const response = await adminApi.getUserStats({
-        pageNum: params.current || userActivities.pagination.current,
+      const pageRequest = {
+        current: params.current || userActivities.pagination.current,
         pageSize: params.pageSize || userActivities.pagination.pageSize,
-      });
+        sortField: params.field || "loginCount", // 默认按登录次数排序
+        sortOrder: params.order || "descend", // 默认降序
+      };
+
+      const response = await adminApi.getUserStats(pageRequest);
 
       if (response.code === 0) {
         setUserActivities({
@@ -154,7 +158,7 @@ const DataStatisticsPage = () => {
             name: item.realName,
             loginCount: item.loginCount,
             achievementCount: item.achievementCount,
-            lastActive: moment(item.lastActive).format("YYYY-MM-DD HH:mm:ss"),
+            lastLoginTime: moment(item.lastActive).format("YYYY-MM-DD HH:mm:ss"),
             status: item.status === "0" ? "active" : "inactive",
           })),
           pagination: {
@@ -163,17 +167,24 @@ const DataStatisticsPage = () => {
             total: response.data.total,
           },
         });
-      } else {
-        throw new Error(response.message || "获取用户活跃度数据失败");
       }
     } catch (error) {
       console.error("获取用户活跃度数据失败:", error);
-      message.error(error.message || "获取用户活跃度数据失败");
+      message.error("获取用户活跃度数据失败");
     } finally {
       setLoading(false);
     }
   };
 
+  // 处理表格变化（分页、排序）
+  const handleTableChange = (pagination, sorter) => {
+    fetchUserActivities({
+      current: pagination.current,
+      pageSize: pagination.pageSize,
+      field: sorter.field, // 排序字段
+      order: sorter.order, // 排序方向
+    });
+  };
   // 时间范围变化处理
   const handleTimeRangeChange = (dates, dateStrings) => {
     if (dates) {
@@ -191,14 +202,6 @@ const DataStatisticsPage = () => {
       fetchSummaryStats();
       fetchTrendStats();
     }
-  };
-
-  // 处理表格分页变化
-  const handleTableChange = (pagination) => {
-    fetchUserActivities({
-      current: pagination.current,
-      pageSize: pagination.pageSize,
-    });
   };
 
   // 初始化加载数据
@@ -345,30 +348,31 @@ const DataStatisticsPage = () => {
       title: "用户姓名",
       dataIndex: "name",
       key: "name",
-      // render: (text) => (
-      //   <a onClick={() => navigate(`/student/profile`)}>{text}</a>
-      // ),
       render: (name) => <a>{name}</a>,
     },
     {
       title: "登录次数",
       dataIndex: "loginCount",
       key: "loginCount",
-      sorter: (a, b) => b.loginCount - a.loginCount,
+      sorter: true, // 启用排序
+      // defaultSortOrder: 'descend', // 默认降序
+      sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="blue">{count}</Tag>,
     },
     {
       title: "成果数量",
       dataIndex: "achievementCount",
       key: "achievementCount",
-      // sorter: (a, b) => a.achievementCount - b.achievementCount,
+      sorter: true, // 启用排序
+      sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="green">{count}</Tag>,
     },
     {
       title: "最后活跃",
-      dataIndex: "lastActive",
-      key: "lastActive",
-      sorter: (a, b) => new Date(a.lastActive) - new Date(b.lastActive),
+      dataIndex: "lastLoginTime",
+      key: "lastLoginTime",
+      sorter: true, // 启用排序
+      sortDirections: ['descend', 'ascend'], // 允许的排序方向
     },
     {
       title: "状态",
@@ -606,12 +610,6 @@ const DataStatisticsPage = () => {
                         onChange={handleTableChange}
                         size="small"
                         rowKey="key"
-                        defaultSortOrder={
-                          {
-                            direction: "descend",
-                            key: "loginCount",
-                          }
-                        }
                       />
                     </Card>
                   </Col>

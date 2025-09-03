@@ -246,7 +246,7 @@ export const adminApi = {
   getStatistics: () => service.get('/admin/stats/summary'),
   getStatsTrend: (params) => service.get('/stats/achievement-trends',{params}),
   getAchievementStats: () => service.get('/stats/achievement-types'),
-  getUserStats: () => service.get('/stats/user-activity'),
+  getUserStats: (params) => service.get('/stats/user-activity',{params}),
 
   //分类设置接口
   getCategoryList: () => service.get('/admin/categories'),
