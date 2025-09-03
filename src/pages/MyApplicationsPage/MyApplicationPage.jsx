@@ -2,23 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Layout, Card, Table, Avatar, Tag, Button, Space, 
-  Input, Select, Spin, message, Empty, Pagination
+  Input, Select, Spin, message, Empty, Pagination,
+  Popconfirm
 } from 'antd';
 import { 
-  MessageOutlined, SearchOutlined, EyeOutlined
+  MessageOutlined, SearchOutlined, EyeOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import Navbar from '../Navbar/Navbar';
+import { authApi } from '../../service/api';
 
 const { Content } = Layout;
 const { Search } = Input;
 const { Option } = Select;
 
-// 状态映射配置
 const applicationStatusMap = {
-  all: { color: 'gray', text: '全部' },
-  pending: { color: 'orange', text: '待审核' },
-  accepted: { color: 'green', text: '已接受' },
-  rejected: { color: 'red', text: '已拒绝' }
+  textToNum: {
+    all: undefined,
+    pending: 0,
+    accepted: 1,
+    rejected: 2
+  },
+  numToText: {
+    0: { color: 'orange', text: '待审核' },
+    1: { color: 'green', text: '已接受' },
+    2: { color: 'red', text: '已拒绝' },
+    3: { color: 'gray', text: '已取消' }
+  }
 };
 
 const roleMap = {
@@ -35,109 +45,20 @@ const roleColorMap = {
   guest: 'gray'
 };
 
-// 静态模拟申请数据
-const staticApplications = [
-  {
-    id: 'extra-1',
-    requirementId: 'req-1001',
-    requirementTitle: '校园活动海报设计',
-    requirementType: '设计',
-    requirementStatus: 'pending',
-    publisher: {
-      id: 'pub-201',
-      name: '李老师',
-      role: 'teacher'
-    },
-    applyTime: '2024-04-20T10:30:00.000Z',
-    status: 'pending',
-    introduction: '有3年海报设计经验，熟悉PS、AI工具，可快速交付符合校园风格的设计方案',
-    budget: '500元',
-    deadline: '2024-04-30T23:59:59.000Z'
-  },
-  {
-    id: 'extra-2',
-    requirementId: 'req-1002',
-    requirementTitle: 'Python课程作业辅导',
-    requirementType: '教育',
-    requirementStatus: 'in_progress',
-    publisher: {
-      id: 'pub-202',
-      name: '张明',
-      role: 'student'
-    },
-    applyTime: '2024-04-18T15:45:00.000Z',
-    status: 'accepted',
-    introduction: '计算机专业大三学生，Python成绩优异，可辅导基础语法和简单项目开发',
-    budget: '300元',
-    deadline: '2024-04-25T23:59:59.000Z'
-  },
-  {
-    id: 'static-3',
-    requirementId: 'req-1003',
-    requirementTitle: '毕业答辩PPT制作',
-    requirementType: '文案/PPT',
-    requirementStatus: 'pending',
-    publisher: {
-      id: 'pub-203',
-      name: '王同学',
-      role: 'student'
-    },
-    applyTime: '2024-04-22T09:15:00.000Z',
-    status: 'pending',
-    introduction: '擅长学术PPT排版设计，熟悉毕业答辩逻辑框架，可提供内容优化建议',
-    budget: '400元',
-    deadline: '2024-05-10T23:59:59.000Z'
-  },
-  {
-    id: 'static-4',
-    requirementId: 'req-1004',
-    requirementTitle: '实验室设备维护',
-    requirementType: '技术支持',
-    requirementStatus: 'completed',
-    publisher: {
-      id: 'pub-204',
-      name: '刘教授',
-      role: 'teacher'
-    },
-    applyTime: '2024-04-10T14:20:00.000Z',
-    status: 'accepted',
-    introduction: '电子信息专业研究生，有2年实验室设备维护经验，可处理常规故障排查',
-    budget: '800元',
-    deadline: '2024-04-15T23:59:59.000Z'
-  },
-  {
-    id: 'static-5',
-    requirementId: 'req-1005',
-    requirementTitle: '校园志愿者招募文案',
-    requirementType: '文案撰写',
-    requirementStatus: 'pending',
-    publisher: {
-      id: 'pub-205',
-      name: '校学生会',
-      role: 'admin'
-    },
-    applyTime: '2024-04-25T11:00:00.000Z',
-    status: 'rejected',
-    introduction: '汉语言文学专业大二学生，有多次校园活动文案撰写经验，可快速产出符合要求的招募文案',
-    budget: '200元',
-    deadline: '2024-04-30T23:59:59.000Z'
-  }
-];
-
 const MyApplicationsPage = () => {
   const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [filteredApplications, setFilteredApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancelLoading, setCancelLoading] = useState('');
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 5,
-    total: staticApplications.length
+    total: 0
   });
 
-  // 检查登录状态
   const checkLoginStatus = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -148,88 +69,162 @@ const MyApplicationsPage = () => {
     return true;
   };
 
-  // 加载静态数据
-  const loadStaticApplications = () => {
+  const fetchMyApplications = async () => {
     if (!checkLoginStatus()) return;
 
-    setTimeout(() => {
-      setApplications(staticApplications);
-      setFilteredApplications(staticApplications);
+    try {
+      setLoading(true);
+      const params = {
+        current: pagination.current - 1,
+        pageSize: pagination.pageSize,
+        sortField: 'applyTime',
+        sortOrder: 'desc',
+        status: applicationStatusMap.textToNum[statusFilter],
+        keyword: searchText.trim() || undefined
+      };
+
+      const response = await authApi.getMyApplicationList(params);
+
+      if (response.code !== 0) {
+        throw new Error(response.message || '获取申请列表失败');
+      }
+
+      const { records, total, current, pageSize } = response.data;
+ 
+      const formattedApplications = records.map(item => ({
+        id: item.userId?.toString() || '', 
+        publisherId: item.publisherId?.toString() || '',
+        requirementId: item.requirementId?.toString() || '',
+        requirementTitle: item.requirementTitle || '未知需求',
+        status: item.status || 0,
+        introduction: item.introduction || '无申请说明',
+        publisher: {
+          id: item.publisherId?.toString() || '', 
+          name: item.publisherName || '未知发布者',
+          role: item.publisherRole || 'guest',
+          avatar: item.publisherAvatar || ''
+        }
+      }));
+
+      setApplications(formattedApplications);
+      filterApplications(formattedApplications);
+      setPagination(prev => ({
+        ...prev,
+        total,
+        current: current || 1,
+        pageSize: pageSize || 10
+      }));
+    } catch (error) {
+      console.error('获取我的申请失败:', error);
+      message.error(error.message || '网络错误，无法加载申请列表');
+      setApplications([]);
+      setFilteredApplications([]);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
-  useEffect(() => {
-    loadStaticApplications();
-  }, []);
-
-  // 搜索+状态筛选逻辑
-  useEffect(() => {
-    let result = [...applications];
+  const filterApplications = (apps) => {
+    let result = [...apps];
     
-    // 状态筛选
     if (statusFilter !== 'all') {
-      result = result.filter(app => app.status === statusFilter);
+      const statusNum = applicationStatusMap.textToNum[statusFilter];
+      result = result.filter(app => app.status === statusNum);
     }
     
-    // 文本搜索
     if (searchText.trim()) {
-      const keyword = searchText.toLowerCase().trim();
+      const keyword = searchText.trim().toLowerCase();
       result = result.filter(app => 
         app.requirementTitle.toLowerCase().includes(keyword) ||
-        app.requirementType.toLowerCase().includes(keyword) ||
         app.publisher.name.toLowerCase().includes(keyword)
       );
     }
     
     setFilteredApplications(result);
-    setPagination(prev => ({ ...prev, total: result.length, current: 1 }));
-  }, [applications, statusFilter, searchText]);
+  };
 
-  // 处理搜索
+  const handleCancelApplication = async (requirementId) => {
+    if (!requirementId) {
+      message.error('需求ID无效，无法取消申请');
+      return;
+    }
+
+    try {
+      setCancelLoading(requirementId);
+
+      const response = await authApi.cancelApplication({ requirementId: Number(requirementId) });
+
+      if (response.code !== 0) {
+        throw new Error(response.message || '取消申请失败');
+      }
+
+      message.success('申请已成功取消');
+      fetchMyApplications();
+    } catch (error) {
+      console.error('取消申请失败:', error);
+      message.error(error.message || '网络错误，取消申请失败');
+    } finally {
+      setCancelLoading('');
+    }
+  };
+
+  useEffect(() => {
+    fetchMyApplications();
+  }, [pagination.current, pagination.pageSize]);
+
+  useEffect(() => {
+    filterApplications(applications);
+    setPagination(prev => ({ ...prev, current: 1 }));
+  }, [statusFilter, searchText]);
+
   const handleSearch = (value) => {
     setSearchText(value);
   };
 
-  // 处理状态筛选变化
   const handleStatusChange = (value) => {
     setStatusFilter(value);
   };
 
-  // 处理分页变化
-  const handleTableChange = (page, pageSize) => {
-    setPagination(prev => ({ ...prev, current: page, pageSize }));
+  const handleTableChange = (current, pageSize) => {
+    setPagination(prev => ({ ...prev, current, pageSize }));
   };
 
-  // 查看需求详情
-  const handleViewDetail = (id) => {
-    message.info(`跳转至需求详情页：${id}`);
-    // navigate(`/requirements/${id}`);
+  const handleViewDetail = (requirementId) => {
+    if (!requirementId) {
+      message.warning('需求ID无效');
+      return;
+    }
+    navigate(`/requirements/${requirementId}`);
   };
 
-  // 联系发布者
   const handleContactPublisher = (publisherId, publisherName) => {
-    message.info(`跳转至与 ${publisherName} 的聊天界面`);
-    // navigate(`/messages?toUserId=${publisherId}&toUserName=${encodeURIComponent(publisherName)}`);
+    if (!checkLoginStatus()) return;
+    if (!publisherId) {
+      message.warning('发布者信息无效，无法发起联系');
+      return;
+    }
+    navigate(`/messages?toUserId=${publisherId}&toUserName=${encodeURIComponent(publisherName)}`);
   };
 
-  // 表格列配置（已移除取消申请功能）
   const columns = [
     {
       title: '需求标题',
       key: 'requirementTitle',
       dataIndex: 'requirementTitle',
-      render: (title) => <div style={{ fontWeight: 500 }}>{title}</div>,
+      render: (title, record) => (
+        <div style={{ fontWeight: 500, cursor: 'pointer' }} onClick={() => handleViewDetail(record.requirementId)}>
+          {title}
+        </div>
+      ),
       width: 200,
     },
     {
       title: '申请状态',
       key: 'appStatus',
-      render: (_, record) => (
-        <Tag color={applicationStatusMap[record.status].color}>
-          {applicationStatusMap[record.status].text}
-        </Tag>
-      ),
+      render: (_, record) => {
+        const statusInfo = applicationStatusMap.numToText[record.status] || { color: 'gray', text: '未知状态' };
+        return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
+      },
       width: 120,
     },
     {
@@ -238,9 +233,11 @@ const MyApplicationsPage = () => {
       render: (_, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Avatar 
-            src={`https://picsum.photos/200/200?random=${record.publisher.id}`} 
+            src={record.publisher.avatar || undefined} 
             size="small"
-          />
+          >
+            {!record.publisher.avatar && record.publisher.name.charAt(0)}
+          </Avatar>
           <div>
             <div>{record.publisher.name}</div>
             <Tag 
@@ -271,13 +268,12 @@ const MyApplicationsPage = () => {
       key: 'action',
       render: (_, record) => (
         <Space size="small">
-          {/* 仅保留详情和联系按钮，移除取消申请按钮 */}
           <Button 
             icon={<EyeOutlined />} 
             onClick={() => handleViewDetail(record.requirementId)}
             size="small"
           >
-            详情
+            查看详情
           </Button>
           <Button 
             icon={<MessageOutlined />} 
@@ -286,9 +282,27 @@ const MyApplicationsPage = () => {
           >
             联系
           </Button>
+          <Popconfirm
+            title="确认取消申请吗？"
+            description="取消后不可恢复，是否继续？"
+            onConfirm={() => handleCancelApplication(record.requirementId)}
+            okText="是"
+            cancelText="否"
+            disabled={record.status !== 0}
+          >
+            <Button 
+              danger 
+              icon={<DeleteOutlined />} 
+              size="small"
+              loading={cancelLoading === record.requirementId}
+              disabled={record.status !== 0}
+            >
+              取消申请
+            </Button>
+          </Popconfirm>
         </Space>
       ),
-      width: 140, // 调整操作列宽度以适应剩余按钮
+      width: 220,
     },
   ];
 
@@ -297,14 +311,13 @@ const MyApplicationsPage = () => {
       <Navbar />
       <Content style={{ padding: '24px 5%' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          {/* 筛选和搜索区域 */}
           <Card style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>我的申请</h2>
               
               <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                 <Search
-                  placeholder="搜索需求标题/类型/发布者"
+                  placeholder="搜索需求标题/发布者"
                   allowClear
                   enterButton={<SearchOutlined />}
                   size="middle"
@@ -329,7 +342,6 @@ const MyApplicationsPage = () => {
             </div>
           </Card>
 
-          {/* 表格区域 */}
           {loading ? (
             <Card style={{ padding: '60px 0', textAlign: 'center' }}>
               <Spin size="large" tip="正在加载我的申请..." />
@@ -343,6 +355,7 @@ const MyApplicationsPage = () => {
                 <Button type="primary" onClick={() => {
                   setStatusFilter('all');
                   setSearchText('');
+                  setPagination(prev => ({ ...prev, current: 1 }));
                 }}>
                   重置筛选
                 </Button>
@@ -359,7 +372,6 @@ const MyApplicationsPage = () => {
                 bordered
               />
               
-              {/* 外部分页组件 */}
               <div style={{ textAlign: 'right', marginTop: 16 }}>
                 <Pagination 
                   current={pagination.current}

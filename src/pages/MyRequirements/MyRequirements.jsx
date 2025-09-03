@@ -276,10 +276,7 @@ const MyRequirementsPage = () => {
     }
   };
 
-  // 查看需求详情
-  const handleViewDetail = (id) => {
-    navigate(`/requirements/${id}`);
-  };
+
 
   // 联系申请人
   const handleContactApplicant = (userId, userName) => {
@@ -424,23 +421,7 @@ const MyRequirementsPage = () => {
                       >
                         申请人
                       </Button>
-                      {requirement.status !== 'pending' && (
-                        <div>
-                          <Button 
-                            icon={<MessageOutlined />} 
-                            onClick={() => {
-                              const firstSelected = requirement.applicants?.find(app => app.isSelected);
-                              if (firstSelected) {
-                                handleContactApplicant(firstSelected.userId, firstSelected.name);
-                              }
-                            }}
-                            size="small"
-                            disabled={!requirement.applicants?.some(app => app.isSelected)}
-                          >
-                            联系承接人
-                          </Button>
-                        </div>
-                      )}
+
                     </div>
                   </Card>
                 )}

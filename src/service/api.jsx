@@ -121,7 +121,8 @@ export const authApi = {
   getApplicationList: (data) =>service.post('/application/list',data),
   getMyApplicationList: (data) => service.get('/application/my',data),
   agreeApplication:(data) => service.post('/application/status',data),
-  cancelApplication:(data) => service.post('/application/cancel',data),
+  // cancelApplication:(data) => service.post('/application/cancel',data),
+  cancelApplication: (params) => service.post('/application/cancel', null, { params }),
 
   //需求
   getMyRequirements:(data)=>service.get('/requirements/my',data),

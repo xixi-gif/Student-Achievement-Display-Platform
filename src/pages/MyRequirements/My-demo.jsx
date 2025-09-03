@@ -652,3 +652,5 @@ const MyRequirementsPage = () => {
 
 export default MyRequirementsPage;
 
+<Route path="/requirements/:id" element={<RequirementDetailPage />} />
+详细页
