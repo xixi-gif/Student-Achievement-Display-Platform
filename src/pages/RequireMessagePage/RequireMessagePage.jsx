@@ -6,8 +6,7 @@ import {
 import { 
   MessageOutlined, PaperClipOutlined, 
   SmileOutlined, CloseOutlined, LoadingOutlined, 
-  CheckOutlined, FileTextOutlined, DeleteOutlined,
-  EyeOutlined, EyeInvisibleOutlined
+  CheckOutlined, FileTextOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import EmojiPicker from 'emoji-picker-react';
 import Navbar from '../Navbar/Navbar';
@@ -38,138 +37,17 @@ const MessageCenterPage = () => {
   const [targetUser, setTargetUser] = useState({ id: null, name: null });
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [currentUserAvatar, setCurrentUserAvatar] = useState(DEFAULT_AVATAR);
-  const [unreadTotal, setUnreadTotal] = useState(0);
-
+  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const formatMessageTime = (timeStr) => {
-    const date = new Date(timeStr);
-    if (isNaN(date.getTime())) return '未知时间';
-    
-    const padZero = (num) => num.toString().padStart(2, '0');
-    const year = date.getFullYear();
-    const month = padZero(date.getMonth() + 1);
-    const day = padZero(date.getDate());
-    const hour = padZero(date.getHours());
-    const minute = padZero(date.getMinutes());
-    
-    return `${year}-${month}-${day} ${hour}:${minute}`;
+  useEffect(() => {
+    console.log('当前用户头像:', currentUserAvatar);
+  }, [currentUserAvatar]);
+
+  const getRoleConfig = (role) => {
+    return ROLE_CONFIG[role] || ROLE_CONFIG.default;
   };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
-  const fetchUnreadCount = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('获取未读计数失败：会话ID无效');
-      return 0;
-    }
-
-    try {
-      const res = await authApi.getUnreadCount(convIdStr);
-      if (res.code === 0) {
-        return res.data || 0;
-      } else {
-        message.warning(`获取未读计数失败：${res.message || '服务器处理错误'}`);
-        return 0;
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`获取未读计数失败：${errorMsg}`);
-      return 0;
-    }
-  };
-
-  const updateTotalUnread = () => {
-    const total = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
-    setUnreadTotal(total);
-  };
-
-  const markAsRead = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('标记已读失败：会话ID无效');
-      return false;
-    }
-
-    try {
-      const res = await authApi.markAsRead(convIdStr);
-      
-      if (res.code === 0) {
-        setConversations(prev => 
-          prev.map(conv => 
-            String(conv.conversationId) === convIdStr
-              ? { 
-                  ...conv, 
-                  unreadCount: 0,
-                  lastMessage: { ...conv.lastMessage, unread: false } 
-                }
-              : conv
-          )
-        );
-        
-        if (activeConversation && String(activeConversation.conversationId) === convIdStr) {
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.status === 'sent' ? { ...msg, status: 'read' } : msg
-            )
-          );
-        }
-        
-        updateTotalUnread();
-        return res.data;
-      } else {
-        message.error(`标记已读失败：${res.message || '服务器处理错误'}`);
-        return false;
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`标记已读失败：${errorMsg}`);
-      return false;
-    }
-  };
-
-  const markAsUnread = async (conversationId) => {
-    const convIdStr = String(conversationId);
-    if (!convIdStr) {
-      message.warning('标记未读失败：会话ID无效');
-      return;
-    }
-
-    try {
-      const res = await authApi.markAsUnread(convIdStr);
-      
-      if (res.code === 0) {
-        const unreadCount = await fetchUnreadCount(conversationId);
-        setConversations(prev => 
-          prev.map(conv => 
-            String(conv.conversationId) === convIdStr
-              ? { 
-                  ...conv, 
-                  unreadCount: unreadCount,
-                  lastMessage: { ...conv.lastMessage, unread: true } 
-                }
-              : conv
-          )
-        );
-        
-        updateTotalUnread();
-        message.success('已标记为未读');
-      } else {
-        message.error(`标记未读失败：${res.message || '服务器处理错误'}`);
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || '网络异常';
-      message.error(`标记未读失败：${errorMsg}`);
-    }
-  };
-
-  const getRoleConfig = (role) => ROLE_CONFIG[role] || ROLE_CONFIG.default;
 
   const getAvatar = (avatarUrl) => {
     if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('/'))) {
@@ -199,20 +77,14 @@ const MessageCenterPage = () => {
   }, []);
 
   useEffect(() => {
-    updateTotalUnread();
-  }, [conversations]);
-
-  useEffect(() => {
     const initData = async () => {
       try {
-        setPageLoading(true);
         const userRes = await authApi.getuserlogin();
+        console.log('个人信息接口返回:', userRes);
         if (userRes.code === 0 && userRes.data?.id) {
           setCurrentUserId(String(userRes.data.id));
           setCurrentUserAvatar(getAvatar(userRes.data.avatar) || DEFAULT_AVATAR);
-          
           await fetchConversations();
-          
           if (targetUser.id && currentUserId) {
             await handleTargetUserConversation();
           }
@@ -227,7 +99,7 @@ const MessageCenterPage = () => {
       }
     };
     initData();
-  }, [targetUser]);
+  }, [targetUser, currentUserId]);
 
   const handleTargetUserConversation = async () => {
     if (targetUser.id === currentUserId) {
@@ -236,7 +108,7 @@ const MessageCenterPage = () => {
     }
 
     const existingConv = conversations.find(
-      conv => String(conv.withUser.id) === String(targetUser.id)
+      conv => conv.withUser.id === targetUser.id
     );
 
     if (existingConv) {
@@ -255,39 +127,37 @@ const MessageCenterPage = () => {
 
         if (sendRes.code === 0 && sendRes.data) {
           await fetchConversations();
-          const updatedConvsRes = await authApi.getConversationRecords({ params: { current: 1, pageSize: 20 } });
+          const updatedConvs = await authApi.getConversationRecords({ 
+            params: { current: 1, pageSize: 20 }
+          });
           
-          if (updatedConvsRes.code === 0 && updatedConvsRes.data) {
-            const formattedConvs = await Promise.all(updatedConvsRes.data.map(async (conv) => {
-              const unreadCount = await fetchUnreadCount(conv.id);
-              return {
-                id: String(conv.id),
-                withUser: {
-                  id: String(conv.withUser.id),
-                  name: conv.withUser.name || '未知用户',
-                  avatar: getAvatar(conv.withUser.avatar),
-                  role: conv.withUser.role || 'default'
-                },
-                lastMessage: {
-                  content: conv.lastMessage?.content || initMessage,
-                  time: conv.lastMessage?.createTime || new Date().toISOString(),
-                  unread: unreadCount > 0,
-                  id: String(conv.lastMessage?.id || '')
-                },
-                conversationId: String(conv.id),
-                unreadCount: unreadCount
-              };
+          if (updatedConvs.code === 0 && updatedConvs.data) {
+            const formattedConvs = updatedConvs.data.map(conv => ({
+              id: conv.id.toString(),
+              withUser: {
+                id: String(conv.withUser.id),
+                name: conv.withUser.name || '未知用户',
+                avatar: getAvatar(conv.withUser.avatar),
+                role: conv.withUser.role || 'default'
+              },
+              lastMessage: {
+                content: conv.lastMessage?.content || initMessage,
+                time: conv.lastMessage?.createTime || new Date().toISOString(),
+                unread: false,
+                id: conv.lastMessage?.id?.toString() || ''
+              },
+              conversationId: conv.id
             }));
             
             setConversations(formattedConvs);
             const newConv = formattedConvs.find(
-              conv => String(conv.withUser.id) === String(targetUser.id)
+              conv => conv.withUser.id === targetUser.id
             );
             
             if (newConv) {
               setActiveConversation(newConv);
               const initialMessages = [{
-                id: String(sendRes.data.id),
+                id: sendRes.data.id.toString(),
                 senderId: currentUserId,
                 content: initMessage,
                 time: sendRes.data.createTime || new Date().toISOString(),
@@ -313,31 +183,28 @@ const MessageCenterPage = () => {
 
   const fetchConversations = async () => {
     try {
-      const res = await authApi.getConversationRecords({ params: { current: 1, pageSize: 20 } });
+      setPageLoading(true);
+      const res = await authApi.getConversationRecords({ 
+        params: { current: 1, pageSize: 20 }
+      });
 
       if (res.code === 0 && res.data) {
-        const formattedConversations = await Promise.all(
-          res.data.map(async (conv) => {
-            const unreadCount = await fetchUnreadCount(conv.id);
-            return {
-              id: String(conv.id),
-              withUser: {
-                id: String(conv.withUser.id),
-                name: conv.withUser.name || '未知用户',
-                avatar: getAvatar(conv.withUser.avatar),
-                role: conv.withUser.role || 'default'
-              },
-              lastMessage: {
-                content: conv.lastMessage?.content || '',
-                time: conv.lastMessage?.createTime || new Date().toISOString(),
-                unread: unreadCount > 0,
-                id: String(conv.lastMessage?.id || '')
-              },
-              conversationId: String(conv.id),
-              unreadCount: unreadCount
-            };
-          })
-        );
+        const formattedConversations = res.data.map(conv => ({
+          id: conv.id.toString(),
+          withUser: {
+            id: String(conv.withUser.id),
+            name: conv.withUser.name || '未知用户',
+            avatar: getAvatar(conv.withUser.avatar),
+            role: conv.withUser.role || 'default'
+          },
+          lastMessage: {
+            content: conv.lastMessage?.content || '',
+            time: conv.lastMessage?.createTime || new Date().toISOString(),
+            unread: conv.lastMessage?.status === 0 && String(conv.lastMessage?.senderId) !== currentUserId,
+            id: conv.lastMessage?.id?.toString() || ''
+          },
+          conversationId: conv.id
+        }));
 
         setConversations(formattedConversations);
         if (!targetUser.id && !activeConversation && formattedConversations.length > 0) {
@@ -349,23 +216,27 @@ const MessageCenterPage = () => {
     } catch (err) {
       console.error('加载会话失败：', err);
       message.error('加载会话失败，请重试');
+    } finally {
+      setPageLoading(false);
     }
   };
 
   const fetchConversationMessages = async (conversationId) => {
-    const convIdStr = String(conversationId);
     try {
       setPageLoading(true);
-      const res = await authApi.getConversationMessages(convIdStr);
+      const res = await authApi.getConversationMessages(conversationId);
+      console.log('原始消息列表接口返回:', res);
       
       if (res.code === 0 && res.data?.records) {
         const validRecords = res.data.records.filter(
-          msg => String(msg.conversationId) === convIdStr
+          msg => msg.conversationId === conversationId
         );
         
-        const sortedRecords = [...validRecords].sort((a, b) => 
-          new Date(a.createTime) - new Date(b.createTime)
-        );
+        console.log(`消息过滤：原始${res.data.records.length}条，有效${validRecords.length}条`);
+        
+        const sortedRecords = [...validRecords].sort((a, b) => {
+          return new Date(a.createTime) - new Date(b.createTime);
+        });
         
         const formattedMessages = sortedRecords.map(msg => {
           let avatar = DEFAULT_AVATAR;
@@ -376,7 +247,7 @@ const MessageCenterPage = () => {
           }
 
           return {
-            id: String(msg.id),
+            id: msg.id.toString(),
             senderId: String(msg.senderId),
             content: msg.content || '',
             time: msg.createTime || new Date().toISOString(),
@@ -389,11 +260,7 @@ const MessageCenterPage = () => {
         });
 
         setMessages(formattedMessages);
-        const markSuccess = await markAsRead(convIdStr);
-        if (markSuccess) {
-          const newCount = await fetchUnreadCount(convIdStr);
-          console.log(`当前会话未读计数更新为: ${newCount}`);
-        }
+        await markAsRead(conversationId);
       } else {
         message.error(res.message || '加载消息失败');
       }
@@ -405,10 +272,24 @@ const MessageCenterPage = () => {
     }
   };
 
+  const markAsRead = async (conversationId) => {
+    try {
+      await authApi.markAsRead(conversationId);
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.conversationId === conversationId 
+            ? { ...conv, lastMessage: { ...conv.lastMessage, unread: false } } 
+            : conv
+        )
+      );
+    } catch (err) {
+      console.error('标记已读失败：', err);
+    }
+  };
+
   const handleFileUpload = async (file) => {
-    const fileId = `file-${Date.now()}`;
     setUploadingFiles(prev => [...prev, {
-      id: fileId,
+      id: `file-${Date.now()}`,
       name: file.name,
       size: file.size,
       type: file.type,
@@ -423,15 +304,15 @@ const MessageCenterPage = () => {
       const res = await authApi.uploadFile(formData);
       if (res.code === 0 && res.data?.url) {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === fileId 
+          f.id === `file-${Date.now()}` 
             ? { ...f, status: 'done', url: res.data.url } 
             : f
         ));
         message.success('文件上传成功');
-        setMessageContent(prev => `${prev}\n[文件] ${file.name}`);
+        setMessageContent(prev => `${prev}\n[文件] ${file.name} (${res.data.url})`);
       } else {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === fileId 
+          f.id === `file-${Date.now()}` 
             ? { ...f, status: 'error' } 
             : f
         ));
@@ -439,7 +320,7 @@ const MessageCenterPage = () => {
       }
     } catch (err) {
       setUploadingFiles(prev => prev.map(f => 
-        f.id === fileId 
+        f.id === `file-${Date.now()}` 
           ? { ...f, status: 'error' } 
           : f
       ));
@@ -468,6 +349,7 @@ const MessageCenterPage = () => {
       status: 'sending',
       senderAvatar: currentUserAvatar,
     };
+    console.log('发送临时消息（头像）:', tempMsg.senderAvatar);
     setMessages(prev => [...prev, tempMsg]);
 
     try {
@@ -556,19 +438,15 @@ const MessageCenterPage = () => {
     document.querySelector('textarea.ant-input')?.focus();
   };
 
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <Navbar>
-        <Badge 
-          count={unreadTotal} 
-          showZero={false}
-          size="small"
-          style={{ marginLeft: 16 }}
-        >
-          <span style={{ fontSize: 14, fontWeight: 500 }}>消息中心</span>
-        </Badge>
-      </Navbar>
-
+      <Navbar />
       {pageLoading && (
         <div style={{ 
           position: 'fixed', 
@@ -605,7 +483,7 @@ const MessageCenterPage = () => {
                   >
                     <List.Item.Meta
                       avatar={
-                        <Badge count={conversation.unreadCount} showZero={false}>
+                        <Badge dot={conversation.lastMessage.unread}>
                           <Avatar src={conversation.withUser.avatar} size={40} />
                         </Badge>
                       }
@@ -636,7 +514,12 @@ const MessageCenterPage = () => {
                       }
                     />
                     <div style={{ fontSize: 11, color: '#999' }}>
-                      {formatMessageTime(conversation.lastMessage.time)}
+                      {new Date(conversation.lastMessage.time).toLocaleDateString()}
+                      <br />
+                      {new Date(conversation.lastMessage.time).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
                     </div>
                   </List.Item>
                 );
@@ -670,6 +553,16 @@ const MessageCenterPage = () => {
                       {getRoleConfig(activeConversation.withUser.role).text}
                     </Tag>
                   </div>
+                </Space>
+                <Space>
+                  <Tooltip title="静音会话">
+                    <Button 
+                      type="text" 
+                      icon={<MessageOutlined />}
+                      size="small"
+                    />
+                  </Tooltip>
+                  <Button type="text" icon={<CloseOutlined />} size="small" />
                 </Space>
               </div>
               
@@ -757,7 +650,11 @@ const MessageCenterPage = () => {
                                   textAlign: 'right',
                                   marginTop: '4px'
                                 }}>
-                                  {formatMessageTime(msg.time)}
+                                  {new Date(msg.time).toLocaleDateString()} {' '}
+                                  {new Date(msg.time).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
                                 </div>
                               </div>
                             </div>
@@ -824,7 +721,11 @@ const MessageCenterPage = () => {
                                   justifyContent: 'flex-end',
                                   alignItems: 'center'
                                 }}>
-                                  {formatMessageTime(msg.time)}
+                                  {new Date(msg.time).toLocaleDateString()} {' '}
+                                  {new Date(msg.time).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
                                   {msg.status === 'sending' && (
                                     <Tooltip title="发送中">
                                       <span style={{ marginLeft: '4px' }}>🕒</span>
