@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { List, Tag, Avatar, Button, Input, Select, Pagination, Layout, Spin, message } from 'antd';
 import { SearchOutlined, MessageOutlined, DollarOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
@@ -8,29 +8,12 @@ import { authApi } from '../../service/api';
 const { Search } = Input;
 const { Option } = Select;
 
-const statusNumMap = {
-  1: 'pending',
-  2: 'in_progress',
-  3: 'completed'
-};
-
-const roleMap = {
-  admin: '超级管理员',
-  teacher: '教师',
-  student: '学生',
-  guest: '访客'
-};
-
-const roleColorMap = {
-  admin: 'red',
-  teacher: 'orange',
-  student: 'green',
-  guest: 'gray'
-};
+const statusNumMap = { 1: 'pending', 2: 'in_progress', 3: 'completed' };
+const roleMap = { admin: '超级管理员', teacher: '教师', student: '学生', guest: '访客' };
+const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', guest: 'gray' };
 
 const RequirementListPage = () => {
-  const [allRequirements, setAllRequirements] = useState([]);
-  const [filteredRequirements, setFilteredRequirements] = useState([]);
+  const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -47,7 +30,6 @@ const RequirementListPage = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return null;
-      
       const response = await authApi.getuserlogin({ params: {} });
       if (response.code === 0 && response.data) {
         setCurrentUser(response.data);
@@ -59,71 +41,65 @@ const RequirementListPage = () => {
     return null;
   };
 
-  const fetchAllRequirements = async () => {
+  const fetchRequirements = useCallback(async () => {
     try {
       setLoading(true);
-      
       const userInfo = await fetchCurrentUser();
-      const userEmail = userInfo?.userAccount || ''; 
-      
+      const userEmail = userInfo?.userAccount || '';
+
+      // 构建包含分页和筛选条件的参数
       const params = {
-        page: pagination.current,
-        pageSize: pagination.pageSize,
-        keyword: searchKeyword || undefined,
-        userEmail: userEmail
+        current: pagination.current,    // 当前页码
+        pageSize: pagination.pageSize,  // 每页条数
+        userEmail: userEmail,
+        keyword: searchKeyword || undefined,  // 搜索关键词
+        status: statusFilter !== 'all' ? Object.keys(statusNumMap).find(key => statusNumMap[key] === statusFilter) : undefined  // 状态筛选
       };
-      
+
+      // 调用后端接口，获取当前页数据
       const response = await authApi.getRequirement(params);
-      
-      if (response.code === 0 && response.data) {
-        const formattedData = response.data.records.map((item, index) => {
-          if (!item.publisher?.id) {
-            console.warn(`第${index+1}条需求缺少发布者ID`, item);
-          }
-          
-          return {
-            id: item.requirementId?.toString() || '',
-            title: item.requirementTitle || '无标题',
-            type: item.requireType || item.requirementType || item.type || '未知类型',
-            description: item.description || '无描述',
-            originalStatus: item.status,
-            status: statusNumMap[item.status] || 'pending',
-            publishTime: item.publishTime || new Date().toISOString(),
-            publisher: {
-              id: item.publisher?.id?.toString() || '',
-              name: item.publisher?.name || item.publisher?.username || '未知用户',
-              role: item.publisher?.role || '', 
-              avatar: item.publisher?.avatar || ''
-            },
-            applicants: item.applicants || 0,
-            budget: item.budget === 0 ? '无偿' : (item.budget || '面议'),
-            urgency: item.urgency || 'normal'
-          };
-        });
-        
-        setAllRequirements(formattedData);
-        setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
+      if (response.code === 0) {
+        const { records, total } = response.data;
+        // 格式化当前页数据
+        const formattedData = records.map((item) => ({
+          id: item.requirementId?.toString() || '',
+          title: item.title || '无标题',
+          type: item.requireType || item.requirementType || item.type || '未知类型',
+          description: item.description || '无描述',
+          originalStatus: item.status,
+          status: statusNumMap[item.status] || 'pending',
+          publishTime: item.publishTime || new Date().toISOString(),
+          publisher: {
+            id: item.publisher?.id?.toString() || '',
+            name: item.publisher?.name || item.publisher?.username || '未知用户',
+            role: item.publisher?.role || '',
+            avatar: item.publisher?.avatar || ''
+          },
+          applicants: item.applicants || 0,
+          budget: item.budget === 0 ? '无偿' : (item.budget || '面议'),
+          urgency: item.urgency || 'normal'
+        }));
+        setRequirements(formattedData);
+        // 更新总条数（用于前端分页控件计算页码）
+        setPagination(prev => ({ ...prev, total }));
+      } else {
+        setRequirements([]);
+        setPagination(prev => ({ ...prev, total: 0 }));
+        message.warning('未获取到需求数据');
       }
     } catch (error) {
-      console.error('获取需求列表错误:', error);
-      message.error('获取需求列表失败，请稍后重试');
+      console.error('获取需求失败:', error);
+      message.error('获取数据失败，请稍后重试');
+      setRequirements([]);
+      setPagination(prev => ({ ...prev, total: 0 }));
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.current, pagination.pageSize, searchKeyword, statusFilter]);
 
   useEffect(() => {
-    fetchAllRequirements();
-  }, [pagination.current, pagination.pageSize, searchKeyword]);
-
-  useEffect(() => {
-    let result = [...allRequirements];
-    if (statusFilter !== 'all') {
-      const statusValue = Object.keys(statusNumMap).find(key => statusNumMap[key] === statusFilter);
-      if (statusValue) result = result.filter(item => item.originalStatus == statusValue);
-    }
-    setFilteredRequirements(result);
-  }, [allRequirements, statusFilter]);
+    fetchRequirements();
+  }, [fetchRequirements]);
 
   const getStatusTag = (status) => {
     const statusMap = {
@@ -149,16 +125,24 @@ const RequirementListPage = () => {
     navigate(`/messages?toUserId=${publisherId}&toUserName=${encodeURIComponent(publisherName)}`);
   };
 
-  const handleSearch = (value) => {
+  const handleSearchInput = (value) => {
     setSearchKeyword(value);
-    setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination(prev => ({ ...prev, current: 1 })); // 搜索时重置到第1页
   };
+
   const handleStatusChange = (value) => {
     setStatusFilter(value);
+    setPagination(prev => ({ ...prev, current: 1 })); // 筛选时重置到第1页
   };
+
   const handleTableChange = (page, pageSize) => {
-    setPagination(prev => ({ ...prev, current: page, pageSize: pageSize }));
+    setPagination(prev => ({ 
+      ...prev, 
+      current: page, 
+      pageSize: pageSize 
+    }));
   };
+
   const handleDetail = (id) => {
     navigate(`/requirements/${id}`);
   };
@@ -186,7 +170,7 @@ const RequirementListPage = () => {
       try {
         await authApi.deleteRequirement(id);
         message.success('需求删除成功');
-        fetchAllRequirements();
+        fetchRequirements(); // 删除后重新获取当前页数据
       } catch (error) {
         console.error('删除需求失败:', error);
         message.error('删除需求失败，请稍后重试');
@@ -205,13 +189,15 @@ const RequirementListPage = () => {
         width: '100%', 
         boxSizing: 'border-box' 
       }}>
-        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Search
             placeholder="搜索需求标题/描述"
             allowClear
             enterButton={<SearchOutlined />}
             style={{ width: 380 }}
-            onSearch={handleSearch}
+            value={searchKeyword}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            onSearch={(value) => handleSearchInput(value)}
             size="middle"
           />
           <Select 
@@ -267,12 +253,12 @@ const RequirementListPage = () => {
               <List
                 itemLayout="vertical"
                 size="large"
-                dataSource={filteredRequirements}  
+                dataSource={requirements}  // 直接使用后端返回的当前页数据
                 bordered={false}
                 renderItem={(item, index) => (
                   <div style={{ 
                     padding: '16px 20px', 
-                    borderBottom: index < filteredRequirements.length - 1 ? '1px solid #f0f2f5' : 'none',
+                    borderBottom: index < requirements.length - 1 ? '1px solid #f0f2f5' : 'none',
                     textAlign: 'left'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -386,7 +372,7 @@ const RequirementListPage = () => {
               <Pagination 
                 current={pagination.current}
                 pageSize={pagination.pageSize}
-                total={pagination.total}
+                total={pagination.total}  // 使用后端返回的总条数
                 showSizeChanger
                 showQuickJumper
                 showTotal={total => `共 ${total} 条需求`}
