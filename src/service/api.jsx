@@ -243,8 +243,6 @@ export const achievementApi = {
 export const studentApi = {
   getProfile: () => service.get("/student/profile"),
   updateProfile: (data) => service.put("/student/update", data),
-  getAchievements: () => service.get("/student/achievements"),
-  deleteAchievement: (id) => service.delete(`/student/achievements/${id}`),
 };
 
 export const teacherApi = {
