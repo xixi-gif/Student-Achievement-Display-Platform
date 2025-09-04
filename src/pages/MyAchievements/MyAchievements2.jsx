@@ -211,7 +211,7 @@ const MyAchievements = () => {
       width: "30%",
       render: (text, record) => (
         <span
-          style={{ fontWeight: 500 }}
+          style={{ fontWeight: 500, cursor: "pointer" }}
           onClick={() => handleViewDetail(record)}
         >
           {text}
@@ -587,6 +587,7 @@ const MyAchievements = () => {
             </Button>,
           ]}
           width={800}
+          confirmLoading={!selectedAchievement} // 添加加载状态
         >
           {selectedAchievement && (
             <div>
@@ -617,7 +618,7 @@ const MyAchievements = () => {
                   </Tag>
                   <span>
                     <CalendarOutlined />{" "}
-                    {selectedAchievement.date || "未知日期"}
+                    {selectedAchievement.date ? selectedAchievement.date.format("YYYY-MM-DD") : "未知日期"}
                   </span>
                 </div>
                 {selectedAchievement.recommendLevel !== undefined &&

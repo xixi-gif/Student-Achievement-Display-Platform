@@ -18,7 +18,8 @@ import {
   Row,
   Col,
   Empty,
-  Pagination
+  Pagination,
+  Modal,
 } from "antd";
 import {
   UserOutlined,
@@ -66,7 +67,6 @@ const AchievementDetailPage = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [achievement, setAchievement] = useState(null);
   const [activeTab, setActiveTab] = useState("basic");
-  const [liked, setLiked] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentContent, setCommentContent] = useState("");
   const contentRefs = {
@@ -82,7 +82,17 @@ const AchievementDetailPage = () => {
     pageSize: 10,
     total: 0,
   });
-  const [likeCount, setLikeCount] = useState(0);
+  //回复状态
+  const [replyState, setReplyState] = useState({
+    replyingTo: null, // 当前正在回复的评论ID
+    replyContent: "", // 回复内容
+  });
+  // 使用一个状态对象管理所有点赞相关数据
+  const [likeData, setLikeData] = useState({
+    count: 0, // 点赞总数
+    isLiked: false, // 当前用户是否点赞
+    loading: false, // 加载状态
+  });
 
   // 获取评论列表
   const fetchComments = async () => {
@@ -91,18 +101,43 @@ const AchievementDetailPage = () => {
         achievementId: id,
         current: commentPagination.current,
         pageSize: commentPagination.pageSize,
+        parentId: null,
       };
 
       const response = await commentApi.getCommentList(params);
 
       if (response.code === 0) {
-        setComments(response.data.records || []);
+        // 过滤掉子评论的独立记录
+        const filteredComments = response.data.records.filter(
+          (comment) =>
+            comment.parentId === null || comment.parentId === undefined
+        );
+
+        // 计算当前页的实际评论数量（包括子评论）
+        let currentPageCommentCount = 0;
+        const visibleComments = [];
+
+        for (const comment of filteredComments) {
+          const commentTotal =
+            1 + (comment.children ? comment.children.length : 0);
+
+          // 如果加上这个评论会超出页面容量，就停止添加
+          if (
+            currentPageCommentCount + commentTotal >
+            commentPagination.pageSize
+          ) {
+            break;
+          }
+
+          currentPageCommentCount += commentTotal;
+          visibleComments.push(comment);
+        }
+
+        setComments(visibleComments);
         setCommentPagination({
           ...commentPagination,
           total: response.data.total,
         });
-      } else {
-        throw new Error(response.message || "获取评论列表失败");
       }
     } catch (error) {
       console.error("获取评论失败:", error);
@@ -113,16 +148,21 @@ const AchievementDetailPage = () => {
   // 获取点赞状态和数量
   const fetchLikeStatus = async () => {
     try {
-      // 这里需要根据实际情况添加获取点赞状态的接口
-      // 假设从成果详情中已经包含了点赞信息
-      if (achievement) {
-        setLikeCount(achievement.likeCount || 0);
-        // 这里可以根据用户信息和成果信息判断当前用户是否已点赞
-        // 暂时设置为false，实际项目中需要从接口获取
-        setLiked(false);
+      const [detailRes, statusRes] = await Promise.all([
+        achievementApi.getDetail(id),
+        achievementApi.checkLikeStatus({ achievementId: id }),
+      ]);
+
+      if (detailRes.code === 0 && statusRes.code === 0) {
+        setLikeData({
+          count: detailRes.data.likeCount || 0,
+          isLiked: statusRes.data,
+          loading: false,
+        });
       }
     } catch (error) {
-      console.error('获取点赞状态失败:', error);
+      console.error("获取点赞状态失败:", error);
+      message.error(error.message || "获取点赞状态失败");
     }
   };
 
@@ -132,49 +172,48 @@ const AchievementDetailPage = () => {
     }
   }, [achievement]);
 
-  useEffect(
-    () => {
-      const fetchData = async () => {
-        try {
-          setLoading(true);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
 
-          // 获取用户信息
-          const token = localStorage.getItem("token");
-          const role = token ? localStorage.getItem("user_role") : "visitor";
-          const username = token ? localStorage.getItem("username") : "访客";
-          setCurrentUser({
-            role,
-            username,
-            avatar: `https://picsum.photos/id/${
-              1030 + Math.floor(Math.random() * 10)
-            }/200/200`,
-          });
+        // 获取用户信息
+        const token = localStorage.getItem("token");
+        const role = token ? localStorage.getItem("user_role") : "visitor";
+        const username = token ? localStorage.getItem("username") : "访客";
+        setCurrentUser({
+          role,
+          username,
+          avatar: `https://picsum.photos/id/${
+            1030 + Math.floor(Math.random() * 10)
+          }/200/200`,
+        });
 
-          // 获取成果详情
-          const response = await achievementApi.getDetail(id);
+        // 获取成果详情
+        const response = await achievementApi.getDetail(id);
 
-          if (response.code === 0) {
-            setAchievement(response.data);
-            setLikeCount(response.data.likeCount || 0)
+        if (response.code === 0) {
+          setAchievement(response.data);
+          setLikeData((prev) => ({
+            ...prev,
+            count: response.data.likeCount || 0,
+          }));
 
-            // 初始化评论数据
-            await fetchComments();
-          } else {
-            throw new Error(response.message || "获取成果详情失败");
-          }
-        } catch (error) {
-          console.error("获取数据失败:", error);
-          message.error(error.message || "获取数据失败，请刷新重试");
-        } finally {
-          setLoading(false);
+          // 初始化评论数据
+          await fetchComments();
+        } else {
+          throw new Error(response.message || "获取成果详情失败");
         }
-      };
+      } catch (error) {
+        console.error("获取数据失败:", error);
+        message.error(error.message || "获取数据失败，请刷新重试");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      fetchData();
-    },
-    [id],
-    commentPagination.current
-  );
+    fetchData();
+  }, [id, commentPagination.current]);
 
   // 安全的数组访问函数
   const getSafeArray = (array) => {
@@ -192,36 +231,40 @@ const AchievementDetailPage = () => {
       message.info("请登录后再进行点赞");
       return;
     }
-
     try {
-      const likeData = {
-        achievementId: parseInt(id)
-      };
+      // 乐观更新
+      const newLiked = !likeData.isLiked;
+      setLikeData((prev) => ({
+        ...prev,
+        isLiked: newLiked,
+        count: newLiked ? prev.count + 1 : Math.max(0, prev.count - 1),
+        loading: true,
+      }));
 
-      let response;
-      if (liked) {
-        // 取消点赞
-        response = await achievementApi.cancelLikeAchievement(likeData);
-      } else {
-        // 点赞
-        response = await achievementApi.likeAchievement(likeData);
+      const likeDataToSend = { achievementId: parseInt(id) };
+      const response = newLiked
+        ? await achievementApi.likeAchievement(likeDataToSend)
+        : await achievementApi.cancelLikeAchievement(likeDataToSend);
+
+      if (response.code !== 0) {
+        throw new Error(response.message || "操作失败");
       }
 
-      if (response.code === 0) {
-        const newLiked = !liked;
-        setLiked(newLiked);
-        
-        // 更新点赞数量
-        const newLikeCount = newLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
-        setLikeCount(newLikeCount);
-        
-        message.success(newLiked ? "点赞成功" : "已取消点赞");
-      } else {
-        throw new Error(response.message || (liked ? '取消点赞失败' : '点赞失败'));
-      }
+      // 成功后重新获取最新数据确保一致性
+      await fetchLikeStatus();
+      message.success(newLiked ? "点赞成功" : "已取消点赞");
     } catch (error) {
-      console.error('点赞操作失败:', error);
-      message.error(error.message || '操作失败，请重试');
+      console.error("点赞操作失败:", error);
+      // 失败时回滚状态
+      setLikeData((prev) => ({
+        ...prev,
+        isLiked: !prev.isLiked,
+        count: prev.isLiked ? prev.count + 1 : Math.max(0, prev.count - 1),
+        loading: false,
+      }));
+      message.error(error.message || "操作失败，请重试");
+    } finally {
+      setLikeData.loading(false);
     }
   };
 
@@ -232,8 +275,8 @@ const AchievementDetailPage = () => {
     );
   };
 
-  const isAdminOrTeacher = () => {
-    return ["admin", "teacher"].includes(currentUser?.role);
+  const isAdmin = () => {
+    return currentUser?.role === "admin";
   };
 
   // 处理评论分页变化
@@ -249,6 +292,7 @@ const AchievementDetailPage = () => {
     setCommentContent(e.target.value);
   };
 
+  // 评论提交函数
   const handleCommentSubmit = async () => {
     if (currentUser?.role === "visitor") {
       message.info("请登录后再发表评论");
@@ -263,7 +307,7 @@ const AchievementDetailPage = () => {
       const commentData = {
         achievementId: parseInt(id),
         content: commentContent,
-        parentId: null, // 默认父评论ID为null，表示一级评论
+        parentId: null, // 明确设置为null，表示一级评论
       };
 
       const response = await commentApi.addComment(commentData);
@@ -282,8 +326,129 @@ const AchievementDetailPage = () => {
     }
   };
 
+  // 回复提交处理函数
+  const handleReplySubmit = async (parentId) => {
+    if (currentUser?.role === "visitor") {
+      message.info("请登录后再发表回复");
+      return;
+    }
+
+    if (!replyState.replyContent.trim()) {
+      message.warning("回复内容不能为空");
+      return;
+    }
+
+    try {
+      const commentData = {
+        achievementId: parseInt(id),
+        content: replyState.replyContent,
+        parentId: parentId, // 设置父评论ID
+      };
+
+      const response = await commentApi.addComment(commentData);
+
+      if (response.code === 0) {
+        message.success("回复成功");
+        setReplyState({
+          replyingTo: null,
+          replyContent: "",
+        });
+        // 刷新评论列表
+        await fetchComments();
+      } else {
+        throw new Error(response.message || "回复失败");
+      }
+    } catch (error) {
+      console.error("发表回复失败:", error);
+      message.error(error.message || "回复失败");
+    }
+  };
+
+  // 删除评论处理函数
+  const handleDeleteComment = async (commentId) => {
+    try {
+      // 查找要删除的评论
+      const commentToDelete = comments.find((c) => c.id === commentId);
+      const hasChildren = commentToDelete?.children?.length > 0;
+
+      // 显示确认对话框
+      Modal.confirm({
+        title: "确认删除",
+        content: hasChildren
+          ? "此评论包含回复，删除后将同时删除所有回复，确定继续吗？"
+          : "确定要删除此评论吗？",
+        okText: "确定",
+        cancelText: "取消",
+        onOk: async () => {
+          // 发送删除请求
+          const response = await commentApi.deleteComment(commentId);
+
+          if (response.code === 0) {
+            message.success(hasChildren ? "评论及回复已删除" : "评论已删除");
+            // 刷新评论列表
+            await fetchComments();
+          } else {
+            throw new Error(response.message || "删除评论失败");
+          }
+        },
+      });
+    } catch (error) {
+      console.error("删除评论失败:", error);
+      message.error(error.message || "删除评论失败");
+    }
+  };
+
+  // 在组件中添加分享处理函数
+  const handleShare = () => {
+    // 获取当前页面URL
+    const currentUrl = window.location.href;
+
+    // 使用Web Share API（如果浏览器支持）
+    if (navigator.share) {
+      navigator
+        .share({
+          title: achievement?.title || "成果详情",
+          text: `查看这个成果: ${achievement?.title}`,
+          url: currentUrl,
+        })
+        .catch((error) => {
+          console.error("分享失败:", error);
+          fallbackShare(currentUrl);
+        });
+    } else {
+      // 浏览器不支持Web Share API时使用备用方案
+      fallbackShare(currentUrl);
+    }
+  };
+
+  // 备用分享方案
+  const fallbackShare = (url) => {
+    // 复制链接到剪贴板
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        message.success("链接已复制到剪贴板");
+      })
+      .catch(() => {
+        // 如果复制失败，显示提示让用户手动复制
+        Modal.info({
+          title: "分享链接",
+          content: (
+            <div>
+              <p>请手动复制以下链接：</p>
+              <Input value={url} readOnly />
+            </div>
+          ),
+          okText: "确定",
+        });
+      });
+  };
+
   // 渲染评论列表项
   const renderCommentItem = (comment) => {
+    const isCurrentUserComment =
+      comment.user?.id === parseInt(localStorage.getItem("userId"));
+
     return (
       <List.Item
         style={{
@@ -308,18 +473,87 @@ const AchievementDetailPage = () => {
           description={
             <div>
               <p style={{ marginTop: 8, marginBottom: 8 }}>{comment.content}</p>
-              {/* 如果有子评论，递归渲染 */}
+
+              {/* 评论操作按钮 */}
+              <Space size="middle" style={{ marginBottom: 8 }}>
+                <Button
+                  type="text"
+                  size="small"
+                  onClick={() =>
+                    setReplyState({
+                      replyingTo: comment.id,
+                      replyContent: "",
+                    })
+                  }
+                >
+                  回复
+                </Button>
+
+                {(isCurrentUserComment || isAdmin()) && (
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    onClick={() => handleDeleteComment(comment.id)}
+                  >
+                    删除
+                  </Button>
+                )}
+              </Space>
+
+              {/* 回复输入框 */}
+              {replyState.replyingTo === comment.id && (
+                <div style={{ marginBottom: 16 }}>
+                  <TextArea
+                    rows={2}
+                    placeholder={`回复 ${comment.user?.userName || "用户"}`}
+                    value={replyState.replyContent}
+                    onChange={(e) =>
+                      setReplyState({
+                        ...replyState,
+                        replyContent: e.target.value,
+                      })
+                    }
+                    style={{ marginBottom: 8, borderRadius: 4 }}
+                  />
+                  <Space>
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={() => handleReplySubmit(comment.id)}
+                    >
+                      提交回复
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        setReplyState({
+                          replyingTo: null,
+                          replyContent: "",
+                        })
+                      }
+                    >
+                      取消
+                    </Button>
+                  </Space>
+                </div>
+              )}
+
+              {/* 子评论展示 */}
               {comment.children && comment.children.length > 0 && (
                 <div
                   style={{
                     marginLeft: 24,
-                    borderLeft: "1px solid #f0f0f0",
+                    borderLeft: "2px solid #f0f0f0",
                     paddingLeft: 12,
                   }}
                 >
                   <List
                     dataSource={comment.children}
                     renderItem={renderCommentItem}
+                    // 禁用子评论的分页和加载更多
+                    pagination={false}
+                    loadMore={false}
                   />
                 </div>
               )}
@@ -445,7 +679,7 @@ const AchievementDetailPage = () => {
                   </h3>
 
                   <Space size="small">
-                    {(isCreator() || isAdminOrTeacher()) && (
+                    {(isCreator() || isAdmin()) && (
                       <Button
                         type="primary"
                         icon={<EditOutlined />}
@@ -459,7 +693,11 @@ const AchievementDetailPage = () => {
                         编辑
                       </Button>
                     )}
-                    <Button icon={<ShareAltOutlined />} size="small">
+                    <Button
+                      icon={<ShareAltOutlined />}
+                      size="small"
+                      onClick={handleShare}
+                    >
                       分享
                     </Button>
                   </Space>
@@ -640,9 +878,7 @@ const AchievementDetailPage = () => {
                   >
                     <span style={{ color: "#666" }}>点赞次数</span>
                     <span style={{ fontWeight: 600, color: "#222" }}>
-                      {liked
-                        ? (achievement.likeCount || 0) + 1
-                        : achievement.likeCount || 0}
+                      {likeData.count}
                     </span>
                   </div>
                   <div
@@ -654,7 +890,7 @@ const AchievementDetailPage = () => {
                   >
                     <span style={{ color: "#666" }}>评论次数</span>
                     <span style={{ fontWeight: 600, color: "#222" }}>
-                      {comments.length}
+                      {commentPagination.total}
                     </span>
                   </div>
                   <div
@@ -671,25 +907,24 @@ const AchievementDetailPage = () => {
 
                 <Button
                   icon={
-                    liked ? (
-                      <HeartFilled style={{ color: "#1890ff" }} />
+                    likeData.isLiked ? (
+                      <HeartFilled style={{ color: "#e80e48ff" }} />
                     ) : (
                       <HeartOutlined />
                     )
                   }
                   onClick={handleLike}
+                  loading={likeData.loading}
+                  disabled={likeData.loading}
                   style={{
                     width: "100%",
                     marginBottom: 12,
-                    borderColor: "#d9d9d9",
+                    borderColor: likeData.isLiked ? "#e80e48ff" : "#d9d9d9",
+                    color: likeData.isLiked ? "#e80e48ff" : undefined,
                     transition: "all 0.3s",
                   }}
                 >
-                  {liked ? "已点赞" : "点赞"} (
-                  {liked
-                    ? (achievement.likeCount || 0) + 1
-                    : achievement.likeCount || 0}
-                  )
+                  {likeData.isLiked ? "已点赞" : "点赞"}({likeData.count})
                 </Button>
               </Card>
             </Col>
@@ -948,7 +1183,7 @@ const AchievementDetailPage = () => {
                       )}
                     </div>
 
-                    {getSafeArray(achievement.videos).length > 0 ? (
+                    {getSafeArray(achievement.video).length > 0 ? (
                       <div>
                         <h3
                           style={{
@@ -959,7 +1194,7 @@ const AchievementDetailPage = () => {
                         >
                           项目视频
                         </h3>
-                        {getSafeArray(achievement.videos).map((video, idx) => (
+                        {getSafeArray(achievement.video).map((video, idx) => (
                           <div key={idx} style={{ marginBottom: 24 }}>
                             <h4
                               style={{
@@ -990,7 +1225,7 @@ const AchievementDetailPage = () => {
                                   width: "100%",
                                   height: "100%",
                                 }}
-                                poster={getSafeArray(achievement.images)[0]}
+                                preload="metadata"
                               />
                             </div>
                           </div>

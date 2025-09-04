@@ -270,7 +270,7 @@ const AchievementManage = () => {
         achievementIds: [Number(id)],
         status: 2, //已发布状态
       };
-      const response = await adminApi.batchUpdateStatus(params);
+      const response = await adminApi.updateAchievementStatus(params);
 
       if (response.code === 0 && response.data) {
         message.success("审核通过成功");
