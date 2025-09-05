@@ -71,7 +71,8 @@ const TeacherProfile = () => {
         // const profileResponse = await teacherApi.getProfile();
         const { data: profileResponse } = await teacherApi.getProfile();
         const formattedData = {
-          realName: profileResponse.username,
+          realName: profileResponse.realName,
+          userName:profileResponse.username,
           teacherId: profileResponse.teacherId,
           department: profileResponse.department,
           title: profileResponse.title,
@@ -167,6 +168,7 @@ const TeacherProfile = () => {
       const values = await form.validateFields();
       const updatedData = {
         realName: values.realName,
+        userName: values.userName,
         department: values.department,
         title: values.title,
         researchField: values.researchField,
@@ -386,8 +388,8 @@ const TeacherProfile = () => {
     const colors = {
       软件开发: "blue",
       科研项目: "purple",
-      毕业论文: "green",
-      竞赛作品: "orange",
+      创新设计: "green",
+      竞赛成果: "orange",
       学术论文: "red",
     };
     return colors[category] || "gray";
@@ -502,7 +504,7 @@ const TeacherProfile = () => {
                         label="真实姓名"
                         rules={[{ required: true }]}
                       >
-                        <Input />
+                        <Input disabled />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
@@ -516,6 +518,13 @@ const TeacherProfile = () => {
                     </Col>
                   </Row>
 
+                  <Form.Item
+                    name="userName"
+                    label="昵称"
+                    rules={[{ required: true }]}
+                  >
+                    <Input />
+                  </Form.Item>
                   <Form.Item
                     name="department"
                     label="所属院系"
@@ -551,8 +560,8 @@ const TeacherProfile = () => {
                       { required: true },
                       { type: "email" },
                       {
-                        pattern: /@(stu.edu\.cn|school\.edu)$/,
-                        message: "请使用学校邮箱",
+                        pattern: /^[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$|^[a-zA-Z0-9._%+-]+@(stu\.edu\.cn|school\.edu)$/i,
+                        message: "请输入有效的邮箱地址",
                       },
                     ]}
                   >

@@ -356,23 +356,23 @@ const DataStatisticsPage = () => {
       key: "loginCount",
       sorter: true, // 启用排序
       // defaultSortOrder: 'descend', // 默认降序
-      sortDirections: ['descend', 'ascend'], // 允许的排序方向
+      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="blue">{count}</Tag>,
     },
     {
       title: "成果数量",
       dataIndex: "achievementCount",
       key: "achievementCount",
-      sorter: true, // 启用排序
-      sortDirections: ['descend', 'ascend'], // 允许的排序方向
+      // sorter: true, // 启用排序
+      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="green">{count}</Tag>,
     },
     {
       title: "最后活跃",
       dataIndex: "lastLoginTime",
       key: "lastLoginTime",
-      sorter: true, // 启用排序
-      sortDirections: ['descend', 'ascend'], // 允许的排序方向
+      // sorter: true, // 启用排序
+      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
     },
     {
       title: "状态",

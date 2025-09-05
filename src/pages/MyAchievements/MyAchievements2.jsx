@@ -556,8 +556,8 @@ const MyAchievements = () => {
               rowKey="id"
               pagination={{
                 pageSize: 10,
-                showSizeChanger: true,
-                pageSizeOptions: ["10", "20", "30", "50"],
+                showSizeChanger: false,
+                // pageSizeOptions: ["10", "20", "30", "50"],
               }}
             />
           ) : (

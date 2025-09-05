@@ -413,7 +413,7 @@ const AchievementRecommendPage = () => {
           loading={loading}
           pagination={{
             ...pagination,
-            showSizeChanger: true,
+            showSizeChanger: false,
             showTotal: (total) => `共 ${total} 条成果`,
           }}
           onChange={(pag) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Layout, Card, Avatar, Button, Form, Input, 
   Tag, Upload, Space, Divider, Spin, message, Tabs,
-  Modal
+  Modal, Descriptions
 } from 'antd';
 import { 
   UserOutlined, EditOutlined, MailOutlined, 
@@ -16,6 +16,7 @@ import { adminApi, authApi } from '../../service/api';
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
+const { Item } = Descriptions;
 
 const DEFAULT_USER = {
   role: 'admin', 
@@ -53,8 +54,9 @@ const AdminProfile = () => {
       items: [
         { label: '管理员ID', field: 'adminId', disabled: true },
         { label: '姓名', field: 'realName' },
+        {label: '昵称', field: 'userName' },
         { label: '职位', field: 'position' },
-        { label: '所属部门', field: 'department' }
+        { label: '所属部门', field: 'department'}
       ]
     },
     {
@@ -71,7 +73,6 @@ const AdminProfile = () => {
   useEffect(() => {
     fetchUserProfile();
   }, [form]);
-
 
   const fetchUserProfile = async () => {
     try {
@@ -121,6 +122,80 @@ const AdminProfile = () => {
     }
   };
 
+  const renderFieldValue = (field, value) => {
+  if (!value) return '-';
+  return value; // 直接返回原始值，不做任何特殊处理
+};
+
+  const renderViewModeContent = () => {
+    return (
+      <Tabs defaultActiveKey="basic">
+        {adminInfoSections.map(section => (
+          <TabPane
+            key={section.key}
+            tab={
+              <span>
+                {section.icon}
+                {section.label}
+              </span>
+            }
+          >
+            <Descriptions column={1} bordered>
+              {section.items.map(item => (
+                <Item key={item.field} label={item.label}>
+                  {renderFieldValue(item.field, currentUser?.[item.field])}
+                </Item>
+              ))}
+            </Descriptions>
+          </TabPane>
+        ))}
+      </Tabs>
+    );
+  };
+
+  const renderEditModeContent = () => {
+    return (
+      <Tabs defaultActiveKey="basic">
+        {adminInfoSections.map(section => (
+          <TabPane
+            key={section.key}
+            tab={
+              <span>
+                {section.icon}
+                {section.label}
+              </span>
+            }
+          >
+            <Form
+              form={form}
+              layout="vertical"
+              initialValues={currentUser}
+            >
+              {section.items.map(item => (
+                <Form.Item
+                  key={item.field}
+                  name={item.field}
+                  label={item.label}
+                  rules={[
+                    { required: true, message: `请输入${item.label}` }
+                  ]}
+                >
+                  <Input 
+                    placeholder={`请输入${item.label}`}
+                    prefix={
+                      item.field === 'phone' ? <PhoneOutlined /> : 
+                      item.field === 'email' ? <MailOutlined /> : null
+                    }
+                    disabled={item.disabled || false}
+                  />
+                </Form.Item>
+              ))}
+            </Form>
+          </TabPane>
+        ))}
+      </Tabs>
+    );
+  };
 
   const handleSave = () => {
     form.validateFields()
@@ -141,7 +216,6 @@ const AdminProfile = () => {
   };
 
   const handleAvatarChange = async (info) => {
-   
     if (info.file.status === 'uploading') {
       setUploading(true);
       message.loading('头像上传中...', 0);
@@ -172,14 +246,12 @@ const AdminProfile = () => {
       }
     }
 
-
     if (info.file.status === 'error') {
       setUploading(false);
       message.destroy();
 
       if (info.file.error?.status === 404) {
         message.error('上传接口不存在，请检查配置');
-        setShowApiConfig(true);
       } else {
         message.error('上传失败，请检查网络或文件格式');
       }
@@ -199,7 +271,6 @@ const AdminProfile = () => {
       return false;
     }
     
-
     const isLt2M = file.size / 1024 / 1024 < 2;
     if (!isLt2M) {
       message.error('图片大小不能超过2MB');
@@ -208,7 +279,6 @@ const AdminProfile = () => {
     
     return true;
   };
-
 
   const renderUploadButton = () => {
     if (uploading) {
@@ -245,8 +315,6 @@ const AdminProfile = () => {
       </div>
     );
   };
-
-
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -287,7 +355,7 @@ const AdminProfile = () => {
           >
             <Spin spinning={loading}>
               <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                {/* 头像区域（与ProfilePage风格一致） */}
+                {/* 头像区域 */}
                 <div style={{ 
                   width: 200, 
                   marginRight: 32,
@@ -300,9 +368,7 @@ const AdminProfile = () => {
                     beforeUpload={beforeAvatarUpload}
                     onChange={handleAvatarChange}
                     disabled={!editMode || uploading}
-                    // 关键：使用customRequest自定义上传，与ProfilePage保持一致
                     customRequest={({ file, onSuccess, onError }) => {
-                      // 调用上传接口，传入文件
                       authApi.uploadAvatar(file)
                         .then(response => onSuccess(response, file))
                         .catch(error => onError(error, file));
@@ -313,17 +379,15 @@ const AdminProfile = () => {
                   </Upload>
                   
                   {editMode && (
-                    <>
-                      <p style={{ 
-                        marginTop: 12, 
-                        fontSize: 12, 
-                        color: '#666',
-                        marginBottom: 0,
-                        textAlign: 'center'
-                      }}>
-                        支持JPG、PNG、GIF格式，大小不超过2MB
-                      </p>
-                    </>
+                    <p style={{ 
+                      marginTop: 12, 
+                      fontSize: 12, 
+                      color: '#666',
+                      marginBottom: 0,
+                      textAlign: 'center'
+                    }}>
+                      支持JPG、PNG、GIF格式，大小不超过2MB
+                    </p>
                   )}
                   
                   <h3 style={{ marginTop: 16, marginBottom: 8, textAlign: 'center' }}>
@@ -340,46 +404,7 @@ const AdminProfile = () => {
                 
                 {/* 表单区域 */}
                 <div style={{ flex: 1, minWidth: 300 }}>
-                  <Tabs defaultActiveKey="basic">
-                    {adminInfoSections.map(section => (
-                      <TabPane
-                        key={section.key}
-                        tab={
-                          <span>
-                            {section.icon}
-                            {section.label}
-                          </span>
-                        }
-                      >
-                        <Form
-                          form={form}
-                          layout="vertical"
-                          disabled={!editMode}
-                          initialValues={currentUser}
-                        >
-                          {section.items.map(item => (
-                            <Form.Item
-                              key={item.field}
-                              name={item.field}
-                              label={item.label}
-                              rules={[
-                                { required: true, message: `请输入${item.label}` }
-                              ]}
-                            >
-                              <Input 
-                                placeholder={`请输入${item.label}`}
-                                prefix={
-                                  item.field === 'phone' ? <PhoneOutlined /> : 
-                                  item.field === 'email' ? <MailOutlined /> : null
-                                }
-                                disabled={item.disabled || false}
-                              />
-                            </Form.Item>
-                          ))}
-                        </Form>
-                      </TabPane>
-                    ))}
-                  </Tabs>
+                  {editMode ? renderEditModeContent() : renderViewModeContent()}
                 </div>
               </div>
             </Spin>
@@ -392,7 +417,6 @@ const AdminProfile = () => {
             style={{ marginTop: 24 }}
           >
             <Space direction="vertical" size="middle">
-              
               <Button 
                 danger 
                 icon={<LogoutOutlined />}
@@ -407,7 +431,6 @@ const AdminProfile = () => {
           </Card>
         </div>
       </Content>
-      
     </Layout>
   );
 };

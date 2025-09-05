@@ -59,7 +59,7 @@ const AchievementFormPage = () => {
   const [videoFiles, setVideoFiles] = useState([]);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [oldFiles, setOldFiles] = useState([]);
-  const [deletedFiles, setDeletedFiles] = useState([]); // 新增：存储用户删除的文件ID
+  const [deletedFiles, setDeletedFiles] = useState([]); // 存储用户删除的文件ID
   const [oldCoverUrl, setOldCoverUrl] = useState("");
   const [tags, setTags] = useState([]);
   const [tagsLoading, setTagsLoading] = useState(false);
@@ -85,6 +85,11 @@ const AchievementFormPage = () => {
     { value: "省级", label: "省级" },
     { value: "国家级", label: "国家级" },
     { value: "国际级", label: "国际级" },
+  ];
+
+  const studentStatusOptions = [
+    { value: 0, label: "草稿" },
+    { value: 1, label: "进入审核流程" },
   ];
 
   // 获取分类数据
@@ -425,16 +430,18 @@ const AchievementFormPage = () => {
       setSearchingStudents(true);
       const response = await achievementApi.searchStudents({
         keyword: studentSearchKeyword.trim(),
-        limit: 10,
+        // limit: 10,
       });
 
       if (response.code === 0) {
         setStudentOptions(
-          response.data.map((student) => ({
-            value: student.name,
-            label: `${student.name} (${student.userNo})`,
-            key: student.userId,
-          }))
+          response.data.length > 0
+            ? response.data.map((student) => ({
+                value: student.name,
+                label: `${student.name} (${student.userNo})`,
+                key: student.userId,
+              }))
+            : [{ value: "no-result", label: "无匹配结果", disabled: true }]
         );
       }
     } catch (error) {
@@ -457,16 +464,18 @@ const AchievementFormPage = () => {
       setSearchingTeachers(true);
       const response = await achievementApi.searchTeachers({
         keyword: instructorSearchKeyword.trim(),
-        limit: 10,
+        // limit: 10,
       });
 
       if (response.code === 0) {
         setTeacherOptions(
-          response.data.map((teacher) => ({
-            value: teacher.name,
-            label: `${teacher.name} (${teacher.userNo})`,
-            key: teacher.userId,
-          }))
+          response.data.length > 0
+            ? response.data.map((teacher) => ({
+                value: teacher.name,
+                label: `${teacher.name} (${teacher.userNo})`,
+                key: teacher.userId,
+              }))
+            : [{ value: "no-result", label: "无匹配结果", disabled: true }]
         );
       }
     } catch (error) {
@@ -524,8 +533,8 @@ const AchievementFormPage = () => {
       formData.append("description", values.description);
       formData.append("price", values.price);
 
-      // 管理员可以设置状态
-      if (isAdmin() && values.status) {
+      // 处理状态（管理员和学生都可以设置）
+      if (values.status !== undefined) {
         formData.append("status", values.status.toString());
       }
 
@@ -560,10 +569,9 @@ const AchievementFormPage = () => {
         formData.append("id", id);
 
         // 传递需要删除的文件ID列表
-        // 传递需要删除的文件ID列表
-      if (deletedFiles.length > 0) {
-        formData.append("deletedFileIds", JSON.stringify(deletedFiles));
-      }
+        if (deletedFiles.length > 0) {
+          formData.append("deletedFileIds", JSON.stringify(deletedFiles));
+        }
 
         // 传递需要保留的旧文件信息
         if (oldFiles.length > 0) {
@@ -642,18 +650,20 @@ const AchievementFormPage = () => {
           ? isEditMode
             ? "成果更新成功"
             : "成果创建成功"
-          : isEditMode
-          ? "成果更新成功，等待审核"
-          : "成果发布成功，等待审核";
+          : values.status === 1
+          ? "成果已创建，等待审核"
+          : "成果已保存为草稿";
 
         message.success(successMessage);
 
-        // 根据用户角色跳转到不同的页面
-        if (isAdmin()) {
-          navigate("/admin/achievements-manage");
-        } else {
-          navigate("/student/my-achievements");
-        }
+        // // 根据用户角色跳转到不同的页面
+        // if (isAdmin()) {
+        //   navigate("/admin/achievements-manage");
+        // } else {
+        //   navigate("/student/my-achievements");
+        // }
+        // 返回上一页
+        navigate(-1);
       } else {
         message.error(response.message || "操作失败");
       }
@@ -674,13 +684,7 @@ const AchievementFormPage = () => {
 
   // 取消操作
   const handleCancel = () => {
-    if (isAdmin()) {
-      navigate("/admin/achievements-manage");
-    } else if (isEditMode) {
-      navigate(`/achievement/detail/${id}`);
-    } else {
-      navigate("/student/my-achievements");
-    }
+    navigate(-1);
   };
 
   // 在表单中添加管理员专用的状态选择字段
@@ -699,6 +703,28 @@ const AchievementFormPage = () => {
           <Option value={2}>已发布</Option>
           <Option value={3}>已驳回</Option>
           <Option value={4}>老师已通过</Option>
+        </Select>
+      </Form.Item>
+    );
+  };
+
+  // 添加一个渲染学生状态选择字段的函数
+  const renderStudentStatusField = () => {
+    if (isAdmin()) return null; // 管理员有自己的状态选择
+
+    return (
+      <Form.Item
+        name="status"
+        label="成果状态"
+        rules={[{ required: true, message: "请选择成果状态" }]}
+        initialValue={0} // 默认选择草稿
+      >
+        <Select placeholder="请选择成果状态">
+          {studentStatusOptions.map((option) => (
+            <Option key={option.value} value={option.value}>
+              {option.label}
+            </Option>
+          ))}
         </Select>
       </Form.Item>
     );
@@ -898,6 +924,8 @@ const AchievementFormPage = () => {
 
                 {/* 管理员状态选择字段 */}
                 {renderAdminStatusField()}
+                {/* 学生状态选择字段 */}
+                <Col span={24}>{renderStudentStatusField()}</Col>
 
                 <Col span={24}>
                   <Form.Item
@@ -1006,6 +1034,7 @@ const AchievementFormPage = () => {
                               borderBottom: "1px solid #f0f0f0",
                             }}
                             onClick={() => {
+                              if (option.disabled) return;
                               // 添加选中的学生
                               const alreadyExists = participants.some((p) =>
                                 typeof p === "string"
@@ -1107,12 +1136,19 @@ const AchievementFormPage = () => {
                               backgroundColor: "#fff",
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = "#f5f5f5";
+                              if (!option.disabled) {
+                                e.target.style.backgroundColor = "#f5f5f5";
+                              }
                             }}
                             onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = "#fff";
+                              if (!option.disabled) {
+                                e.target.style.backgroundColor = "#fff";
+                              }
                             }}
-                            onClick={() => handleInstructorSelect(option.value)}
+                            onClick={() => {
+                              if (option.disabled) return;
+                              handleInstructorSelect(option.value);
+                            }}
                           >
                             {option.label}
                           </div>
