@@ -14,6 +14,7 @@ const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', guest:
 
 const RequirementListPage = () => {
   const [requirements, setRequirements] = useState([]);
+  const [allRequirements, setAllRequirements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -41,28 +42,20 @@ const RequirementListPage = () => {
     return null;
   };
 
-  const fetchRequirements = useCallback(async () => {
+  const fetchAllRequirements = useCallback(async () => {
     try {
       setLoading(true);
       const userInfo = await fetchCurrentUser();
       const userEmail = userInfo?.userAccount || '';
 
-      // 构建包含分页和筛选条件的参数
-      const params = {
-        current: pagination.current,    // 当前页码
-        pageSize: pagination.pageSize,  // 每页条数
-        userEmail: userEmail,
-        keyword: searchKeyword || undefined,  // 搜索关键词
-        status: statusFilter !== 'all' ? Object.keys(statusNumMap).find(key => statusNumMap[key] === statusFilter) : undefined  // 状态筛选
-      };
+      const params = { userEmail: userEmail };
 
-      // 调用后端接口，获取当前页数据
       const response = await authApi.getRequirement(params);
       if (response.code === 0) {
-        const { records, total } = response.data;
-        // 格式化当前页数据
-        const formattedData = records.map((item) => ({
-          id: item.requirementId?.toString() || '',
+        const { records } = response.data;
+        // 修复：确保id始终有有效值，避免空字符串导致跳转失败
+        const formattedAllData = records.map((item, index) => ({
+          id: item.requirementId?.toString() || `req-${index}-${Date.now()}`,
           title: item.title || '无标题',
           type: item.requireType || item.requirementType || item.type || '未知类型',
           description: item.description || '无描述',
@@ -70,7 +63,7 @@ const RequirementListPage = () => {
           status: statusNumMap[item.status] || 'pending',
           publishTime: item.publishTime || new Date().toISOString(),
           publisher: {
-            id: item.publisher?.id?.toString() || '',
+            id: item.publisher?.id?.toString() || `pub-${index}-${Date.now()}`,
             name: item.publisher?.name || item.publisher?.username || '未知用户',
             role: item.publisher?.role || '',
             avatar: item.publisher?.avatar || ''
@@ -79,27 +72,56 @@ const RequirementListPage = () => {
           budget: item.budget === 0 ? '无偿' : (item.budget || '面议'),
           urgency: item.urgency || 'normal'
         }));
-        setRequirements(formattedData);
-        // 更新总条数（用于前端分页控件计算页码）
-        setPagination(prev => ({ ...prev, total }));
+        setAllRequirements(formattedAllData);
       } else {
-        setRequirements([]);
-        setPagination(prev => ({ ...prev, total: 0 }));
+        setAllRequirements([]);
         message.warning('未获取到需求数据');
       }
     } catch (error) {
-      console.error('获取需求失败:', error);
+      console.error('获取全量需求失败:', error);
       message.error('获取数据失败，请稍后重试');
-      setRequirements([]);
-      setPagination(prev => ({ ...prev, total: 0 }));
+      setAllRequirements([]);
     } finally {
       setLoading(false);
     }
-  }, [pagination.current, pagination.pageSize, searchKeyword, statusFilter]);
+  }, []);
+
+  // 修复：优化依赖项，避免不必要的重复计算
+  const filterAndPaginateData = useCallback(() => {
+    let filteredData = [...allRequirements];
+
+    if (searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      filteredData = filteredData.filter(item => 
+        item.title.toLowerCase().includes(keyword) || 
+        item.description.toLowerCase().includes(keyword)
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      filteredData = filteredData.filter(item => item.status === statusFilter);
+    }
+
+    const { current, pageSize } = pagination;
+    const startIndex = (current - 1) * pageSize;
+    const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+
+    setRequirements(paginatedData);
+    setPagination(prev => ({ ...prev, total: filteredData.length }));
+  }, [allRequirements, searchKeyword, statusFilter, pagination.current, pagination.pageSize]);
 
   useEffect(() => {
-    fetchRequirements();
-  }, [fetchRequirements]);
+    fetchAllRequirements();
+  }, [fetchAllRequirements]);
+
+  useEffect(() => {
+    if (allRequirements.length > 0) {
+      filterAndPaginateData();
+    } else {
+      setRequirements([]);
+      setPagination(prev => ({ ...prev, total: 0 }));
+    }
+  }, [allRequirements, filterAndPaginateData]);
 
   const getStatusTag = (status) => {
     const statusMap = {
@@ -127,12 +149,12 @@ const RequirementListPage = () => {
 
   const handleSearchInput = (value) => {
     setSearchKeyword(value);
-    setPagination(prev => ({ ...prev, current: 1 })); // 搜索时重置到第1页
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleStatusChange = (value) => {
     setStatusFilter(value);
-    setPagination(prev => ({ ...prev, current: 1 })); // 筛选时重置到第1页
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   const handleTableChange = (page, pageSize) => {
@@ -144,6 +166,8 @@ const RequirementListPage = () => {
   };
 
   const handleDetail = (id) => {
+    // 增加日志便于调试
+    console.log('跳转详情页，ID:', id);
     navigate(`/requirements/${id}`);
   };
 
@@ -170,7 +194,7 @@ const RequirementListPage = () => {
       try {
         await authApi.deleteRequirement(id);
         message.success('需求删除成功');
-        fetchRequirements(); // 删除后重新获取当前页数据
+        setAllRequirements(prev => prev.filter(item => item.id !== id));
       } catch (error) {
         console.error('删除需求失败:', error);
         message.error('删除需求失败，请稍后重试');
@@ -253,7 +277,7 @@ const RequirementListPage = () => {
               <List
                 itemLayout="vertical"
                 size="large"
-                dataSource={requirements}  // 直接使用后端返回的当前页数据
+                dataSource={requirements}
                 bordered={false}
                 renderItem={(item, index) => (
                   <div style={{ 
@@ -372,7 +396,7 @@ const RequirementListPage = () => {
               <Pagination 
                 current={pagination.current}
                 pageSize={pagination.pageSize}
-                total={pagination.total}  // 使用后端返回的总条数
+                total={pagination.total}
                 showSizeChanger
                 showQuickJumper
                 showTotal={total => `共 ${total} 条需求`}
