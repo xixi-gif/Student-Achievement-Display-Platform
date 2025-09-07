@@ -301,7 +301,7 @@ const MessageCenterPage = () => {
     formData.append('file', file);
     
     try {
-      const res = await authApi.uploadFile(formData);
+      const res = await authApi.uploadFile(formData); //
       if (res.code === 0 && res.data?.url) {
         setUploadingFiles(prev => prev.map(f => 
           f.id === `file-${Date.now()}` 

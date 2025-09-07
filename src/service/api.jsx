@@ -134,14 +134,14 @@ export const authApi = {
   //需求申请
   addApplication: (id, data) => service.post(`/application/${id}/apply`, data),
   getApplicationList: (data) => service.post("/application/list", data),
-  getMyApplicationList: (data) => service.get("/application/my", data),
+  getMyApplicationList: (params) => service.get("/application/my", {params}),
   agreeApplication: (data) => service.post("/application/status", data),
   // cancelApplication:(data) => service.post('/application/cancel',data),
   cancelApplication: (params) =>
     service.post("/application/cancel", null, { params }),
 
   //需求
-  getMyRequirements: (data) => service.get("/requirements/my", data),
+  getMyRequirements: (params) => service.get("/requirements/my", {params}),
   deleteRequirements: (id) => service.delete(`/requirements/${id}`),
   updateRequirement: (data) => service.put("/requirements/status", data),
 };
@@ -272,7 +272,7 @@ export const adminApi = {
   getStatistics: () => service.get("/admin/stats/summary"),
   getStatsTrend: (params) =>
     service.get("/stats/achievement-trends", { params }),
-  getAchievementStats: () => service.get("/stats/achievement-types"),
+  getAchievementStats: (params) => service.get("/stats/achievement-types",{params}),
   getUserStats: (params) => service.get("/stats/user-activity", { params }),
 
   //分类设置接口

@@ -75,7 +75,7 @@ const MyApplicationsPage = () => {
     try {
       setLoading(true);
       const params = {
-        current: pagination.current - 1,
+        current: pagination.current,
         pageSize: pagination.pageSize,
         sortField: 'applyTime',
         sortOrder: 'desc',

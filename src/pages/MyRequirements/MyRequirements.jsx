@@ -25,7 +25,7 @@ const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', guest:
 
 const MyRequirementsPage = () => {
   const navigate = useNavigate();
-  
+
   // 状态管理
   const [requirements, setRequirements] = useState([]);
   const [filteredRequirements, setFilteredRequirements] = useState([]);
@@ -34,7 +34,7 @@ const MyRequirementsPage = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [pagination, setPagination] = useState({ current: 1, size: 10, total: 0 });
-  
+
   // 申请人模态框状态
   const [applicantModal, setApplicantModal] = useState({
     visible: false,
@@ -50,19 +50,19 @@ const MyRequirementsPage = () => {
       try {
         setLoading(true);
         const params = {
-          current: pagination.current - 1,
-          size: pagination.size,
+          current: pagination.current -1,
+          pageSize: pagination.pageSize,
           status: selectedStatus === 'all' ? undefined : statusTextMap[selectedStatus],
-          keyword: searchText || undefined
+          // keyword: searchText || undefined 后端没有过滤逻辑
         };
         const response = await authApi.getMyRequirements(params);
         if (response.code !== 0) throw new Error(response.message || '获取需求失败');
         const { records, total, current, size } = response.data;
         const formattedRequirements = records.map(item => ({
           id: item.requirementId.toString(),
-          title: item.requirementTitle,
+          title: item.title || '',
           type: item.requireType,
-          description: item.description,
+          description: item.description || '',
           status: statusNumMap[item.status],
           publishTime: item.publishTime,
           deadline: item.deadline,
@@ -82,7 +82,7 @@ const MyRequirementsPage = () => {
       }
     };
     fetchMyRequirements();
-  }, [pagination.current, pagination.size, searchText, selectedStatus]);
+  }, [pagination.current, pagination.size, selectedStatus]);
 
   // 筛选需求列表
   useEffect(() => {
@@ -97,8 +97,13 @@ const MyRequirementsPage = () => {
 
   // 搜索处理
   const handleSearch = (value) => {
-    setSearchText(value);
-    setPagination(prev => ({ ...prev, current: 1 }));
+    if (value !== searchText) {
+      setSearchText(value);
+      // 只有当有实际搜索内容或明确清除内容时才重置分页
+    if (value || searchText) {
+      setPagination(prev => ({ ...prev, current: 1 }));
+    }
+    }
   };
 
   // 状态筛选处理
@@ -170,7 +175,7 @@ const MyRequirementsPage = () => {
   const handleApproveApplicant = async (requirementId, userId) => {
     const parsedReqId = Number(requirementId);
     const parsedUserId = Number(userId); // applicantsId即为此userId
-    
+
     // 参数校验
     if (isNaN(parsedReqId) || parsedReqId <= 0 || !Number.isInteger(parsedReqId)) {
       message.error("需求ID无效，请刷新后重试");
@@ -192,10 +197,10 @@ const MyRequirementsPage = () => {
         try {
           setActionLoading(true);
           // 核心：applicantsId传递userId
-          const data = { 
+          const data = {
             applicantsId: parsedUserId,  // applicantsId = 用户ID
             requirementId: parsedReqId,
-            status: 1 
+            status: 1
           };
           const response = await authApi.agreeApplication(data);
           if (response.code !== 0) throw new Error(response.message || '同意申请失败');
@@ -217,7 +222,7 @@ const MyRequirementsPage = () => {
   const handleRejectApplicant = async (requirementId, userId) => {
     const parsedReqId = Number(requirementId);
     const parsedUserId = Number(userId); // applicantsId即为此userId
-    
+
     // 参数校验
     if (isNaN(parsedReqId) || parsedReqId <= 0 || !Number.isInteger(parsedReqId)) {
       message.error("需求ID无效，请刷新后重试");
@@ -239,10 +244,10 @@ const MyRequirementsPage = () => {
         try {
           setActionLoading(true);
           // 核心：applicantsId传递userId
-          const data = { 
+          const data = {
             applicantsId: parsedUserId,  // applicantsId = 用户ID
             requirementId: parsedReqId,
-            status: 2 
+            status: 2
           };
           const response = await authApi.agreeApplication(data);
           if (response.code !== 0) throw new Error(response.message || '拒绝申请失败');
@@ -327,6 +332,13 @@ const MyRequirementsPage = () => {
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 onSearch={handleSearch}
+                // 清除按钮单独处理
+                onClear={() => {
+                  if (searchText) { // 只有当有内容时才执行清除
+                    setSearchText('');
+                    setPagination(prev => ({ ...prev, current: 1 }));
+                  }
+                }}
               />
               <Select
                 defaultValue="all"
@@ -348,8 +360,8 @@ const MyRequirementsPage = () => {
             </Card>
           ) : filteredRequirements.length === 0 ? (
             <Card style={{ padding: '80px 0', textAlign: 'center' }}>
-              <Empty 
-                description="暂无符合条件的需求" 
+              <Empty
+                description="暂无符合条件的需求"
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               >
                 <Button type="primary" onClick={() => navigate('/publish-requirement')}>发布新需求</Button>
@@ -414,8 +426,8 @@ const MyRequirementsPage = () => {
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Button 
-                        type="primary" 
+                      <Button
+                        type="primary"
                         onClick={() => handleOpenApplicants(requirement)}
                         size="small"
                       >
@@ -464,8 +476,8 @@ const MyRequirementsPage = () => {
                   renderItem={(applicant) => (
                     <Card key={applicant.userId} style={{ marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
                       <div style={{ display: 'flex', marginBottom: 12 }}>
-                        <Avatar 
-                          src={applicant.avatar || undefined} 
+                        <Avatar
+                          src={applicant.avatar || undefined}
                           size="large"
                           style={{ marginRight: 12 }}
                         >
@@ -474,8 +486,8 @@ const MyRequirementsPage = () => {
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center' }}>
                             <h4 style={{ margin: 0, fontSize: 15 }}>{applicant.name}</h4>
-                            <Tag 
-                              color={roleColorMap[applicant.role]} 
+                            <Tag
+                              color={roleColorMap[applicant.role]}
                               style={{ marginLeft: 8 }}
                               size="small"
                             >
@@ -497,8 +509,8 @@ const MyRequirementsPage = () => {
                         </div>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                        <Button 
-                          icon={<MessageOutlined />} 
+                        <Button
+                          icon={<MessageOutlined />}
                           onClick={() => handleContactApplicant(applicant.userId, applicant.name)}
                           size="small"
                         >
@@ -506,11 +518,11 @@ const MyRequirementsPage = () => {
                         </Button>
                         {applicantModal.currentRequirement?.status !== 'completed' && (
                           <>
-                            <Button 
-                              danger 
-                              icon={<CloseOutlined />} 
+                            <Button
+                              danger
+                              icon={<CloseOutlined />}
                               onClick={() => handleRejectApplicant(
-                                applicantModal.currentRequirement.requirementId, 
+                                applicantModal.currentRequirement.requirementId,
                                 applicant.userId // 传递userId作为applicantsId
                               )}
                               size="small"
@@ -519,11 +531,11 @@ const MyRequirementsPage = () => {
                             >
                               拒绝接单
                             </Button>
-                            <Button 
-                              type="primary" 
-                              icon={<CheckOutlined />} 
+                            <Button
+                              type="primary"
+                              icon={<CheckOutlined />}
                               onClick={() => handleApproveApplicant(
-                                applicantModal.currentRequirement.requirementId, 
+                                applicantModal.currentRequirement.requirementId,
                                 applicant.userId // 传递userId作为applicantsId
                               )}
                               size="small"
@@ -559,4 +571,3 @@ const MyRequirementsPage = () => {
 };
 
 export default MyRequirementsPage;
-    

@@ -309,7 +309,8 @@ const UserManage = () => {
   };
 
   const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "active" ? "禁用" : "正常"; 
+    // const newStatus = user.status === "active" ? "禁用" : "正常"; 
+    const newStatus = user.status === "active" ? 0 : 1; 
     try {
       const updateData = {
         id: user.id,
@@ -384,7 +385,7 @@ const UserManage = () => {
 const handleDelete = async (id) => {
   try {
 
-    const response = await adminApi.deleteUser({ id });
+    const response = await adminApi.deleteUser({id});
     console.log("删除接口原始响应：", response);
 
     if (response.code === 0) {

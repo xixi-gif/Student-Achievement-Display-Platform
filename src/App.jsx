@@ -28,15 +28,15 @@ import AccountSettingsPage from './pages/SettingPage/SettingPage'
 
 // 需求相关页面
 import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
-import RequirementListPage from './pages/RequirementListPage/RequirementListPage';
+import RequirementListPage from './pages/RequirementListPage/RequirementList2';
 import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDetailPage';
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
 import ChatPage from './pages/ChatPage/ChatPage';
 
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
-import UserManage from './pages/UserManagePage/UserManagePage';
-import MyRequirementsPage from './pages/MyRequirements/MyRequirements';
+import UserManage from './pages/UserManagePage/succed';
+import MyRequirementsPage from './pages/MyRequirements/MyRequirements2';
 import MyApplicationsPage from './pages/MyApplicationsPage/MyApplicationPage';
 
 function App() {

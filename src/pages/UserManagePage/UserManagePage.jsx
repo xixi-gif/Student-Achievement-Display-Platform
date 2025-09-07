@@ -369,7 +369,7 @@ const UserManage = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await adminApi.deleteUser({ id });
+      const response = await adminApi.deleteUser({ id:Number(id) });
       console.log("删除接口原始响应：", response);
 
       if (response.code === 0) {

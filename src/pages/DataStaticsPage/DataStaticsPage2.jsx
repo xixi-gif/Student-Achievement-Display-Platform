@@ -63,7 +63,6 @@ const DataStatisticsPage = () => {
       total: 0,
     },
   });
-  const navigate = useNavigate();
 
   // 获取统计数据概览
   const fetchSummaryStats = async (params = {}) => {
@@ -113,9 +112,12 @@ const DataStatisticsPage = () => {
   };
 
   // 获取成果分类统计数据
-  const fetchAchievementTypeStats = async () => {
+  const fetchAchievementTypeStats = async (params = {}) => {
     try {
-      const response = await adminApi.getAchievementStats();
+      const response = await adminApi.getAchievementStats({
+        startTime: params.startTime,
+        endTime: params.endTime,
+      });
 
       if (response.code === 0) {
         // 格式化接口返回的数据
@@ -147,6 +149,8 @@ const DataStatisticsPage = () => {
         pageSize: params.pageSize || userActivities.pagination.pageSize,
         sortField: params.field || "loginCount", // 默认按登录次数排序
         sortOrder: params.order || "descend", // 默认降序
+        startTime: params.startTime,
+        endTime: params.endTime,
       };
 
       const response = await adminApi.getUserStats(pageRequest);
@@ -197,10 +201,14 @@ const DataStatisticsPage = () => {
       };
       fetchSummaryStats(params);
       fetchTrendStats(params);
+      fetchAchievementTypeStats(params);
+      fetchUserActivities(params);
     } else {
       setTimeRange([]);
       fetchSummaryStats();
       fetchTrendStats();
+      fetchAchievementTypeStats();
+      fetchUserActivities();
     }
   };
 
@@ -354,25 +362,20 @@ const DataStatisticsPage = () => {
       title: "登录次数",
       dataIndex: "loginCount",
       key: "loginCount",
-      sorter: true, // 启用排序
-      // defaultSortOrder: 'descend', // 默认降序
-      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="blue">{count}</Tag>,
+      defaultSortOrder: "descend",
+    sorter: (a, b) => b.loginCount - a.loginCount, // 改为降序
     },
     {
       title: "成果数量",
       dataIndex: "achievementCount",
       key: "achievementCount",
-      // sorter: true, // 启用排序
-      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
       render: (count) => <Tag color="green">{count}</Tag>,
     },
     {
       title: "最后活跃",
       dataIndex: "lastLoginTime",
       key: "lastLoginTime",
-      // sorter: true, // 启用排序
-      // sortDirections: ['descend', 'ascend'], // 允许的排序方向
     },
     {
       title: "状态",
@@ -386,6 +389,18 @@ const DataStatisticsPage = () => {
     },
   ];
 
+  // 添加一个状态来存储图表数据
+const [chartData, setChartData] = useState([]);
+
+// 当 userActivities.data 变化时，更新图表数据
+useEffect(() => {
+  if (userActivities.data && userActivities.data.length > 0) {
+    const sortedData = [...userActivities.data]
+      .sort((a, b) => b.loginCount - a.loginCount)
+      .slice(0, 10);
+    setChartData(sortedData);
+  }
+}, [userActivities.data]);
   // 用户活跃度图表配置
   const getUserActivityChartOption = () => ({
     title: {
@@ -409,10 +424,7 @@ const DataStatisticsPage = () => {
     },
     yAxis: {
       type: "category",
-      data: userActivities.data
-        .sort((a, b) => a.loginCount - b.loginCount)
-        .slice(0, 10)
-        .map((user) => user.name || user.realName),
+      data: chartData.map((user) => user.name || user.realName),
       axisLabel: {
         interval: 0,
         rotate: 0,
@@ -422,10 +434,7 @@ const DataStatisticsPage = () => {
       {
         name: "登录次数",
         type: "bar",
-        data: userActivities.data
-          .sort((a, b) => a.loginCount - b.loginCount)
-          .slice(0, 10)
-          .map((user) => user.loginCount),
+        data: chartData.map((user) => user.loginCount),
         itemStyle: {
           color: "#1890ff",
         },
@@ -449,7 +458,7 @@ const DataStatisticsPage = () => {
                 style={{ width: 250 }}
               />
               <Select
-                defaultValue="month"
+                defaultValue="week"
                 style={{ width: 120 }}
                 onChange={(value) => {
                   let days = 30;
@@ -598,6 +607,7 @@ const DataStatisticsPage = () => {
                       <ReactECharts
                         option={getUserActivityChartOption()}
                         style={{ height: 500 }}
+                        key={chartData.length} // 添加 key 属性，当数据长度变化时重新渲染
                       />
                     </Card>
                   </Col>
