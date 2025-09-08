@@ -37,6 +37,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
 import moment from "moment";
+import dayjs from "dayjs";
 import { achievementApi, adminApi } from "../../service/api";
 
 const { Content } = Layout;
@@ -92,7 +93,26 @@ const AchievementFormPage = () => {
     { value: 1, label: "进入审核流程" },
   ];
 
-  // 获取分类数据
+  const CustomDateTimePicker = ({ value, onChange }) => {
+  return (
+    <DatePicker
+      showTime={{
+        format: 'HH:mm',
+        defaultValue: dayjs().set('hour', 8).set('minute', 0)
+      }}
+      format="YYYY-MM-DD HH:mm"
+      value={value ? dayjs(value) : dayjs()}
+      onChange={(date, dateString) => {
+        onChange(dateString);
+      }}
+      style={{ width: '100%' }}
+      allowClear={false}
+      // 修复日历显示问题
+      getPopupContainer={trigger => trigger.parentElement}
+    />
+  );
+};
+
   useEffect(() => {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
@@ -932,12 +952,9 @@ const AchievementFormPage = () => {
                     name="date"
                     label="完成日期"
                     rules={[{ required: true, message: "请选择成果完成日期" }]}
+                    // initialValue={dayjs().format("YYYY-MM-DD HH:mm")} // 设置默认值为当前时间
                   >
-                    <DatePicker
-                      placeholder="选择成果完成的日期"
-                      style={{ width: "100%" }}
-                      suffixIcon={<CalendarOutlined />}
-                    />
+                    <CustomDateTimePicker/>
                   </Form.Item>
                 </Col>
               </Row>

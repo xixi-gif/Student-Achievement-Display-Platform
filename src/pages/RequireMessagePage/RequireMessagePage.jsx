@@ -21,7 +21,7 @@ const ROLE_CONFIG = {
   student: { text: '学生', color: 'green' },
   teacher: { text: '老师', color: 'orange' },
   admin: { text: '超级管理员', color: 'red' },
-  guest: { text: '访客', color: 'gray' },
+  visitor: { text: '访客', color: 'gray' },
   default: { text: '用户', color: 'blue' } 
 };
 
@@ -93,79 +93,158 @@ const MessageCenterPage = () => {
     initData();
   }, [targetUser, currentUserId]);
 
-  const handleTargetUserConversation = async () => {
-    if (targetUser.id === currentUserId) {
-      message.warning('不能与自己创建会话');
-      return;
-    }
+  // const handleTargetUserConversation = async () => {
+  //   if (targetUser.id === currentUserId) {
+  //     message.warning('不能与自己创建会话');
+  //     return;
+  //   }
 
-    const existingConv = conversations.find(conv => conv.withUser.id === targetUser.id);
-    if (existingConv) {
-      setActiveConversation(existingConv);
-      await fetchConversationMessages(existingConv.conversationId);
-      return;
-    }
+  //   const existingConv = conversations.find(conv => conv.withUser.id === targetUser.id);
+  //   if (existingConv) {
+  //     setActiveConversation(existingConv);
+  //     await fetchConversationMessages(existingConv.conversationId);
+  //     return;
+  //   }
 
-    setCreatingConversation(true);
-    try {
-      const initMessage = '你好，我想咨询关于这个项目';
-      const sendRes = await authApi.sendMessage({
-        content: initMessage,
-        fromUserId: currentUserId,
-        toUserId: targetUser.id,
-        type: 0
-      });
+  //   setCreatingConversation(true);
+  //   try {
+  //     const initMessage = '你好，我想咨询关于这个项目';
+  //     const sendRes = await authApi.sendMessage({
+  //       content: initMessage,
+  //       fromUserId: currentUserId,
+  //       toUserId: targetUser.id,
+  //       type: 0
+  //     });
 
-      if (sendRes.code === 0 && sendRes.data) {
-        await fetchConversations(); 
-        const updatedConvs = await authApi.getConversationRecords();
+  //     if (sendRes.code === 0 && sendRes.data) {
+  //       await fetchConversations(); 
+  //       const updatedConvs = await authApi.getConversationRecords();
         
-        if (updatedConvs.code === 0 && updatedConvs.data) {
-          const formattedConvs = updatedConvs.data.map(conv => ({
-            id: conv.id.toString(),
-            withUser: {
-              id: String(conv.withUser.id),
-              name: conv.withUser.name || '未知用户',
-              avatar: getAvatar(conv.withUser.avatar),
-              role: conv.withUser.role || 'default'
-            },
-            lastMessage: {
-              content: conv.lastMessage?.content || 'initMessage',
-              time: conv.lastMessage?.createTime || new Date().toISOString(),
-              unread: false,
-              id: conv.lastMessage?.id?.toString() || ''
-            },
-            conversationId: conv.id
-          }));
+  //       if (updatedConvs.code === 0 && updatedConvs.data) {
+  //         const formattedConvs = updatedConvs.data.map(conv => ({
+  //           id: conv.id.toString(),
+  //           withUser: {
+  //             id: String(conv.withUser.id),
+  //             name: conv.withUser.name || '未知用户',
+  //             avatar: getAvatar(conv.withUser.avatar),
+  //             role: conv.withUser.role || 'default'
+  //           },
+  //           lastMessage: {
+  //             content: conv.lastMessage?.content || 'initMessage',
+  //             time: conv.lastMessage?.createTime || new Date().toISOString(),
+  //             unread: false,
+  //             id: conv.lastMessage?.id?.toString() || ''
+  //           },
+  //           conversationId: conv.id
+  //         }));
           
-          setConversations(formattedConvs);
-          const newConv = formattedConvs.find(conv => conv.withUser.id === targetUser.id);
+  //         setConversations(formattedConvs);
+  //         const newConv = formattedConvs.find(conv => conv.withUser.id === targetUser.id);
           
-          if (newConv) {
-            setActiveConversation(newConv);
-            const initialMessages = [{
-              id: sendRes.data.id.toString(),
-              senderId: currentUserId,
-              content: initMessage,
-              time: sendRes.data.createTime || new Date().toISOString(),
-              status: 'sent',
-              senderAvatar: currentUserAvatar,
-              files: []
-            }];
-            setMessages(initialMessages);
-          }
-      } else {
-        message.error('创建会话失败');
+  //         if (newConv) {
+  //           setActiveConversation(newConv);
+  //           const initialMessages = [{
+  //             id: sendRes.data.id.toString(),
+  //             senderId: currentUserId,
+  //             content: initMessage,
+  //             time: sendRes.data.createTime || new Date().toISOString(),
+  //             status: 'sent',
+  //             senderAvatar: currentUserAvatar,
+  //             files: []
+  //           }];
+  //           setMessages(initialMessages);
+  //         }
+  //     } else {
+  //       message.error('创建会话失败');
+  //     }
+  //   }
+  //   } catch (err) {
+  //     console.error('创建会话失败详情：', err.response || err);
+  //     const errorMsg = err.response?.data?.message || err.message || '创建会话失败，请重试';
+  //     message.error(errorMsg);
+  //   } finally {
+  //     setCreatingConversation(false);
+  //   }
+  // };
+
+  const handleTargetUserConversation = async () => {
+  if (targetUser.id === currentUserId) {
+    message.warning('不能与自己创建会话');
+    return;
+  }
+
+  const existingConv = conversations.find(conv => conv.withUser.id === targetUser.id);
+  
+  if (existingConv) {
+    setActiveConversation(existingConv);
+    await fetchConversationMessages(existingConv.conversationId);
+    return;
+  }
+
+  setCreatingConversation(true);
+  try {
+    // 只有在新会话时才发送初始消息
+    const initMessage = '你好，我想咨询关于这个项目';
+    const sendRes = await authApi.sendMessage({
+      content: initMessage,
+      fromUserId: currentUserId,
+      toUserId: targetUser.id,
+      type: 0
+    });
+
+    if (sendRes.code === 0 && sendRes.data) {
+       //  刷新会话列表
+      await fetchConversations();
+      
+      // 获取更新后的会话列表
+      const updatedConvs = await authApi.getConversationRecords();
+      
+      if (updatedConvs.code === 0 && updatedConvs.data) {
+        const formattedConvs = updatedConvs.data.map(conv => ({
+          id: conv.id.toString(),
+          withUser: {
+            id: String(conv.withUser.id),
+            name: conv.withUser.name || '未知用户',
+            avatar: getAvatar(conv.withUser.avatar),
+            role: conv.withUser.role || 'default'
+          },
+          lastMessage: {
+            content: conv.lastMessage?.content || initMessage,
+            time: conv.lastMessage?.createTime || new Date().toISOString(),
+            unread: false,
+            id: conv.lastMessage?.id?.toString() || ''
+          },
+          conversationId: conv.id
+        }));
+        
+        setConversations(formattedConvs);
+        const newConv = formattedConvs.find(conv => conv.withUser.id === targetUser.id);
+        
+        if (newConv) {
+          setActiveConversation(newConv);
+          const initialMessages = [{
+            id: sendRes.data.id.toString(),
+            senderId: currentUserId,
+            content: initMessage,
+            time: sendRes.data.createTime || new Date().toISOString(),
+            status: 'sent',
+            senderAvatar: currentUserAvatar,
+            files: []
+          }];
+          setMessages(initialMessages);
+        }
       }
+    }else{
+      message.error(sendRes.message || '发送初始消息失败');
     }
-    } catch (err) {
-      console.error('创建会话失败详情：', err.response || err);
-      const errorMsg = err.response?.data?.message || err.message || '创建会话失败，请重试';
-      message.error(errorMsg);
-    } finally {
-      setCreatingConversation(false);
-    }
-  };
+  } catch (err) {
+    // 错误处理
+    console.error('创建会话失败详情：', err);
+    message.error(err.message || '创建会话失败，请重试');
+  } finally {
+    setCreatingConversation(false);
+  }
+};
 
   const fetchConversations = async () => {
     try {
@@ -591,7 +670,7 @@ const MessageCenterPage = () => {
                     </Tag>
                   </div>
                 </Space>
-                <Space>
+                {/* <Space>
                   <Tooltip title="静音会话">
                     <Button 
                       type="text" 
@@ -600,7 +679,7 @@ const MessageCenterPage = () => {
                     />
                   </Tooltip>
                   <Button type="text" icon={<CloseOutlined />} size="small" />
-                </Space>
+                </Space> */}
               </div>
               
               <div style={{ 

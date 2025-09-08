@@ -9,8 +9,8 @@ const { Search } = Input;
 const { Option } = Select;
 
 const statusNumMap = { 1: 'pending', 2: 'in_progress', 3: 'completed' };
-const roleMap = { admin: '超级管理员', teacher: '教师', student: '学生', guest: '访客' };
-const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', guest: 'gray' };
+const roleMap = { admin: '超级管理员', teacher: '教师', student: '学生', visitor: '访客' };
+const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', visitor: 'gray' };
 
 const RequirementListPage = () => {
   const [requirements, setRequirements] = useState([]);

@@ -350,9 +350,9 @@ const RequirementDetailPage = () => {
                               选择
                             </Button>
                           ),
-                          <Button type="link" onClick={handleContact}>
-                            联系
-                          </Button>
+                          // <Button type="link" onClick={handleContact}>
+                          //   联系
+                          // </Button>
                         ]}
                       >
                         <List.Item.Meta
