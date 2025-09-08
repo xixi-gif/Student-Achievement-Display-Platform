@@ -182,7 +182,8 @@ const AuthorDetailPage = () => {
                   type="primary" 
                   style={{ marginTop: 20 }}
                   size="small"
-                  onClick={() => navigate(`/chat?userId=${author.userId}`)}
+                  // onClick={() => navigate(`/chat?userId=${author.userId}`)}
+                  onClick={() => navigate(`/messages?toUserId=${author.userId}&toUserName=${encodeURIComponent(author.realName || author.name || '用户')}`)}
                 >
                   联系作者
                 </Button>

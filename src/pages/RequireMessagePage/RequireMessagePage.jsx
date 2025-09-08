@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   List, Avatar, Input, Button, Space, Tag,
-  Spin, Tooltip, message, Badge, Popover
+  Spin, Tooltip, message, Badge, Popover, Select
 } from 'antd';
 import { 
   MessageOutlined, PaperClipOutlined, 
@@ -13,6 +13,7 @@ import Navbar from '../Navbar/Navbar';
 import { authApi } from '../../service/api';
 
 const { TextArea } = Input;
+const { Option } = Select;
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 const loadingIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
@@ -37,17 +38,12 @@ const MessageCenterPage = () => {
   const [targetUser, setTargetUser] = useState({ id: null, name: null });
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [currentUserAvatar, setCurrentUserAvatar] = useState(DEFAULT_AVATAR);
-  
+  const [selectedExpireDays, setSelectedExpireDays] = useState(7);
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    console.log('当前用户头像:', currentUserAvatar);
-  }, [currentUserAvatar]);
-
-  const getRoleConfig = (role) => {
-    return ROLE_CONFIG[role] || ROLE_CONFIG.default;
-  };
+  const getRoleConfig = (role) => ROLE_CONFIG[role] || ROLE_CONFIG.default;
 
   const getAvatar = (avatarUrl) => {
     if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('/'))) {
@@ -55,6 +51,7 @@ const MessageCenterPage = () => {
                src={avatarUrl} 
                onError={(e) => e.target.src = DEFAULT_AVATAR} 
                alt="用户头像" 
+               style={{ objectFit: 'cover' }}
              />;
     }
     return DEFAULT_AVATAR;
@@ -69,9 +66,7 @@ const MessageCenterPage = () => {
       const params = new URLSearchParams(window.location.search);
       const toUserId = params.get('toUserId');
       const toUserName = params.get('toUserName') ? decodeURIComponent(params.get('toUserName')) : null;
-      if (toUserId) {
-        setTargetUser({ id: toUserId, name: toUserName || '未知用户' });
-      }
+      if (toUserId) setTargetUser({ id: toUserId, name: toUserName || '未知用户' });
     };
     parseUrlParams();
   }, []);
@@ -80,19 +75,16 @@ const MessageCenterPage = () => {
     const initData = async () => {
       try {
         const userRes = await authApi.getuserlogin();
-        console.log('个人信息接口返回:', userRes);
-        if (userRes.code === 0 && userRes.data?.id) {
+        if (userRes.code === 0 && userRes.data) {
           setCurrentUserId(String(userRes.data.id));
           setCurrentUserAvatar(getAvatar(userRes.data.avatar) || DEFAULT_AVATAR);
           await fetchConversations();
-          if (targetUser.id && currentUserId) {
-            await handleTargetUserConversation();
-          }
+          if (targetUser.id && currentUserId) await handleTargetUserConversation();
         } else {
           message.error('获取用户信息失败，请重新登录');
         }
       } catch (err) {
-        console.error('初始化失败：', err);
+        console.error('初始化失败:', err);
         message.error('页面加载失败，请刷新重试');
       } finally {
         setPageLoading(false);
@@ -107,86 +99,78 @@ const MessageCenterPage = () => {
       return;
     }
 
-    const existingConv = conversations.find(
-      conv => conv.withUser.id === targetUser.id
-    );
-
+    const existingConv = conversations.find(conv => conv.withUser.id === targetUser.id);
     if (existingConv) {
       setActiveConversation(existingConv);
       await fetchConversationMessages(existingConv.conversationId);
-    } else {
-      setCreatingConversation(true);
-      try {
-        const initMessage = '你好，我想咨询关于这个项目';
-        const sendRes = await authApi.sendMessage({
-          content: initMessage,
-          fromUserId: currentUserId,
-          toUserId: targetUser.id,
-          type: 0
-        });
+      return;
+    }
 
-        if (sendRes.code === 0 && sendRes.data) {
-          await fetchConversations();
-          const updatedConvs = await authApi.getConversationRecords({ 
-            params: { current: 1, pageSize: 20 }
-          });
+    setCreatingConversation(true);
+    try {
+      const initMessage = '你好，我想咨询关于这个项目';
+      const sendRes = await authApi.sendMessage({
+        content: initMessage,
+        fromUserId: currentUserId,
+        toUserId: targetUser.id,
+        type: 0
+      });
+
+      if (sendRes.code === 0 && sendRes.data) {
+        await fetchConversations(); 
+        const updatedConvs = await authApi.getConversationRecords();
+        
+        if (updatedConvs.code === 0 && updatedConvs.data) {
+          const formattedConvs = updatedConvs.data.map(conv => ({
+            id: conv.id.toString(),
+            withUser: {
+              id: String(conv.withUser.id),
+              name: conv.withUser.name || '未知用户',
+              avatar: getAvatar(conv.withUser.avatar),
+              role: conv.withUser.role || 'default'
+            },
+            lastMessage: {
+              content: conv.lastMessage?.content || 'initMessage',
+              time: conv.lastMessage?.createTime || new Date().toISOString(),
+              unread: false,
+              id: conv.lastMessage?.id?.toString() || ''
+            },
+            conversationId: conv.id
+          }));
           
-          if (updatedConvs.code === 0 && updatedConvs.data) {
-            const formattedConvs = updatedConvs.data.map(conv => ({
-              id: conv.id.toString(),
-              withUser: {
-                id: String(conv.withUser.id),
-                name: conv.withUser.name || '未知用户',
-                avatar: getAvatar(conv.withUser.avatar),
-                role: conv.withUser.role || 'default'
-              },
-              lastMessage: {
-                content: conv.lastMessage?.content || initMessage,
-                time: conv.lastMessage?.createTime || new Date().toISOString(),
-                unread: false,
-                id: conv.lastMessage?.id?.toString() || ''
-              },
-              conversationId: conv.id
-            }));
-            
-            setConversations(formattedConvs);
-            const newConv = formattedConvs.find(
-              conv => conv.withUser.id === targetUser.id
-            );
-            
-            if (newConv) {
-              setActiveConversation(newConv);
-              const initialMessages = [{
-                id: sendRes.data.id.toString(),
-                senderId: currentUserId,
-                content: initMessage,
-                time: sendRes.data.createTime || new Date().toISOString(),
-                status: 'sent',
-                senderAvatar: currentUserAvatar,
-                files: []
-              }];
-              setMessages(initialMessages);
-            }
+          setConversations(formattedConvs);
+          const newConv = formattedConvs.find(conv => conv.withUser.id === targetUser.id);
+          
+          if (newConv) {
+            setActiveConversation(newConv);
+            const initialMessages = [{
+              id: sendRes.data.id.toString(),
+              senderId: currentUserId,
+              content: initMessage,
+              time: sendRes.data.createTime || new Date().toISOString(),
+              status: 'sent',
+              senderAvatar: currentUserAvatar,
+              files: []
+            }];
+            setMessages(initialMessages);
           }
-        } else {
-          message.error('创建会话失败：' + (sendRes.message || '未知错误'));
-        }
-      } catch (err) {
-        console.error('创建会话失败详情：', err.response || err);
-        const errorMsg = err.response?.data?.message || err.message || '创建会话失败，请重试';
-        message.error(errorMsg);
-      } finally {
-        setCreatingConversation(false);
+      } else {
+        message.error('创建会话失败');
       }
+    }
+    } catch (err) {
+      console.error('创建会话失败详情：', err.response || err);
+      const errorMsg = err.response?.data?.message || err.message || '创建会话失败，请重试';
+      message.error(errorMsg);
+    } finally {
+      setCreatingConversation(false);
     }
   };
 
   const fetchConversations = async () => {
     try {
       setPageLoading(true);
-      const res = await authApi.getConversationRecords({ 
-        params: { current: 1, pageSize: 20 }
-      });
+      const res = await authApi.getConversationRecords();
 
       if (res.code === 0 && res.data) {
         const formattedConversations = res.data.map(conv => ({
@@ -225,14 +209,9 @@ const MessageCenterPage = () => {
     try {
       setPageLoading(true);
       const res = await authApi.getConversationMessages(conversationId);
-      console.log('原始消息列表接口返回:', res);
       
       if (res.code === 0 && res.data?.records) {
-        const validRecords = res.data.records.filter(
-          msg => msg.conversationId === conversationId
-        );
-        
-        console.log(`消息过滤：原始${res.data.records.length}条，有效${validRecords.length}条`);
+        const validRecords = res.data.records.filter(msg => msg.conversationId === conversationId);
         
         const sortedRecords = [...validRecords].sort((a, b) => {
           return new Date(a.createTime) - new Date(b.createTime);
@@ -255,7 +234,9 @@ const MessageCenterPage = () => {
                     msg.status === 1 ? 'sent' : 
                     msg.status === 2 ? 'read' : 'failed',
             senderAvatar: avatar,
-            files: msg.files || []
+            files: msg.files || [],
+            expireTime: msg.expireTime,
+            isExpired: msg.isExpired === 1
           };
         });
 
@@ -288,44 +269,99 @@ const MessageCenterPage = () => {
   };
 
   const handleFileUpload = async (file) => {
+    if (!activeConversation) {
+      message.warning('请先选择会话');
+      return;
+    }
+    
+    const fileId = `file-${Date.now()}`;
     setUploadingFiles(prev => [...prev, {
-      id: `file-${Date.now()}`,
+      id: fileId,
       name: file.name,
       size: file.size,
       type: file.type,
       status: 'uploading',
-      file: file
+      file: file,
+      progress: 0
     }]);
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('conversationId', activeConversation.conversationId);
+    formData.append('expireDays', selectedExpireDays);
+    formData.append('receiverId', activeConversation.withUser.id);
     
     try {
-      const res = await authApi.uploadFile(formData); //
-      if (res.code === 0 && res.data?.url) {
+      const res = await authApi.sendFileMessage(formData);
+
+      if (res.code === 0 && res.data?.content) {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === `file-${Date.now()}` 
-            ? { ...f, status: 'done', url: res.data.url } 
-            : f
+          f.id === fileId ? { ...f, status: 'done', url: res.data.content, fileName: res.data.fileName } : f
         ));
-        message.success('文件上传成功');
-        setMessageContent(prev => `${prev}\n[文件] ${file.name} (${res.data.url})`);
       } else {
         setUploadingFiles(prev => prev.map(f => 
-          f.id === `file-${Date.now()}` 
-            ? { ...f, status: 'error' } 
-            : f
+          f.id === fileId ? { ...f, status: 'error' } : f
         ));
         message.error(res.message || '文件上传失败');
       }
     } catch (err) {
       setUploadingFiles(prev => prev.map(f => 
-        f.id === `file-${Date.now()}` 
-          ? { ...f, status: 'error' } 
-          : f
+        f.id === fileId ? { ...f, status: 'error' } : f
       ));
-      console.error('文件上传失败：', err);
-      message.error('文件上传失败，请重试');
+      message.error('文件上传异常: ' + (err.message || '未知错误'));
+    }
+  };
+
+  const handleSendFileMessage = async () => {
+    if (!activeConversation || !currentUserId || uploadingFiles.length === 0) {
+      message.warning('请选择文件并确保会话有效');
+      return;
+    }
+
+    setSendingLoading(true);
+
+    try {
+      const formData = new FormData();
+      uploadingFiles.forEach((file) => {
+        formData.append('file', file.file);
+      });
+      formData.append('conversationId', activeConversation.conversationId);
+      formData.append('expireDays', selectedExpireDays);
+      formData.append('receiverId', activeConversation.withUser.id);
+
+      const res = await authApi.sendFileMessage(formData);
+
+      if (res.code === 0 && res.data) {
+        const newFileMessage = {
+          id: res.data.id.toString(),
+          senderId: currentUserId,
+          content: `发送了文件: ${res.data.fileName}`,
+          time: res.data.createTime || new Date().toISOString(),
+          status: 'sent',
+          senderAvatar: currentUserAvatar,
+          files: [
+            {
+              name: res.data.fileName,
+              url: res.data.content,
+              size: res.data.fileSize
+            }
+          ],
+          expireTime: res.data.expireTime,
+          isExpired: res.data.isExpired === 1
+        };
+        setMessages(prev => [...prev, newFileMessage]);
+        updateConversationLastMessage(newFileMessage.content, newFileMessage.time);
+        setMessageContent('');
+        setUploadingFiles([]);
+        message.success('文件发送成功');
+      } else {
+        message.error(res.message || '文件发送失败');
+      }
+    } catch (err) {
+      console.error('文件发送失败：', err);
+      message.error('网络异常，文件发送失败');
+    } finally {
+      setSendingLoading(false);
     }
   };
 
@@ -349,7 +385,6 @@ const MessageCenterPage = () => {
       status: 'sending',
       senderAvatar: currentUserAvatar,
     };
-    console.log('发送临时消息（头像）:', tempMsg.senderAvatar);
     setMessages(prev => [...prev, tempMsg]);
 
     try {
@@ -372,7 +407,9 @@ const MessageCenterPage = () => {
                   time: res.data.createTime,
                   status: 'sent',
                   senderAvatar: finalAvatar,
-                  files: res.data.files || []
+                  files: res.data.files || [],
+                  expireTime: res.data.expireTime,
+                  isExpired: res.data.isExpired === 1
                 }
               : msg
           )
@@ -627,19 +664,29 @@ const MessageCenterPage = () => {
                                         display: 'flex', 
                                         alignItems: 'center',
                                         marginBottom: 4,
-                                        color: '#1890ff'
+                                        color: msg.isExpired ? '#999' : '#1890ff'
                                       }}>
                                         <FileTextOutlined style={{ marginRight: 6 }} />
                                         <a 
-                                          href={file.url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
+                                          href={!msg.isExpired ? file.url : 'javascript:void(0)'} 
+                                          target={!msg.isExpired ? "_blank" : undefined} 
+                                          rel={!msg.isExpired ? "noopener noreferrer" : undefined}
+                                          onClick={msg.isExpired ? (e) => {
+                                            e.preventDefault();
+                                            message.warning('文件已过期，无法下载');
+                                          } : undefined}
                                         >
                                           {file.name}
+                                          {msg.isExpired && <span style={{ marginLeft: 8 }}>（已过期）</span>}
                                         </a>
                                         <span style={{ marginLeft: 6, fontSize: 12 }}>
                                           {formatFileSize(file.size)}
                                         </span>
+                                        {!msg.isExpired && msg.expireTime && (
+                                          <span style={{ marginLeft: 8, fontSize: 12, color: '#ff7d00' }}>
+                                            有效期至 {new Date(msg.expireTime).toLocaleDateString()}
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
@@ -695,19 +742,29 @@ const MessageCenterPage = () => {
                                         display: 'flex', 
                                         alignItems: 'center',
                                         marginBottom: 4,
-                                        color: 'rgba(255,255,255,0.9)'
+                                        color: msg.isExpired ? '#ccc' : 'rgba(255,255,255,0.9)'
                                       }}>
                                         <FileTextOutlined style={{ marginRight: 6 }} />
                                         <a 
-                                          href={file.url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
+                                          href={!msg.isExpired ? file.url : 'javascript:void(0)'} 
+                                          target={!msg.isExpired ? "_blank" : undefined} 
+                                          rel={!msg.isExpired ? "noopener noreferrer" : undefined}
+                                          onClick={msg.isExpired ? (e) => {
+                                            e.preventDefault();
+                                            message.warning('文件已过期，无法下载');
+                                          } : undefined}
                                         >
                                           {file.name}
+                                          {msg.isExpired && <span style={{ marginLeft: 8 }}>（已过期）</span>}
                                         </a>
                                         <span style={{ marginLeft: 6, fontSize: 12 }}>
                                           {formatFileSize(file.size)}
                                         </span>
+                                        {!msg.isExpired && msg.expireTime && (
+                                          <span style={{ marginLeft: 8, fontSize: 12, color: '#ffd700' }}>
+                                            有效期至 {new Date(msg.expireTime).toLocaleDateString()}
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
@@ -796,7 +853,7 @@ const MessageCenterPage = () => {
                               color: '#999',
                               marginTop: 2
                             }}>
-                              {file.status === 'uploading' ? '上传中...' : 
+                              {file.status === 'uploading' ? `上传中... ${file.progress}%` : 
                                file.status === 'done' ? `已上传 · ${formatFileSize(file.size)}` : 
                                '上传失败'}
                             </div>
@@ -811,6 +868,21 @@ const MessageCenterPage = () => {
                         />
                       </div>
                     ))}
+                    
+                    <div style={{ marginTop: 10 }}>
+                      <span style={{ fontSize: 13, color: '#666', marginRight: 8 }}>文件有效期：</span>
+                      <Select
+                        value={selectedExpireDays}
+                        onChange={setSelectedExpireDays}
+                        style={{ width: 120 }}
+                        size="small"
+                      >
+                        <Option value={1}>1天</Option>
+                        <Option value={7}>7天</Option>
+                        <Option value={30}>30天</Option>
+                        <Option value={90}>90天</Option>
+                      </Select>
+                    </div>
                   </div>
                 )}
                 
@@ -869,14 +941,27 @@ const MessageCenterPage = () => {
                     </Popover>
                   </Space>
                   
-                  <Button 
-                    type="primary" 
-                    onClick={handleSendMessage}
-                    loading={sendingLoading}
-                    disabled={!messageContent.trim() || uploadingFiles.some(f => f.status === 'uploading')}
-                  >
-                    发送
-                  </Button>
+                  <Space>
+                    {uploadingFiles.length > 0 ? (
+                      <Button 
+                        type="primary" 
+                        onClick={handleSendFileMessage}
+                        loading={sendingLoading}
+                        disabled={uploadingFiles.some(f => f.status === 'uploading')}
+                      >
+                        发送文件
+                      </Button>
+                    ) : (
+                      <Button 
+                        type="primary" 
+                        onClick={handleSendMessage}
+                        loading={sendingLoading}
+                        disabled={!messageContent.trim()}
+                      >
+                        发送
+                      </Button>
+                    )}
+                  </Space>
                 </div>
               </div>
             </div>
@@ -901,3 +986,4 @@ const MessageCenterPage = () => {
 };
 
 export default MessageCenterPage;
+    

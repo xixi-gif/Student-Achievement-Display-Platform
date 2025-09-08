@@ -204,7 +204,7 @@ export const getTableColumns = (
 
           <Popconfirm
             title="确定删除此用户？"
-            onConfirm={() => handleDelete(record.id)}
+            onClick={() => handleDelete(record)} 
           >
             <Button
               type="link"

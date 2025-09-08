@@ -108,6 +108,11 @@ export const authApi = {
   //会话
   getConversationRecords: () => service.get("/conversations"),
   sendMessage: (data) => service.post("/conversations", data),
+  sendFileMessage: (data) => service.post('/messages/send-file', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data' 
+    }
+  }),
   deleteConversation: (conversationId) =>
     service.delete(`/conversations/${conversationId}`),
   muteConversation: (conversationId) =>

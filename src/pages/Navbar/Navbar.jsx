@@ -12,7 +12,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
 import AnnouncementPublish from '../AnnouncementPublish/AnnouncementPublish';
-import { authApi } from '../../service/api';
+import { authApi,achievementApi } from '../../service/api';
+import debounce from 'lodash/debounce';
 
 const { Header } = Layout;
 const { Search } = Input;
@@ -129,7 +130,7 @@ const Navbar = ({ currentUser }) => {
   const specificItems = roleSpecificItems[role] || [];
 
   const handleSearch = (value) => {
-    navigate(`/search?keyword=${encodeURIComponent(value)}`);
+    navigate(`/achievements/?search=${encodeURIComponent(value)}`);
   };
 
   const handleLogout = () => {

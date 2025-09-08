@@ -25,6 +25,7 @@ import './App.css';
 import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage2';
 import AnnouncementPublish from './pages/AnnouncementPublish/AnnouncementPublish';
 import AccountSettingsPage from './pages/SettingPage/SettingPage'
+import AboutUs from './pages/AboutUsPage/AboutUsPage';
 
 // 需求相关页面
 import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
@@ -35,7 +36,7 @@ import ChatPage from './pages/ChatPage/ChatPage';
 
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
-import UserManage from './pages/UserManagePage/succed';
+import UserManage from './pages/UserManagePage/UserManagePage';
 import MyRequirementsPage from './pages/MyRequirements/MyRequirements2';
 import MyApplicationsPage from './pages/MyApplicationsPage/MyApplicationPage';
 
@@ -57,6 +58,7 @@ function App() {
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
             <Route path="/setting" element={<AccountSettingsPage />} />
             <Route path='my-applications' element={<MyApplicationsPage /> } />
+            <Route path ='/about' element={<AboutUs /> } />
 
             {/* 需要权限验证的路由 */}
             <Route element={<AuthRoute/>}>
