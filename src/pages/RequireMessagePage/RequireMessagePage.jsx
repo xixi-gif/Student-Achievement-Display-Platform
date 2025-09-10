@@ -97,64 +97,131 @@ const MessageCenterPage = () => {
     parseUrlParams();
   }, []);
 
-  useEffect(() => {
-    const initData = async () => {
-      try {
-        const userRes = await authApi.getuserlogin();
-        if (userRes.code === 0 && userRes.data) {
-          const currentUserIdFromApi = String(userRes.data.id);
-          console.log("当前用户ID:", currentUserIdFromApi);
-          setCurrentUserId(currentUserIdFromApi);
-          currentUserIdRef.current = currentUserIdFromApi;
-          setCurrentUserAvatar(
-            getAvatar(userRes.data.avatar) || DEFAULT_AVATAR
-          );
+  // useEffect(() => {
+  //   const initData = async () => {
+  //     try {
+  //       const userRes = await authApi.getuserlogin();
+  //       if (userRes.code === 0 && userRes.data) {
+  //         const currentUserIdFromApi = String(userRes.data.id);
+  //         console.log("当前用户ID:", currentUserIdFromApi);
+  //         setCurrentUserId(currentUserIdFromApi);
+  //         currentUserIdRef.current = currentUserIdFromApi;
+  //         setCurrentUserAvatar(
+  //           getAvatar(userRes.data.avatar) || DEFAULT_AVATAR
+  //         );
 
-          // 先获取会话列表
-          const conversationsList = await fetchConversations();
-          setIsConversationsLoaded(true); // 标记会话列表已加载
+  //         // 先获取会话列表
+  //         const conversationsList = await fetchConversations();
+  //         setIsConversationsLoaded(true); // 标记会话列表已加载
 
+  //         // 检查是否已经发送过初始消息给这个用户
+  //         const hasSentToThisUser = initialMessageSentRef.current.has(
+  //           targetUser.id
+  //         );
+
+  //         // 如果目标用户存在且尚未发送过初始消息
+  //         if (targetUser.id && currentUserIdFromApi && !hasSentToThisUser) {
+  //           // 检查是否已存在与目标用户的会话
+  //           const existingConv = conversationsList.find(
+  //             (conv) => conv.withUser && conv.withUser.id === targetUser.id
+  //           );
+
+  //           console.log("找到的会话:", existingConv);
+
+  //           if (!existingConv) {
+  //             // 只有不存在会话时才发送初始消息
+  //             await handleTargetUserConversation();
+  //             initialMessageSentRef.current.add(targetUser.id);
+  //           } else {
+  //             // 如果会话已存在，标记为已处理，避免重复发送
+  //             initialMessageSentRef.current.add(targetUser.id);
+  //           }
+  //         }
+  //       } else {
+  //         message.error("获取用户信息失败，请重新登录");
+  //       }
+  //     } catch (err) {
+  //       console.error("初始化失败:", err);
+  //       message.error("页面加载失败，请刷新重试");
+  //     } finally {
+  //       setPageLoading(false);
+  //     }
+  //   };
+
+  //   if (targetUser.id) {
+  //     initData();
+  //   }
+  // }, [targetUser.id]);
+
+  let currentUserIdFromApi = null;
+
+useEffect(() => {
+  const initData = async () => {
+    try {
+      const userRes = await authApi.getuserlogin();
+      if (userRes.code === 0 && userRes.data) {
+        currentUserIdFromApi = String(userRes.data.id);
+        console.log("当前用户ID:", currentUserIdFromApi);
+        setCurrentUserId(currentUserIdFromApi);
+        currentUserIdRef.current = currentUserIdFromApi;
+        setCurrentUserAvatar(
+          getAvatar(userRes.data.avatar) || DEFAULT_AVATAR
+        );
+
+        // 检查是否尝试与自己创建会话
+        if (targetUser.id && currentUserIdFromApi === targetUser.id) {
+          message.warning("不能与自己创建会话");
+          // 不返回，继续加载会话列表
+        }
+
+        // 获取会话列表
+        const conversationsList = await fetchConversations();
+        setIsConversationsLoaded(true);
+
+        // 如果目标用户存在且不是自己
+        if (targetUser.id && currentUserIdFromApi && 
+            currentUserIdFromApi !== targetUser.id) {
           // 检查是否已经发送过初始消息给这个用户
           const hasSentToThisUser = initialMessageSentRef.current.has(
             targetUser.id
           );
 
-          // 如果目标用户存在且尚未发送过初始消息
-          if (targetUser.id && currentUserIdFromApi && !hasSentToThisUser) {
+          if (!hasSentToThisUser) {
             // 检查是否已存在与目标用户的会话
             const existingConv = conversationsList.find(
               (conv) => conv.withUser && conv.withUser.id === targetUser.id
             );
 
-            console.log("找到的会话:", existingConv);
-
             if (!existingConv) {
-              // 只有不存在会话时才发送初始消息
               await handleTargetUserConversation();
               initialMessageSentRef.current.add(targetUser.id);
             } else {
-              // 如果会话已存在，标记为已处理，避免重复发送
               initialMessageSentRef.current.add(targetUser.id);
             }
           }
-        } else {
-          message.error("获取用户信息失败，请重新登录");
         }
-      } catch (err) {
-        console.error("初始化失败:", err);
-        message.error("页面加载失败，请刷新重试");
-      } finally {
-        setPageLoading(false);
+      } else {
+        message.error("获取用户信息失败，请重新登录");
       }
-    };
-
-    if (targetUser.id) {
-      initData();
+    } catch (err) {
+      console.error("初始化失败:", err);
+      message.error("页面加载失败，请刷新重试");
+    } finally {
+      setPageLoading(false);
     }
-  }, [targetUser.id]);
+  };
+
+  if (targetUser.id) {
+    initData();
+  }
+}, [targetUser.id]);
 
   const handleTargetUserConversation = async () => {
     if (targetUser.id === currentUserId) {
+      console.warn("尝试与自己创建会话被阻止", {
+           targetUserId: targetUser.id,
+          currentUserId
+  });
       message.warning("不能与自己创建会话");
       return;
     }

@@ -227,7 +227,7 @@ const AchievementDetailPage = () => {
 
   // 点赞处理函数
   const handleLike = async () => {
-    if (currentUser?.role === "visitor") {
+    if (currentUser?.role === "") {
       message.info("请登录后再进行点赞");
       return;
     }
@@ -294,7 +294,7 @@ const AchievementDetailPage = () => {
 
   // 评论提交函数
   const handleCommentSubmit = async () => {
-    if (currentUser?.role === "visitor") {
+    if (currentUser?.role === "") {
       message.info("请登录后再发表评论");
       return;
     }
@@ -1165,7 +1165,7 @@ const AchievementDetailPage = () => {
                             <TabPane tab={`图片 ${idx + 1}`} key={idx}>
                               <div style={{ textAlign: "center" }}>
                                 <img
-                                  src={img}
+                                  src={img.url}
                                   alt={`${achievement.title} 图片 ${idx + 1}`}
                                   style={{
                                     maxWidth: "100%",
@@ -1183,7 +1183,7 @@ const AchievementDetailPage = () => {
                       )}
                     </div>
 
-                    {getSafeArray(achievement.video).length > 0 ? (
+                    {getSafeArray(achievement.videos).length > 0 ? (
                       <div>
                         <h3
                           style={{
@@ -1194,7 +1194,7 @@ const AchievementDetailPage = () => {
                         >
                           项目视频
                         </h3>
-                        {getSafeArray(achievement.video).map((video, idx) => (
+                        {getSafeArray(achievement.videos).map((video, idx) => (
                           <div key={idx} style={{ marginBottom: 24 }}>
                             <h4
                               style={{

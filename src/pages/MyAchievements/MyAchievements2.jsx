@@ -37,6 +37,7 @@ import {
   FileTextOutlined,
   VideoCameraOutlined,
   DollarOutlined,
+  QuestionCircleOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -257,12 +258,23 @@ const MyAchievements = () => {
       title: "状态",
       dataIndex: "status",
       key: "status",
-      render: (status) => {
+      render: (status, record) => {
         const statusInfo = statusMap[status] || { text: status, color: "gray" };
         return (
-          <Tag color={statusInfo.color} icon={statusInfo.icon}>
-            {statusInfo.text}
-          </Tag>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <Tag color={statusInfo.color} icon={statusInfo.icon}>
+              {statusInfo.text}
+            </Tag>
+            {status === "rejected" && record.rejectReason && (
+              <Tooltip title={record.rejectReason}>
+                <span
+                  style={{ marginLeft: 8, color: "#ff4d4f", cursor: "pointer" }}
+                >
+                  <QuestionCircleOutlined />
+                </span>
+              </Tooltip>
+            )}
+          </div>
         );
       },
     },
@@ -618,7 +630,9 @@ const MyAchievements = () => {
                   </Tag>
                   <span>
                     <CalendarOutlined />{" "}
-                    {selectedAchievement.date ? selectedAchievement.date.format("YYYY-MM-DD") : "未知日期"}
+                    {selectedAchievement.date
+                      ? selectedAchievement.date.format("YYYY-MM-DD")
+                      : "未知日期"}
                   </span>
                 </div>
                 {selectedAchievement.recommendLevel !== undefined &&

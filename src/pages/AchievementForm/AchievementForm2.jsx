@@ -60,7 +60,7 @@ const AchievementFormPage = () => {
   const [videoFiles, setVideoFiles] = useState([]);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [oldFiles, setOldFiles] = useState([]);
-  const [deletedFiles, setDeletedFiles] = useState([]); // 存储用户删除的文件ID
+  const [deleteFiles, setDeleteFiles] = useState([]); // 存储用户删除的文件ID
   const [oldCoverUrl, setOldCoverUrl] = useState("");
   const [tags, setTags] = useState([]);
   const [tagsLoading, setTagsLoading] = useState(false);
@@ -94,25 +94,26 @@ const AchievementFormPage = () => {
   ];
 
   const CustomDateTimePicker = ({ value, onChange }) => {
-  return (
-    <DatePicker
-      showTime={{
-        format: 'HH:mm',
-        defaultValue: dayjs().set('hour', 8).set('minute', 0)
-      }}
-      format="YYYY-MM-DD HH:mm"
-      value={value ? dayjs(value) : dayjs()}
-      onChange={(date, dateString) => {
-        onChange(dateString);
-      }}
-      style={{ width: '100%' }}
-      allowClear={false}
-      // 修复日历显示问题
-      getPopupContainer={trigger => trigger.parentElement}
-    />
-  );
-};
+    return (
+      <DatePicker
+        showTime={{
+          format: "HH:mm",
+          defaultValue: dayjs().set("hour", 8).set("minute", 0),
+        }}
+        format="YYYY-MM-DD HH:mm"
+        value={value ? dayjs(value) : dayjs()}
+        onChange={(date, dateString) => {
+          onChange(dateString);
+        }}
+        style={{ width: "100%" }}
+        allowClear={false}
+        // 修复日历显示问题
+        getPopupContainer={(trigger) => trigger.parentElement}
+      />
+    );
+  };
 
+  //获取分类数据
   useEffect(() => {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
@@ -197,14 +198,30 @@ const AchievementFormPage = () => {
 
             // 设置多个指导教师
             if (achievement.instructors && achievement.instructors.length > 0) {
-              setInstructors(
-                achievement.instructors.map((inst) => inst.name || inst)
-              );
+              const instructorNames = achievement.instructors
+                .map((inst) => {
+                  // 尝试多种可能的字段名
+                  if (typeof inst === "string") return inst;
+                  return (
+                    inst.realName || inst.name || inst.username || inst.userId
+                  );
+                })
+                .filter((name) => name); // 过滤掉undefined/null
+
+              setInstructors(instructorNames);
             } else if (achievement.instructor) {
-              // 兼容旧数据：单个指导教师
-              setInstructors([
-                achievement.instructor.name || achievement.instructor,
-              ]);
+              // 处理单个指导教师的多种情况
+              const instructorName =
+                typeof achievement.instructor === "string"
+                  ? achievement.instructor
+                  : achievement.instructor.realName ||
+                    achievement.instructor.name ||
+                    achievement.instructor.username ||
+                    achievement.instructor.userId;
+
+              if (instructorName) {
+                setInstructors([instructorName]);
+              }
             }
 
             // 保存旧封面图URL
@@ -238,29 +255,28 @@ const AchievementFormPage = () => {
             }
 
             // 处理视频文件
-            if (achievement.video && achievement.video.length > 0) {
-              const videoFile = {
-                uid: `video-${achievement.video[0].id}`,
-                id: achievement.video[0].id,
-                name: achievement.video[0].name || "video.mp4",
-                url: achievement.video[0].url,
-                size: achievement.video[0].size,
+            if (achievement.videos && achievement.videos.length > 0) {
+              const videoFiles = achievement.videos.map((video) => ({
+                uid: `video-${video.id}`,
+                id: video.id,
+                name: video.name || `video-${video.id}.mp4`,
+                url: video.url,
+                size: video.size,
                 status: "done",
                 isOld: true,
-                type: "video",
-              };
-              setVideoFiles([videoFile]);
+              }));
+              setVideoFiles([videoFiles]);
 
               // 将旧视频添加到oldFiles中
               setOldFiles((prev) => [
                 ...prev,
-                {
-                  id: achievement.video[0].id,
-                  fileUrl: achievement.video[0].url,
-                  fileName: achievement.video[0].name || "video.mp4",
+                ...achievement.videos.map((video) => ({
+                  id: video.id,
+                  fileUrl: video.url,
+                  fileName: video.name || `video-${video.id}.mp4`,
                   fileType: "video",
-                  fileSize: achievement.video[0].size,
-                },
+                  fileSize: video.size,
+                })),
               ]);
             }
 
@@ -352,8 +368,12 @@ const AchievementFormPage = () => {
     },
     onRemove: (file) => {
       if (file.isOld && file.id) {
-        // 记录被删除的旧文件ID
-        setDeletedFiles((prev) => [...prev, file.id]);
+        // 使用函数式更新确保状态正确
+        setDeleteFiles((prev) => {
+          const newDeleteFiles = [...prev, file.id];
+          console.log("更新删除文件列表:", newDeleteFiles);
+          return newDeleteFiles;
+        });
         // 从oldFiles中移除
         setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
@@ -378,7 +398,7 @@ const AchievementFormPage = () => {
   // 视频上传配置
   const uploadVideoProps = {
     name: "videos",
-    multiple: false,
+    multiple: true,
     beforeUpload: (file) => {
       const isVideo = file.type.startsWith("video/");
       if (!isVideo) {
@@ -400,8 +420,12 @@ const AchievementFormPage = () => {
     },
     onRemove: (file) => {
       if (file.isOld && file.id) {
-        // 记录被删除的旧文件ID
-        setDeletedFiles((prev) => [...prev, file.id]);
+        // 使用函数式更新确保状态正确
+        setDeleteFiles((prev) => {
+          const newDeleteFiles = [...prev, file.id];
+          console.log("更新删除文件列表:", newDeleteFiles);
+          return newDeleteFiles;
+        });
         // 从oldFiles中移除
         setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
@@ -424,8 +448,12 @@ const AchievementFormPage = () => {
     },
     onRemove: (file) => {
       if (file.isOld && file.id) {
-        // 记录被删除的旧文件ID
-        setDeletedFiles((prev) => [...prev, file.id]);
+        // 使用函数式更新确保状态正确
+        setDeleteFiles((prev) => {
+          const newDeleteFiles = [...prev, file.id];
+          console.log("更新删除文件列表:", newDeleteFiles);
+          return newDeleteFiles;
+        });
         // 从oldFiles中移除
         setOldFiles(oldFiles.filter((old) => old.id !== file.id));
       }
@@ -541,6 +569,7 @@ const AchievementFormPage = () => {
     setSubmitting(true);
     try {
       const values = await form.validateFields();
+      console.log("表单提交开始，删除文件列表:", deleteFiles);
 
       // 创建FormData
       const formData = new FormData();
@@ -589,32 +618,15 @@ const AchievementFormPage = () => {
         formData.append("id", id);
 
         // 传递需要删除的文件ID列表
-        if (deletedFiles.length > 0) {
-          formData.append("deletedFileIds", JSON.stringify(deletedFiles));
-        }
-
-        // 传递需要保留的旧文件信息
-        if (oldFiles.length > 0) {
-          oldFiles.forEach((file, index) => {
-            if (file) {
-              if (file.id) {
-                formData.append(`oldFiles[${index}].id`, file.id.toString());
-              }
-              formData.append(`oldFiles[${index}].fileUrl`, file.fileUrl || "");
-              formData.append(
-                `oldFiles[${index}].fileName`,
-                file.fileName || ""
-              );
-              formData.append(
-                `oldFiles[${index}].fileType`,
-                file.fileType || ""
-              );
-              formData.append(
-                `oldFiles[${index}].fileSize`,
-                file.fileSize?.toString() || "0"
-              );
-            }
+        console.log("要删除的文件ID:", deleteFiles);
+        if (deleteFiles.length > 0) {
+          // 确保使用正确的字段名和格式
+          // 将每个ID单独添加到FormData中
+          deleteFiles.forEach((id) => {
+            formData.append("deleteFiles", id);
           });
+        } else {
+          console.log("没有需要删除的文件");
         }
       }
 
@@ -627,14 +639,11 @@ const AchievementFormPage = () => {
       });
 
       // 视频文件
-      if (
-        videoFiles.length > 0 &&
-        videoFiles[0] &&
-        videoFiles[0].originFileObj &&
-        !videoFiles[0].isOld
-      ) {
-        formData.append("video", videoFiles[0].originFileObj);
-      }
+      videoFiles.forEach((file) => {
+        if (file && file.originFileObj && !file.isOld) {
+          formData.append("videos", file.originFileObj);
+        }
+      });
 
       // 附件文件
       attachmentFiles.forEach((file) => {
@@ -642,6 +651,12 @@ const AchievementFormPage = () => {
           formData.append("files", file.originFileObj);
         }
       });
+
+      // 调试：输出 FormData 内容
+      console.log("FormData 内容:");
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value instanceof File ? value.name : value);
+      }
 
       // 5. 提交请求
       let response;
@@ -651,15 +666,14 @@ const AchievementFormPage = () => {
         },
       };
 
-      if (isAdmin()) {
-        if (isEditMode) {
-          response = await achievementApi.updateAchievement(formData, config);
-        } else {
-          response = await adminApi.addAchievement(formData, config);
-        }
+      // 注意：根据您的API设计，可能需要区分管理员和普通用户的更新接口
+      if (isEditMode) {
+        // 使用统一的更新接口，传递deleteFiles参数
+        response = await achievementApi.updateAchievement(formData, config);
       } else {
-        if (isEditMode) {
-          response = await achievementApi.updateAchievement(formData, config);
+        // 创建新成果的逻辑保持不变
+        if (isAdmin()) {
+          response = await adminApi.addAchievement(formData, config);
         } else {
           response = await achievementApi.createAchievement(formData, config);
         }
@@ -675,14 +689,6 @@ const AchievementFormPage = () => {
           : "成果已保存为草稿";
 
         message.success(successMessage);
-
-        // // 根据用户角色跳转到不同的页面
-        // if (isAdmin()) {
-        //   navigate("/admin/achievements-manage");
-        // } else {
-        //   navigate("/student/my-achievements");
-        // }
-        // 返回上一页
         navigate(-1);
       } else {
         message.error(response.message || "操作失败");
@@ -790,7 +796,7 @@ const AchievementFormPage = () => {
               </div>
               {file.fileSize && (
                 <div style={{ fontSize: "12px", color: "#666" }}>
-                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB
+                  {(file.fileSize / 1024).toFixed(2)} KB
                 </div>
               )}
             </div>
@@ -954,7 +960,7 @@ const AchievementFormPage = () => {
                     rules={[{ required: true, message: "请选择成果完成日期" }]}
                     // initialValue={dayjs().format("YYYY-MM-DD HH:mm")} // 设置默认值为当前时间
                   >
-                    <CustomDateTimePicker/>
+                    <CustomDateTimePicker />
                   </Form.Item>
                 </Col>
               </Row>
@@ -1282,7 +1288,7 @@ const AchievementFormPage = () => {
                 <Form.Item
                   name="videos"
                   label="成果视频"
-                  extra="最多上传一个视频，支持MP4格式，单个文件不超过100MB"
+                  extra="支持MP4格式，单个文件不超过100MB"
                 >
                   <div>
                     {renderFileList(videoFiles, "video")}

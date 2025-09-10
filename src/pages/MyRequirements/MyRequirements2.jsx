@@ -50,13 +50,15 @@ const roleMap = {
   admin: "超级管理员",
   teacher: "教师",
   student: "学生",
-  guest: "访客",
+  visitor: "访客",
+  default: "访客",
 };
 const roleColorMap = {
   admin: "red",
   teacher: "orange",
   student: "green",
-  guest: "gray",
+  visitor: "gray",
+  default: "gray",
 };
 
 const MyRequirementsPage = () => {
@@ -194,6 +196,7 @@ const MyRequirementsPage = () => {
         applyTime: item.applyTime || "",
         introduction: item.introduction || "无申请说明",
         isSelected: item.status === 1,
+        isRejected: item.status === 2, // 添加拒绝状态字段
       }));
 
       setApplicantModal((prev) => ({
@@ -688,6 +691,15 @@ const MyRequirementsPage = () => {
                                 已同意
                               </Tag>
                             )}
+                            {applicant.isRejected && (
+                              <Tag
+                                color="red"
+                                style={{ marginLeft: 8 }}
+                                size="small"
+                              >
+                                已拒绝
+                              </Tag>
+                            )}
                           </div>
                           <div
                             style={{
@@ -758,7 +770,7 @@ const MyRequirementsPage = () => {
                               }
                               size="small"
                               loading={actionLoading}
-                              disabled={applicant.isSelected}
+                              disabled={applicant.isSelected || applicant.isRejected}
                             >
                               拒绝接单
                             </Button>
@@ -774,7 +786,7 @@ const MyRequirementsPage = () => {
                               }
                               size="small"
                               loading={actionLoading}
-                              disabled={applicant.isSelected}
+                              disabled={applicant.isSelected || applicant.isRejected}
                             >
                               同意接单
                             </Button>
