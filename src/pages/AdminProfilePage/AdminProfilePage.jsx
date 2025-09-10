@@ -54,7 +54,7 @@ const AdminProfile = () => {
       items: [
         { label: '管理员ID', field: 'adminId', disabled: true },
         { label: '姓名', field: 'realName' },
-        {label: '昵称', field: 'userName' },
+        {label: '昵称', field: 'username' },
         { label: '职位', field: 'position' },
         { label: '所属部门', field: 'department'}
       ]
@@ -198,22 +198,45 @@ const AdminProfile = () => {
   };
 
   const handleSave = () => {
-    form.validateFields()
-      .then(values => {
-        const updatedUser = { ...currentUser, ...values };
-
-        localStorage.setItem('admin_profile', JSON.stringify(updatedUser));
-        localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-        
-        setCurrentUser(updatedUser);
-        message.success('个人信息已保存');
-        setEditMode(false);
-      })
-      .catch(err => {
-        console.error('表单验证失败:', err);
-        message.error('表单填写有误，请检查后重试');
-      });
-  };
+  form.validateFields()
+    .then(values => {
+      // 只提取后端需要的字段，并正确映射字段名
+      const updateData = {
+        realName: values.realName,
+        username: values.username,
+        title: values.position, // 将 position 映射为 title
+        department: values.department,
+        email: values.email,
+        phone: values.phone
+      };
+      
+      setLoading(true);
+      
+      adminApi.updateProfile(updateData)
+        .then(response => {
+          if (response.code === 0) {
+            // 重新获取完整用户信息
+            fetchUserProfile().then(() => {
+              message.success('个人信息已保存');
+              setEditMode(false);
+            });
+          } else {
+            throw new Error(response.message || "更新个人信息失败");
+          }
+        })
+        .catch(error => {
+          console.error('更新个人信息失败:', error);
+          message.error(error.message || '更新个人信息失败，请重试');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    })
+    .catch(err => {
+      console.error('表单验证失败:', err);
+      message.error('表单填写有误，请检查后重试');
+    });
+};
 
   const handleAvatarChange = async (info) => {
     if (info.file.status === 'uploading') {

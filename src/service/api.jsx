@@ -261,6 +261,7 @@ export const teacherApi = {
 export const adminApi = {
   //个人中心
   getProfile: (data) => service.get("/admin/profile", { data }),
+  updateProfile: (data) => service.put("/admin/profile", data),
   // 用户管理接口
   getUserList: (params) => service.get("/admin/user", { params }),
   createUser: (data) => service.post("/admin/add", data),

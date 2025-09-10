@@ -176,25 +176,6 @@ const AnnouncementList = () => {
       align: 'center'
     },
     {
-      title: '作者',
-      dataIndex: 'author',
-      key: 'author',
-      align: 'center'
-    },
-    {
-      title: '发布时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
-      render: (text) => text ? dayjs(text).format('YYYY-MM-DD') : '-', // 使用 dayjs 替代 moment
-      align: 'center'
-    },
-    {
-      title: '浏览量',
-      dataIndex: 'viewCount',
-      key: 'viewCount',
-      align: 'center'
-    },
-    {
       title: '操作',
       key: 'action',
       render: (_, record) => (
