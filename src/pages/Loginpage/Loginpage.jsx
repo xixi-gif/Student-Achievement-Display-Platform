@@ -154,7 +154,7 @@ const LoginPage = () => {
             fontWeight: 600, 
             color: 'rgba(0, 0, 0, 0.85)' 
           }}>
-            学生成功展示平台
+            学生成果展示平台
           </h1>
         </div>
 

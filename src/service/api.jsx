@@ -261,7 +261,16 @@ export const teacherApi = {
 export const adminApi = {
   //个人中心
   getProfile: (data) => service.get("/admin/profile", { data }),
-  updateProfile: (data) => service.put("/admin/profile", data),
+  updateProfile: (data) => service.put("/admin/profile", data,{
+    timeout: 60000, // 1分钟超时
+      onUploadProgress: (progressEvent) => {
+        // 添加上传进度显示
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        console.log(`上传进度: ${percentCompleted}%`);
+      },
+  }),
   // 用户管理接口
   getUserList: (params) => service.get("/admin/user", { params }),
   createUser: (data) => service.post("/admin/add", data),
