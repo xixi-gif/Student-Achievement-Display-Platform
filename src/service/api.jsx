@@ -175,7 +175,14 @@ export const commentApi = {
   addComment: (data) => service.post("/comment/add", data),
   // 获取评论列表
   getCommentList: (params) => service.get("/comment/list", { params }),
+  //删除评论
   deleteComment: (id) => service.post('/comment/delete', null, { params: { id } }),
+  //批量删除
+  batchDeleteComments:(data) => service.post('/comment/admin/batch/delete',data),
+  //审核评论
+  batchUpdateStatus: (data) => service.post('/comment/admin/batch/update/status', data),
+  //获取当前登录用户的评论列表
+  getUserComments:(params) => service.get('/comment/list/my', {params}),
 };
 
 export const achievementApi = {

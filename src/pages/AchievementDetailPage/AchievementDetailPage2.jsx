@@ -107,19 +107,27 @@ const AchievementDetailPage = () => {
       const response = await commentApi.getCommentList(params);
 
       if (response.code === 0) {
-        // 过滤掉子评论的独立记录
-        const filteredComments = response.data.records.filter(
-          (comment) =>
-            comment.parentId === null || comment.parentId === undefined
-        );
+        // 过滤掉未审核和审核未通过的评论，只保留审核通过的
+        const filteredComments = response.data.records
+          .filter(
+            (comment) =>
+              (comment.parentId === null || comment.parentId === undefined) &&
+              comment.status === 1 // 假设approved表示审核通过
+          )
+          // 同时过滤子评论，只保留审核通过的
+          .map((comment) => ({
+            ...comment,
+            children: getSafeArray(comment.children).filter(
+              (child) => child.status === 1
+            ),
+          }));
 
         // 计算当前页的实际评论数量（包括子评论）
         let currentPageCommentCount = 0;
         const visibleComments = [];
 
         for (const comment of filteredComments) {
-          const commentTotal =
-            1 + (comment.children ? comment.children.length : 0);
+          const commentTotal = 1 + comment.children.length;
 
           // 如果加上这个评论会超出页面容量，就停止添加
           if (
@@ -134,9 +142,11 @@ const AchievementDetailPage = () => {
         }
 
         setComments(visibleComments);
+        // 注意：这里显示的总数应该是所有审核通过的评论数
         setCommentPagination({
           ...commentPagination,
-          total: response.data.total,
+          total: response.data.records.filter((c) => c.status === "approved")
+            .length,
         });
       }
     } catch (error) {
@@ -313,10 +323,10 @@ const AchievementDetailPage = () => {
       const response = await commentApi.addComment(commentData);
 
       if (response.code === 0) {
-        message.success("评论发表成功");
+        message.success("评论已提交，等待管理员审核");
         setCommentContent("");
-        // 刷新评论列表
-        await fetchComments();
+        // 不需要刷新评论列表，新评论需要审核
+        // await fetchComments();
       } else {
         throw new Error(response.message || "评论发表失败");
       }
@@ -348,13 +358,13 @@ const AchievementDetailPage = () => {
       const response = await commentApi.addComment(commentData);
 
       if (response.code === 0) {
-        message.success("回复成功");
+        message.success("评论回复已提交，等待管理员审核");
         setReplyState({
           replyingTo: null,
           replyContent: "",
         });
-        // 刷新评论列表
-        await fetchComments();
+        // 不需要刷新评论列表
+        // await fetchComments();
       } else {
         throw new Error(response.message || "回复失败");
       }

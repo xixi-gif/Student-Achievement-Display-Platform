@@ -7,7 +7,8 @@ import {
   BellOutlined, InfoOutlined, MenuOutlined, SolutionOutlined,
   CrownOutlined, StarOutlined, CheckCircleOutlined,
   BarChartOutlined, ReadOutlined, ReconciliationOutlined, 
-  NotificationOutlined, MoreOutlined
+  NotificationOutlined, MoreOutlined,
+  CommentOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
@@ -23,7 +24,8 @@ const commonMenuItems = [
   { key: '/achievements', icon: <TrophyOutlined />, label: '成果展示' },
   { key: '/announcements', icon: <BellOutlined />, label: '公告' },
   { key: '/requirements', icon: <NotificationOutlined />, label: '需求公告' },
-  { key: '/about', icon: <InfoOutlined />, label: '关于我们' }
+  { key: '/about', icon: <InfoOutlined />, label: '关于我们' },
+  { key: '/my/comments',icon:<CommentOutlined/>,label:'我的评论'}
 ];
 
 const roleSpecificItems = {
@@ -39,7 +41,8 @@ const roleSpecificItems = {
     { key: '/admin/manage-users', icon: <UsergroupAddOutlined />, label: '用户管理' },
     { key: '/admin/data-statistics', icon: <BarChartOutlined />, label: '数据统计' },
     { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },
-    { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' }
+    { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' },
+    { key: '/admin/comments-manage',icon:<CommentOutlined/>,label:'评论管理'}
   ],
   visitor: []
 };

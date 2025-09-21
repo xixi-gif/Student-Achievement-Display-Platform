@@ -34,6 +34,11 @@ import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDeta
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
 import ChatPage from './pages/ChatPage/ChatPage';
 
+//评论相关页面
+import CommentList from './pages/CommentList/commonList';
+import AdminReviewComment from './pages/AdminReviewComment/adminReviewComment'
+
+
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
 import UserManage from './pages/UserManagePage/UserManagePage';
@@ -76,6 +81,7 @@ function App() {
               <Route path="/publish-requirement" element={<RequirementPublishPage />} />
               <Route path="/messages" element={<MessageCenterPage />} />
               <Route path="/my-requirements" element={<MyRequirementsPage />} /> 
+              <Route path="/my/comments" element={<CommentList />}/>
 
               {/* 教师相关路由 */}
               <Route path="/teacher/achievements/review" element={<AchievementReviewPage />} />
@@ -89,6 +95,7 @@ function App() {
               <Route path="/admin/data-statistics" element={<DataStatisticsPage />} />
               <Route path="/admin/achievements-manage" element={<AdminAchievementManagementPage />} />
               <Route path="/admin/announcement-publish" element={<AnnouncementPublish />} />
+              <Route path="/admin/comments-manage" element={<AdminReviewComment />} />
             </Route>
           </Routes>
         </div>
