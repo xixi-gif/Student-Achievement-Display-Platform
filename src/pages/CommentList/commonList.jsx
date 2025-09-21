@@ -146,7 +146,7 @@ const UserCommentListPage = () => {
 
   // 查看评论所在成果
   const viewAchievement = (achievementId) => {
-    navigate(`/achievement/${achievementId}`);
+    navigate(`/achievement/detail/${achievementId}`);
   };
   
   return (
