@@ -8,7 +8,15 @@ import { authApi } from '../../service/api';
 const { Search } = Input;
 const { Option } = Select;
 
-const statusNumMap = { 1: 'pending', 2: 'in_progress', 3: 'completed' };
+// 状态映射配置
+const statusMap = { 
+  1: { color: 'orange', text: '待接单' },
+  2: { color: 'blue', text: '进行中' },
+  3: { color: 'green', text: '已完成' }
+};
+// 允许显示的状态白名单
+const ALLOWED_STATUSES = [1, 2, 3];
+
 const roleMap = { admin: '超级管理员', teacher: '教师', student: '学生', visitor: '访客' };
 const roleColorMap = { admin: 'red', teacher: 'orange', student: 'green', visitor: 'gray' };
 
@@ -48,35 +56,37 @@ const RequirementListPage = () => {
       await fetchCurrentUser();
 
       const params = {
-        current: 1, // 总是获取第一页
-        pageSize: 1000, // 获取足够大的数据量，确保获取全部数据
+        current: 1,
+        pageSize: 1000,
       };
 
       const response = await authApi.getRequirement(params);
       if (response.code === 0) {
         const { records, total } = response.data;
-        const formattedData = records.map((item, index) => ({
-          id: item.requirementId?.toString() || `req-${index}-${Date.now()}`,
-          title: item.title || '无标题',
-          type: item.requireType || item.requirementType || item.type || '未知类型',
-          description: item.description || '无描述',
-          originalStatus: item.status,
-          status: statusNumMap[item.status] || 'pending',
-          publishTime: item.publishTime || new Date().toISOString(),
-          publisher: {
-            id: item.publisher?.id?.toString() || `pub-${index}-${Date.now()}`,
-            name: item.publisher?.name || item.publisher?.username || '未知用户',
-            role: item.publisher?.role || '',
-            avatar: item.publisher?.avatar || ''
-          },
-          applicants: item.applicants || 0,
-          budget: item.budget === 0 ? '无偿' : (item.budget || '面议'),
-          urgency: item.urgency || 'normal'
-        }));
+        // 格式化数据时直接过滤掉不允许的状态
+        const formattedData = records
+          .filter(item => ALLOWED_STATUSES.includes(item.status))
+          .map((item, index) => ({
+            id: item.requirementId?.toString() || `req-${index}-${Date.now()}`,
+            title: item.title || '无标题',
+            type: item.requireType || item.requirementType || item.type || '未知类型',
+            description: item.description || '无描述',
+            status: item.status || 1,
+            publishTime: item.publishTime || new Date().toISOString(),
+            publisher: {
+              id: item.publisher?.id?.toString() || `pub-${index}-${Date.now()}`,
+              name: item.publisher?.name || item.publisher?.username || '未知用户',
+              role: item.publisher?.role || '',
+              avatar: item.publisher?.avatar || ''
+            },
+            applicants: item.applicants || 0,
+            budget: item.budget === 0 ? '无偿' : (item.budget || '面议'),
+            urgency: item.urgency || 'normal'
+          }));
         
         setAllRequirements(formattedData);
-        setPagination(prev => ({ ...prev, total }));
-        applyFilters(formattedData); // 初始加载时应用过滤
+        setPagination(prev => ({ ...prev, total: formattedData.length }));
+        applyFilters(formattedData);
       } else {
         setAllRequirements([]);
         setRequirements([]);
@@ -95,7 +105,7 @@ const RequirementListPage = () => {
   const applyFilters = useCallback((data = allRequirements) => {
     let filteredData = [...data];
     
-    // 应用搜索过滤
+    // 搜索过滤
     if (searchKeyword.trim()) {
       const keyword = searchKeyword.trim().toLowerCase();
       filteredData = filteredData.filter(item =>
@@ -104,22 +114,20 @@ const RequirementListPage = () => {
       );
     }
 
-    // 应用状态过滤
+    // 状态筛选（只在允许的状态中筛选）
     if (statusFilter !== 'all') {
-      filteredData = filteredData.filter(item => item.status === statusFilter);
+      const filterStatus = Number(statusFilter);
+      filteredData = filteredData.filter(item => item.status === filterStatus);
     }
 
-    // 更新分页数据
+    // 分页处理
     const total = filteredData.length;
     const startIndex = (pagination.current - 1) * pagination.pageSize;
     const endIndex = startIndex + pagination.pageSize;
     const paginatedData = filteredData.slice(startIndex, endIndex);
 
     setRequirements(paginatedData);
-    setPagination(prev => ({
-      ...prev,
-      total
-    }));
+    setPagination(prev => ({ ...prev, total }));
   }, [searchKeyword, statusFilter, pagination.current, pagination.pageSize, allRequirements]);
 
   useEffect(() => {
@@ -131,12 +139,8 @@ const RequirementListPage = () => {
   }, [searchKeyword, statusFilter, pagination.current, pagination.pageSize, applyFilters]);
 
   const getStatusTag = (status) => {
-    const statusMap = {
-      pending: { color: 'orange', text: '待接单' },
-      in_progress: { color: 'blue', text: '进行中' },
-      completed: { color: 'green', text: '已完成' }
-    };
-    return <Tag color={statusMap[status]?.color || 'gray'}>{statusMap[status]?.text || '未知状态'}</Tag>;
+    const config = statusMap[status] || { color: 'gray', text: '未知状态' };
+    return <Tag color={config.color}>{config.text}</Tag>;
   };
 
   const checkLoginStatus = () => {
@@ -172,7 +176,6 @@ const RequirementListPage = () => {
   };
 
   const handleDetail = (id) => {
-    console.log('跳转详情页，ID:', id);
     navigate(`/requirements/${id}`);
   };
 
@@ -199,8 +202,9 @@ const RequirementListPage = () => {
       try {
         await authApi.deleteRequirement(id);
         message.success('需求删除成功');
-        setAllRequirements(prev => prev.filter(item => item.id !== id));
-        applyFilters(allRequirements.filter(item => item.id !== id));
+        const updatedData = allRequirements.filter(item => item.id !== id);
+        setAllRequirements(updatedData);
+        applyFilters(updatedData);
       } catch (error) {
         console.error('删除需求失败:', error);
         message.error('删除需求失败，请稍后重试');
@@ -241,26 +245,14 @@ const RequirementListPage = () => {
             size="middle"
           >
             <Option value="all">全部状态</Option>
-            <Option value="pending">待接单</Option>
-            <Option value="in_progress">进行中</Option>
-            <Option value="completed">已完成</Option>
+            <Option value="1">待接单</Option>
+            <Option value="2">进行中</Option>
+            <Option value="3">已完成</Option>
           </Select>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-            <Button
-              type="primary"
-              onClick={handleMyRequirements}
-              size="middle"
-            >
-              我的需求
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleMyApplications}
-              size="middle"
-            >
-              我的申请
-            </Button>
+            <Button type="primary" onClick={handleMyRequirements} size="middle">我的需求</Button>
+            <Button type="primary" onClick={handleMyApplications} size="middle">我的申请</Button>
           </div>
         </div>
 

@@ -23,10 +23,11 @@ import {
   UserOutlined,
   CheckOutlined,
   CloseOutlined,
-  EyeOutlined,
   DeleteOutlined,
   MessageOutlined,
   SearchOutlined,
+  SyncOutlined,
+  ExclamationCircleOutlined
 } from "@ant-design/icons";
 import Navbar from "../Navbar/Navbar";
 import { authApi } from "../../service/api";
@@ -36,13 +37,27 @@ const { Search } = Input;
 const { Option } = Select;
 
 // 状态映射配置
-const statusNumMap = { 1: "pending", 2: "in_progress", 3: "completed" };
-const statusTextMap = { pending: 1, in_progress: 2, completed: 3 };
+const statusNumMap = { 
+  0: "pending_review",
+  1: "pending",
+  2: "in_progress",
+  3: "completed",
+  4: "rejected"
+};
+const statusTextMap = { 
+  pending_review: 0,
+  pending: 1, 
+  in_progress: 2, 
+  completed: 3,
+  rejected: 4
+};
 const statusMap = {
   all: { color: "gray", text: "全部" },
+  pending_review: { color: "purple", text: "审核中", icon: <SyncOutlined spin size="small" /> },
   pending: { color: "orange", text: "待接单", icon: <ClockCircleOutlined /> },
   in_progress: { color: "blue", text: "进行中", icon: <Spin size="small" /> },
   completed: { color: "green", text: "已完成", icon: <CheckOutlined /> },
+  rejected: { color: "red", text: "已驳回", icon: <ExclamationCircleOutlined /> }
 };
 
 // 角色映射配置
@@ -66,7 +81,7 @@ const MyRequirementsPage = () => {
 
   // 状态管理
   const [requirements, setRequirements] = useState([]);
-  const [allRequirements, setAllRequirements] = useState([]); // 存储所有需求数据
+  const [allRequirements, setAllRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -111,7 +126,7 @@ const MyRequirementsPage = () => {
         title: item.title || "",
         type: item.requireType,
         description: item.description || "",
-        status: statusNumMap[item.status],
+        status: statusNumMap[item.status] || "pending_review",
         publishTime: item.publishTime,
         deadline: item.deadline,
         budget: `${item.budget}元`,
@@ -123,7 +138,6 @@ const MyRequirementsPage = () => {
       setRequirements(formattedRequirements);
       setAllRequirements(formattedRequirements);
 
-      // 更新分页信息
       setPagination((prev) => ({
         ...prev,
         total,
@@ -143,11 +157,8 @@ const MyRequirementsPage = () => {
     fetchMyRequirements();
   }, [pagination.current, pagination.pageSize]);
 
+  // 筛选需求数据
   const filteredRequirements = allRequirements.filter((item) => {
-    // 如果没有搜索词且状态为"all"，则显示所有数据
-    if (!searchText && selectedStatus === "all") {
-      return requirements;
-    }
     const statusMatch =
       selectedStatus === "all" || item.status === selectedStatus;
     const searchMatch =
@@ -160,21 +171,18 @@ const MyRequirementsPage = () => {
   // 搜索处理
   const handleSearch = (value) => {
     setSearchText(value);
-    // 搜索时重置到第一页并重新获取数据
-    // setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   // 状态筛选处理
   const handleStatusChange = (value) => {
     setSelectedStatus(value);
-    // 筛选时重置到第一页并重新获取数据
-    // setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   // 分页处理
   const handlePaginationChange = (page, pageSize) => {
     setPagination((prev) => ({ ...prev, current: page, pageSize }));
-    // 分页变化时不需要立即调用fetchMyRequirements，因为useEffect会处理
   };
 
   // 获取申请人列表
@@ -196,7 +204,7 @@ const MyRequirementsPage = () => {
         applyTime: item.applyTime || "",
         introduction: item.introduction || "无申请说明",
         isSelected: item.status === 1,
-        isRejected: item.status === 2, // 添加拒绝状态字段
+        isRejected: item.status === 2,
       }));
 
       setApplicantModal((prev) => ({
@@ -212,8 +220,12 @@ const MyRequirementsPage = () => {
     }
   };
 
-  // 打开申请人模态框
+  // 打开申请人模态框（仅审核通过的状态可查看）
   const handleOpenApplicants = async (requirement) => {
+    if (requirement.status === "pending_review" || requirement.status === "rejected") {
+      message.warning(`${statusMap[requirement.status].text}状态下不可查看申请人`);
+      return;
+    }
     setApplicantModal((prev) => ({
       ...prev,
       visible: true,
@@ -345,7 +357,6 @@ const MyRequirementsPage = () => {
       const response = await authApi.deleteRequirements(requirementId);
       if (response.code !== 0) throw new Error(response.message || "删除失败");
 
-      // 重新获取数据以更新列表
       await fetchMyRequirements(pagination.current, pagination.pageSize);
       message.success("需求已删除");
     } catch (error) {
@@ -364,8 +375,15 @@ const MyRequirementsPage = () => {
     handleCloseApplicants();
   };
 
-  // 更新需求状态
+  // 更新需求状态（仅允许修改1、2、3状态）
   const handleStatusSelect = async (newStatus, requirement) => {
+    // 如果是0或4状态，不允许修改
+    if (["pending_review", "rejected"].includes(requirement.status)) {
+      message.warning(`${statusMap[requirement.status].text}状态不允许修改`);
+      return;
+    }
+    
+    // 相同状态不处理
     if (requirement.status === newStatus) return;
 
     Modal.confirm({
@@ -386,7 +404,6 @@ const MyRequirementsPage = () => {
           if (response.code !== 0)
             throw new Error(response.message || "更新状态失败");
 
-          // 重新获取数据以更新列表
           await fetchMyRequirements(pagination.current, pagination.pageSize);
           message.success(`需求已更新为${statusMap[newStatus].text}`);
         } catch (error) {
@@ -438,9 +455,11 @@ const MyRequirementsPage = () => {
                 value={selectedStatus}
               >
                 <Option value="all">全部状态</Option>
+                <Option value="pending_review">审核中</Option>
                 <Option value="pending">待接单</Option>
                 <Option value="in_progress">进行中</Option>
                 <Option value="completed">已完成</Option>
+                <Option value="rejected">已驳回</Option>
               </Select>
             </div>
           </div>
@@ -449,7 +468,7 @@ const MyRequirementsPage = () => {
             <Card style={{ padding: "60px 0", textAlign: "center" }}>
               <Spin size="large" tip="正在加载我的需求..." />
             </Card>
-          ) : requirements.length === 0 ? (
+          ) : filteredRequirements.length === 0 ? (
             <Card style={{ padding: "80px 0", textAlign: "center" }}>
               <Empty
                 description="暂无符合条件的需求"
@@ -508,23 +527,30 @@ const MyRequirementsPage = () => {
                         </h3>
                       </div>
                       <Space>
-                        <Select
-                          value={requirement.status}
-                          style={{ width: 130 }}
-                          onChange={(value) =>
-                            handleStatusSelect(value, requirement)
-                          }
-                        >
-                          <Option value="pending">待接单</Option>
-                          <Option value="in_progress">进行中</Option>
-                          <Option value="completed">已完成</Option>
-                        </Select>
+                        {/* 状态按钮处理：审核中和已驳回显示文字并灰显，其他状态显示下拉选择器 */}
+                        {["pending_review", "rejected"].includes(requirement.status) ? (
+                          <Button 
+                            style={{ width: 130 }}
+                            disabled 
+                            size="middle"
+                          >
+                            {statusMap[requirement.status].text}
+                          </Button>
+                        ) : (
+                          <Select
+                            value={requirement.status}
+                            style={{ width: 130 }}
+                            onChange={(value) => handleStatusSelect(value, requirement)}
+                          >
+                            <Option value="pending">待接单</Option>
+                            <Option value="in_progress">进行中</Option>
+                            <Option value="completed">已完成</Option>
+                          </Select>
+                        )}
                         <Popconfirm
                           title="确定删除该需求吗？"
                           description="删除后不可恢复，是否继续？"
-                          onConfirm={() =>
-                            handleDeleteRequirement(requirement.id)
-                          }
+                          onConfirm={() => handleDeleteRequirement(requirement.id)}
                           okText="是"
                           cancelText="否"
                         >
@@ -610,6 +636,7 @@ const MyRequirementsPage = () => {
                         type="primary"
                         onClick={() => handleOpenApplicants(requirement)}
                         size="small"
+                        disabled={requirement.status === "pending_review" || requirement.status === "rejected"}
                       >
                         申请人
                       </Button>
@@ -817,3 +844,4 @@ const MyRequirementsPage = () => {
 };
 
 export default MyRequirementsPage;
+    

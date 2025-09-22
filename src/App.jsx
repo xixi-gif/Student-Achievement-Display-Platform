@@ -32,6 +32,7 @@ import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPu
 import RequirementListPage from './pages/RequirementListPage/RequirementList2';
 import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDetailPage';
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
+import RequirementManagePage from './pages/RequirementManagePage/RequirementManagePage';
 import ChatPage from './pages/ChatPage/ChatPage';
 
 //评论相关页面
@@ -96,6 +97,7 @@ function App() {
               <Route path="/admin/achievements-manage" element={<AdminAchievementManagementPage />} />
               <Route path="/admin/announcement-publish" element={<AnnouncementPublish />} />
               <Route path="/admin/comments-manage" element={<AdminReviewComment />} />
+              <Route path="/admin/requirement-manage" element={<RequirementManagePage />} /> 
             </Route>
           </Routes>
         </div>

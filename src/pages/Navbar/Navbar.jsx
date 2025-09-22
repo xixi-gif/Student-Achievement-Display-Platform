@@ -8,7 +8,7 @@ import {
   CrownOutlined, StarOutlined, CheckCircleOutlined,
   BarChartOutlined, ReadOutlined, ReconciliationOutlined, 
   NotificationOutlined, MoreOutlined,
-  CommentOutlined
+  CommentOutlined,ProjectOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
@@ -42,7 +42,8 @@ const roleSpecificItems = {
     { key: '/admin/data-statistics', icon: <BarChartOutlined />, label: '数据统计' },
     { key: '/admin/system-settings', icon: <SettingOutlined />, label: '系统设置' },
     { key: '/admin/achievements-manage', icon: <ReconciliationOutlined />, label: '成果管理' },
-    { key: '/admin/comments-manage',icon:<CommentOutlined/>,label:'评论管理'}
+    { key: '/admin/comments-manage',icon:<CommentOutlined/>,label:'评论管理'},
+    { key: '/admin/requirement-manage',icon:<ProjectOutlined/>,label:'需求管理'},
   ],
   visitor: []
 };

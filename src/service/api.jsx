@@ -278,6 +278,8 @@ export const adminApi = {
         console.log(`上传进度: ${percentCompleted}%`);
       },
   }),
+  //需求管理
+  batchOperateRequirement: (data) => service.post('/requirements/batch/operate', data),
   // 用户管理接口
   getUserList: (params) => service.get("/admin/user", { params }),
   createUser: (data) => service.post("/admin/add", data),
