@@ -148,7 +148,7 @@ const TeacherProfile = () => {
         recommendLevel: item.recommendLevel || 0,
         views: item.views || 0,
         category: item.category,
-        keyword: item.keyword || [],
+        keyword: item.keywords || [],
         recommendComment: item.recommendComment,
         isRecommended: item.recommended,
       }));

@@ -13,7 +13,7 @@ import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDeta
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
 import AchievementForm from './pages/AchievementForm/AchievementForm2';
-import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage2';
+import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
 import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage2';
 import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage2';

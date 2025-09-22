@@ -240,16 +240,21 @@ export const achievementApi = {
   // 切换推荐状态
   toggleRecommend: (id) =>
     service.post("/teacher/recommend/toggle", null, { params: { id } }),
-  // 设置推荐等级
-  setRecommendLevel: (id, level) =>
-    service.post("/teacher/recommend/level", null, {
-      params: { id, recommendLevel: level },
-    }),
+  // 设置推荐等级，旧接口：多老师推荐，以最后一次记录等级为准
+  // setRecommendLevel: (id, level) =>
+  //   service.post("/teacher/recommend/level", null, {
+  //     params: { id, recommendLevel: level },
+  //   }),
+  //新接口：多老师推荐，取平均值
+  setRecommendLevel:(achievementId, level) => service.post("/teacher/recommend/level/teacher",null,{params:{achievementId,recommendLevel:level}}),
   // 设置推荐原因
   setRecommendComment: (id, comment) =>
     service.post("/teacher/recommend/comment", null, {
       params: { id, recommendComment: comment },
     }),
+  // 获取教师个人推荐列表（包含个人等级和平均等级）
+  getTeacherPersonalRecommendations: (params) => 
+    service.get("/teacher/personal-recommendations", { params }),
 };
 
 export const studentApi = {
