@@ -1,36 +1,50 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  List, Avatar, Input, Button, Space, Tag,
-  Spin, Tooltip, message, Badge, Popover
-} from 'antd';
-import { 
-  MessageOutlined, PaperClipOutlined, 
-  SmileOutlined, CloseOutlined, LoadingOutlined, 
-  CheckOutlined, FileTextOutlined, DeleteOutlined
-} from '@ant-design/icons';
-import EmojiPicker from 'emoji-picker-react';
-import Navbar from '../Navbar/Navbar';
-import { authApi } from '../../service/api';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  List,
+  Avatar,
+  Input,
+  Button,
+  Space,
+  Tag,
+  Spin,
+  Tooltip,
+  message,
+  Badge,
+  Popover,
+  Select,
+} from "antd";
+import {
+  MessageOutlined,
+  PaperClipOutlined,
+  SmileOutlined,
+  CloseOutlined,
+  LoadingOutlined,
+  CheckOutlined,
+  FileTextOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
+import EmojiPicker from "emoji-picker-react";
+import Navbar from "../Navbar/Navbar";
+import { authApi } from "../../service/api";
 
 const { TextArea } = Input;
-// 默认头像（兜底使用）
-const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+const { Option } = Select;
+const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 const loadingIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
-
 const ROLE_CONFIG = {
-  student: { text: '学生', color: 'green' },
-  teacher: { text: '老师', color: 'orange' },
-  admin: { text: '超级管理员', color: 'red' },
-  guest: { text: '访客', color: 'gray' },
-  default: { text: '用户', color: 'blue' } 
+  student: { text: "学生", color: "green" },
+  teacher: { text: "老师", color: "orange" },
+  admin: { text: "超级管理员", color: "red" },
+  visitor: { text: "访客", color: "gray" },
+  default: { text: "用户", color: "blue" },
 };
 
 const MessageCenterPage = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [messageContent, setMessageContent] = useState('');
+  const [messageContent, setMessageContent] = useState("");
   const [emojiVisible, setEmojiVisible] = useState(false);
   const [sendingLoading, setSendingLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -38,38 +52,34 @@ const MessageCenterPage = () => {
   const [uploadingFiles, setUploadingFiles] = useState([]);
   const [targetUser, setTargetUser] = useState({ id: null, name: null });
   const [creatingConversation, setCreatingConversation] = useState(false);
-  
-  // 当前登录用户的头像（从个人信息接口获取，用于发送新消息时）
   const [currentUserAvatar, setCurrentUserAvatar] = useState(DEFAULT_AVATAR);
-  
+  const [selectedExpireDays, setSelectedExpireDays] = useState(7);
+  const currentUserIdRef = useRef(null); // 添加这个 ref，确保异步获取的userId被正确存储
+  const initialMessageSentRef = useRef(new Set()); // 使用 ref 替代 state
+  const [isConversationsLoaded, setIsConversationsLoaded] = useState(false); // 添加这个状态
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // 监控头像状态
-  useEffect(() => {
-    console.log('当前用户头像:', currentUserAvatar);
-  }, [currentUserAvatar]);
+  const getRoleConfig = (role) => ROLE_CONFIG[role] || ROLE_CONFIG.default;
 
-  // 获取角色配置
-  const getRoleConfig = (role) => {
-    return ROLE_CONFIG[role] || ROLE_CONFIG.default;
-  };
-
-  // 处理头像的工具函数（优先使用接口返回值，失败时用默认头像）
   const getAvatar = (avatarUrl) => {
-    // 检查头像链接是否有效
-    if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('/'))) {
-      // 当头像加载失败时，显示默认头像
-      return <img 
-               src={avatarUrl} 
-               onError={(e) => e.target.src = DEFAULT_AVATAR} 
-               alt="用户头像" 
-             />;
+    if (
+      avatarUrl &&
+      (avatarUrl.startsWith("http") || avatarUrl.startsWith("/"))
+    ) {
+      return (
+        <img
+          src={avatarUrl}
+          onError={(e) => (e.target.src = DEFAULT_AVATAR)}
+          alt="用户头像"
+          style={{ objectFit: "cover" }}
+        />
+      );
     }
     return DEFAULT_AVATAR;
   };
 
-  // 消息更新时自动滚动到底部
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -77,194 +87,295 @@ const MessageCenterPage = () => {
   useEffect(() => {
     const parseUrlParams = () => {
       const params = new URLSearchParams(window.location.search);
-      const toUserId = params.get('toUserId');
-      const toUserName = params.get('toUserName') ? decodeURIComponent(params.get('toUserName')) : null;
-      if (toUserId) {
-        setTargetUser({ id: toUserId, name: toUserName || '未知用户' });
-      }
+      const toUserId = params.get("toUserId");
+      const toUserName = params.get("toUserName")
+        ? decodeURIComponent(params.get("toUserName"))
+        : null;
+      if (toUserId)
+        setTargetUser({ id: toUserId, name: toUserName || "未知用户" });
     };
     parseUrlParams();
   }, []);
 
-  useEffect(() => {
-    const initData = async () => {
-      try {
-        // 1. 获取当前登录用户信息（用于发送新消息时的头像）
-        const userRes = await authApi.getuserlogin();
-        console.log('个人信息接口返回:', userRes);
-        if (userRes.code === 0 && userRes.data?.id) {
-          setCurrentUserId(String(userRes.data.id));
-          // 保存我方头像（用于发送新消息）
-          setCurrentUserAvatar(getAvatar(userRes.data.avatar) || DEFAULT_AVATAR);
-          
-          // 2. 获取会话列表
-          await fetchConversations();
-          
-          // 3. 处理目标用户会话
-          if (targetUser.id && currentUserId) {
-            await handleTargetUserConversation();
-          }
-        } else {
-          message.error('获取用户信息失败，请重新登录');
-        }
-      } catch (err) {
-        console.error('初始化失败：', err);
-        message.error('页面加载失败，请刷新重试');
-      } finally {
-        setPageLoading(false);
-      }
-    };
-    initData();
-  }, [targetUser, currentUserId]);
+  // useEffect(() => {
+  //   const initData = async () => {
+  //     try {
+  //       const userRes = await authApi.getuserlogin();
+  //       if (userRes.code === 0 && userRes.data) {
+  //         const currentUserIdFromApi = String(userRes.data.id);
+  //         console.log("当前用户ID:", currentUserIdFromApi);
+  //         setCurrentUserId(currentUserIdFromApi);
+  //         currentUserIdRef.current = currentUserIdFromApi;
+  //         setCurrentUserAvatar(
+  //           getAvatar(userRes.data.avatar) || DEFAULT_AVATAR
+  //         );
 
+  //         // 先获取会话列表
+  //         const conversationsList = await fetchConversations();
+  //         setIsConversationsLoaded(true); // 标记会话列表已加载
+
+  //         // 检查是否已经发送过初始消息给这个用户
+  //         const hasSentToThisUser = initialMessageSentRef.current.has(
+  //           targetUser.id
+  //         );
+
+  //         // 如果目标用户存在且尚未发送过初始消息
+  //         if (targetUser.id && currentUserIdFromApi && !hasSentToThisUser) {
+  //           // 检查是否已存在与目标用户的会话
+  //           const existingConv = conversationsList.find(
+  //             (conv) => conv.withUser && conv.withUser.id === targetUser.id
+  //           );
+
+  //           console.log("找到的会话:", existingConv);
+
+  //           if (!existingConv) {
+  //             // 只有不存在会话时才发送初始消息
+  //             await handleTargetUserConversation();
+  //             initialMessageSentRef.current.add(targetUser.id);
+  //           } else {
+  //             // 如果会话已存在，标记为已处理，避免重复发送
+  //             initialMessageSentRef.current.add(targetUser.id);
+  //           }
+  //         }
+  //       } else {
+  //         message.error("获取用户信息失败，请重新登录");
+  //       }
+  //     } catch (err) {
+  //       console.error("初始化失败:", err);
+  //       message.error("页面加载失败，请刷新重试");
+  //     } finally {
+  //       setPageLoading(false);
+  //     }
+  //   };
+
+  //   if (targetUser.id) {
+  //     initData();
+  //   }
+  // }, [targetUser.id]);
+
+  let currentUserIdFromApi = null;
+
+useEffect(() => {
+  const initData = async () => {
+    try {
+      const userRes = await authApi.getuserlogin();
+      if (userRes.code === 0 && userRes.data) {
+        currentUserIdFromApi = String(userRes.data.id);
+        console.log("当前用户ID:", currentUserIdFromApi);
+        setCurrentUserId(currentUserIdFromApi);
+        currentUserIdRef.current = currentUserIdFromApi;
+        setCurrentUserAvatar(
+          getAvatar(userRes.data.avatar) || DEFAULT_AVATAR
+        );
+
+        // 检查是否尝试与自己创建会话
+        if (targetUser.id && currentUserIdFromApi === targetUser.id) {
+          message.warning("不能与自己创建会话");
+          // 不返回，继续加载会话列表
+        }
+
+        // 获取会话列表
+        const conversationsList = await fetchConversations();
+        setIsConversationsLoaded(true);
+
+        // 如果目标用户存在且不是自己
+        if (targetUser.id && currentUserIdFromApi && 
+            currentUserIdFromApi !== targetUser.id) {
+          // 检查是否已经发送过初始消息给这个用户
+          const hasSentToThisUser = initialMessageSentRef.current.has(
+            targetUser.id
+          );
+
+          if (!hasSentToThisUser) {
+            // 检查是否已存在与目标用户的会话
+            const existingConv = conversationsList.find(
+              (conv) => conv.withUser && conv.withUser.id === targetUser.id
+            );
+
+            if (!existingConv) {
+              await handleTargetUserConversation();
+              initialMessageSentRef.current.add(targetUser.id);
+            } else {
+              initialMessageSentRef.current.add(targetUser.id);
+            }
+          }
+        }
+      } else {
+        message.error("获取用户信息失败，请重新登录");
+      }
+    } catch (err) {
+      console.error("初始化失败:", err);
+      message.error("页面加载失败，请刷新重试");
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  if (targetUser.id) {
+    initData();
+  }
+}, [targetUser.id]);
 
   const handleTargetUserConversation = async () => {
     if (targetUser.id === currentUserId) {
-      message.warning('不能与自己创建会话');
+      console.warn("尝试与自己创建会话被阻止", {
+           targetUserId: targetUser.id,
+          currentUserId
+  });
+      message.warning("不能与自己创建会话");
       return;
     }
 
-    const existingConv = conversations.find(
-      conv => conv.withUser.id === targetUser.id
-    );
+    setCreatingConversation(true);
+    try {
+      const initMessage = "你好，我想咨询关于这个项目";
+      const sendRes = await authApi.sendMessage({
+        content: initMessage,
+        fromUserId: currentUserIdRef.current,
+        toUserId: targetUser.id,
+        type: 0,
+      });
 
-    if (existingConv) {
-      setActiveConversation(existingConv);
-      await fetchConversationMessages(existingConv.conversationId);
-    } else {
-      setCreatingConversation(true);
-      try {
-        const initMessage = '你好，我想咨询关于这个项目';
-        const sendRes = await authApi.sendMessage({
-          content: initMessage,
-          fromUserId: currentUserId,
-          toUserId: targetUser.id,
-          type: 0
-        });
+      if (sendRes.code === 0 && sendRes.data) {
+        // 刷新会话列表
+        await fetchConversations();
 
-        if (sendRes.code === 0 && sendRes.data) {
-          await fetchConversations();
-          const updatedConvs = await authApi.getConversationRecords({ 
-            params: { current: 1, pageSize: 20 }
-          });
-          
-          if (updatedConvs.code === 0 && updatedConvs.data) {
-            const formattedConvs = updatedConvs.data.map(conv => ({
-              id: conv.id.toString(),
-              withUser: {
-                id: String(conv.withUser.id),
-                name: conv.withUser.name || '未知用户',
-                avatar: getAvatar(conv.withUser.avatar),
-                role: conv.withUser.role || 'default'
-              },
-              lastMessage: {
-                content: conv.lastMessage?.content || initMessage,
-                time: conv.lastMessage?.createTime || new Date().toISOString(),
-                unread: false,
-                id: conv.lastMessage?.id?.toString() || ''
-              },
-              conversationId: conv.id
-            }));
-            
-            setConversations(formattedConvs);
-            const newConv = formattedConvs.find(
-              conv => conv.withUser.id === targetUser.id
-            );
-            
-            if (newConv) {
-              setActiveConversation(newConv);
-              const initialMessages = [{
+        // 获取更新后的会话列表
+        const updatedConvs = await authApi.getConversationRecords();
+
+        if (updatedConvs.code === 0 && updatedConvs.data) {
+          const formattedConvs = updatedConvs.data.map((conv) => ({
+            id: conv.id.toString(),
+            withUser: {
+              id: String(conv.withUser.id),
+              name: conv.withUser.name || "未知用户",
+              avatar: getAvatar(conv.withUser.avatar),
+              role: conv.withUser.role || "default",
+            },
+            lastMessage: {
+              content: conv.lastMessage?.content || initMessage,
+              time: conv.lastMessage?.createTime || new Date().toISOString(),
+              unread: false,
+              id: conv.lastMessage?.id?.toString() || "",
+            },
+            conversationId: conv.id,
+          }));
+
+          setConversations(formattedConvs);
+
+          // 找到新创建的会话并激活它
+          const newConv = formattedConvs.find(
+            (conv) => conv.withUser && conv.withUser.id === targetUser.id
+          );
+
+          if (newConv) {
+            setActiveConversation(newConv);
+            const initialMessages = [
+              {
                 id: sendRes.data.id.toString(),
-                senderId: currentUserId,
+                senderId: currentUserIdRef.current,
                 content: initMessage,
                 time: sendRes.data.createTime || new Date().toISOString(),
-                status: 'sent',
-                // 使用当前用户头像（新消息）
+                status: "sent",
                 senderAvatar: currentUserAvatar,
-                files: []
-              }];
-              setMessages(initialMessages);
-            }
+                files: [],
+              },
+            ];
+            setMessages(initialMessages);
           }
-        } else {
-          message.error('创建会话失败：' + (sendRes.message || '未知错误'));
         }
-      } catch (err) {
-        console.error('创建会话失败详情：', err.response || err);
-        const errorMsg = err.response?.data?.message || err.message || '创建会话失败，请重试';
-        message.error(errorMsg);
-      } finally {
-        setCreatingConversation(false);
+      } else {
+        message.error(sendRes.message || "发送初始消息失败");
       }
+    } catch (err) {
+      console.error("创建会话失败详情：", err);
+      message.error(err.message || "创建会话失败，请重试");
+    } finally {
+      setCreatingConversation(false);
     }
   };
 
   const fetchConversations = async () => {
     try {
       setPageLoading(true);
-      const res = await authApi.getConversationRecords({ 
-        params: { current: 1, pageSize: 20 }
-      });
+      const res = await authApi.getConversationRecords();
 
       if (res.code === 0 && res.data) {
-        const formattedConversations = res.data.map(conv => ({
+        const formattedConversations = res.data.map((conv) => ({
           id: conv.id.toString(),
           withUser: {
             id: String(conv.withUser.id),
-            name: conv.withUser.name || '未知用户',
+            name: conv.withUser.name || "未知用户",
             avatar: getAvatar(conv.withUser.avatar),
-            role: conv.withUser.role || 'default'
+            role: conv.withUser.role || "default",
           },
           lastMessage: {
-            content: conv.lastMessage?.content || '',
+            content: conv.lastMessage?.content || "",
             time: conv.lastMessage?.createTime || new Date().toISOString(),
-            unread: conv.lastMessage?.status === 0 && String(conv.lastMessage?.senderId) !== currentUserId,
-            id: conv.lastMessage?.id?.toString() || ''
+            unread:
+              conv.lastMessage?.status === 0 &&
+              String(conv.lastMessage?.senderId) !== currentUserId,
+            id: conv.lastMessage?.id?.toString() || "",
           },
-          conversationId: conv.id
+          conversationId: conv.id,
         }));
 
         setConversations(formattedConversations);
-        if (!targetUser.id && !activeConversation && formattedConversations.length > 0) {
+
+        // 如果有目标用户ID，尝试找到对应的会话并激活
+        if (targetUser.id) {
+          const targetConversation = formattedConversations.find(
+            (conv) => conv.withUser && conv.withUser.id === targetUser.id
+          );
+
+          if (targetConversation) {
+            setActiveConversation(targetConversation);
+            await fetchConversationMessages(targetConversation.conversationId);
+          }
+        } else if (formattedConversations.length > 0) {
+          // 如果没有目标用户ID，选择第一个会话
           setActiveConversation(formattedConversations[0]);
+          await fetchConversationMessages(
+            formattedConversations[0].conversationId
+          );
         }
+
+        // 返回格式化后的会话列表
+        return formattedConversations;
       } else {
-        message.error(res.message || '加载会话列表失败');
+        message.error(res.message || "加载会话列表失败");
+        return [];
       }
     } catch (err) {
-      console.error('加载会话失败：', err);
-      message.error('加载会话失败，请重试');
+      console.error("加载会话失败：", err);
+      message.error("加载会话失败，请重试");
+      return [];
     } finally {
       setPageLoading(false);
     }
   };
 
-  // 修改 fetchConversationMessages 函数，增加 conversationId 过滤
   const fetchConversationMessages = async (conversationId) => {
     try {
       setPageLoading(true);
       const res = await authApi.getConversationMessages(conversationId);
-      console.log('原始消息列表接口返回:', res);
-      
+
       if (res.code === 0 && res.data?.records) {
-        // 🌟 关键修复：只保留与当前会话ID匹配的消息
         const validRecords = res.data.records.filter(
-          msg => msg.conversationId === conversationId
+          (msg) => msg.conversationId === conversationId
         );
-        
-        // 打印过滤前后的数量，确认过滤效果
-        console.log(`消息过滤：原始${res.data.records.length}条，有效${validRecords.length}条`);
-        
-        // 按时间升序排序
+
         const sortedRecords = [...validRecords].sort((a, b) => {
           return new Date(a.createTime) - new Date(b.createTime);
         });
-        
-        // 格式化消息
-        const formattedMessages = sortedRecords.map(msg => {
-          // 确定头像（优先用当前用户头像或对方头像）
+
+        const formattedMessages = sortedRecords.map((msg) => {
           let avatar = DEFAULT_AVATAR;
-          if (String(msg.senderId) === currentUserId) {
+          // 确保正确识别消息发送者
+          const isCurrentUser =
+            String(msg.senderId) === currentUserIdRef.current;
+
+          if (isCurrentUser) {
             avatar = currentUserAvatar;
           } else {
             avatar = activeConversation?.withUser?.avatar || DEFAULT_AVATAR;
@@ -273,174 +384,250 @@ const MessageCenterPage = () => {
           return {
             id: msg.id.toString(),
             senderId: String(msg.senderId),
-            content: msg.content || '',
+            content: msg.content || "",
             time: msg.createTime || new Date().toISOString(),
-            status: msg.status === 0 ? 'sending' : 
-                    msg.status === 1 ? 'sent' : 
-                    msg.status === 2 ? 'read' : 'failed',
+            status:
+              msg.status === 0
+                ? "sending"
+                : msg.status === 1
+                ? "sent"
+                : msg.status === 2
+                ? "read"
+                : "failed",
             senderAvatar: avatar,
-            files: msg.files || []
+            files: msg.files || [],
+            expireTime: msg.expireTime,
+            isExpired: msg.isExpired === 1,
           };
         });
 
         setMessages(formattedMessages);
         await markAsRead(conversationId);
       } else {
-        message.error(res.message || '加载消息失败');
+        message.error(res.message || "加载消息失败");
       }
     } catch (err) {
-      console.error('加载消息失败：', err);
-      message.error('加载消息失败，请重试');
+      console.error("加载消息失败：", err);
+      message.error("加载消息失败，请重试");
     } finally {
       setPageLoading(false);
     }
   };
 
-
   const markAsRead = async (conversationId) => {
     try {
       await authApi.markAsRead(conversationId);
-      setConversations(prev => 
-        prev.map(conv => 
-          conv.conversationId === conversationId 
-            ? { ...conv, lastMessage: { ...conv.lastMessage, unread: false } } 
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.conversationId === conversationId
+            ? { ...conv, lastMessage: { ...conv.lastMessage, unread: false } }
             : conv
         )
       );
     } catch (err) {
-      console.error('标记已读失败：', err);
+      console.error("标记已读失败：", err);
     }
   };
 
   const handleFileUpload = async (file) => {
-    setUploadingFiles(prev => [...prev, {
-      id: `file-${Date.now()}`,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      status: 'uploading',
-      file: file
-    }]);
+    if (!activeConversation) {
+      message.warning("请先选择会话");
+      return;
+    }
+
+    const fileId = `file-${Date.now()}`;
+    setUploadingFiles((prev) => [
+      ...prev,
+      {
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: "uploading",
+        file: file,
+        progress: 0,
+      },
+    ]);
 
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append("file", file);
+    formData.append("conversationId", activeConversation.conversationId);
+    formData.append("expireDays", selectedExpireDays);
+    formData.append("receiverId", activeConversation.withUser.id);
+
     try {
-      const res = await authApi.uploadFile(formData);
-      if (res.code === 0 && res.data?.url) {
-        setUploadingFiles(prev => prev.map(f => 
-          f.id === `file-${Date.now()}` 
-            ? { ...f, status: 'done', url: res.data.url } 
-            : f
-        ));
-        message.success('文件上传成功');
-        setMessageContent(prev => `${prev}\n[文件] ${file.name} (${res.data.url})`);
+      const res = await authApi.sendFileMessage(formData);
+
+      if (res.code === 0 && res.data?.content) {
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId
+              ? {
+                  ...f,
+                  status: "done",
+                  url: res.data.content,
+                  fileName: res.data.fileName,
+                }
+              : f
+          )
+        );
       } else {
-        setUploadingFiles(prev => prev.map(f => 
-          f.id === `file-${Date.now()}` 
-            ? { ...f, status: 'error' } 
-            : f
-        ));
-        message.error(res.message || '文件上传失败');
+        setUploadingFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "error" } : f))
+        );
+        message.error(res.message || "文件上传失败");
       }
     } catch (err) {
-      setUploadingFiles(prev => prev.map(f => 
-        f.id === `file-${Date.now()}` 
-          ? { ...f, status: 'error' } 
-          : f
-      ));
-      console.error('文件上传失败：', err);
-      message.error('文件上传失败，请重试');
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "error" } : f))
+      );
+      message.error("文件上传异常: " + (err.message || "未知错误"));
     }
   };
 
-  const handleRemoveFile = (fileId) => {
-    setUploadingFiles(prev => prev.filter(f => f.id !== fileId));
-  };
-
-  // 发送消息时，使用当前用户头像（与接口返回的senderAvatar保持一致）
-  const handleSendMessage = async () => {
-    const content = messageContent.trim();
-    if (!content || !activeConversation || !currentUserId) {
-      message.warning('请输入消息内容');
+  const handleSendFileMessage = async () => {
+    if (!activeConversation || !currentUserId || uploadingFiles.length === 0) {
+      message.warning("请选择文件并确保会话有效");
       return;
     }
 
     setSendingLoading(true);
-    // 临时消息使用当前用户头像（与接口最终返回的senderAvatar一致）
+
+    try {
+      const formData = new FormData();
+      uploadingFiles.forEach((file) => {
+        formData.append("file", file.file);
+      });
+      formData.append("conversationId", activeConversation.conversationId);
+      formData.append("expireDays", selectedExpireDays);
+      formData.append("receiverId", activeConversation.withUser.id);
+
+      const res = await authApi.sendFileMessage(formData);
+
+      if (res.code === 0 && res.data) {
+        const newFileMessage = {
+          id: res.data.id.toString(),
+          senderId: currentUserId,
+          content: `发送了文件: ${res.data.fileName}`,
+          time: res.data.createTime || new Date().toISOString(),
+          status: "sent",
+          senderAvatar: currentUserAvatar,
+          files: [
+            {
+              name: res.data.fileName,
+              url: res.data.content,
+              size: res.data.fileSize,
+            },
+          ],
+          expireTime: res.data.expireTime,
+          isExpired: res.data.isExpired === 1,
+        };
+        setMessages((prev) => [...prev, newFileMessage]);
+        updateConversationLastMessage(
+          newFileMessage.content,
+          newFileMessage.time
+        );
+        setMessageContent("");
+        setUploadingFiles([]);
+        message.success("文件发送成功");
+      } else {
+        message.error(res.message || "文件发送失败");
+      }
+    } catch (err) {
+      console.error("文件发送失败：", err);
+      message.error("网络异常，文件发送失败");
+    } finally {
+      setSendingLoading(false);
+    }
+  };
+
+  const handleRemoveFile = (fileId) => {
+    setUploadingFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  const handleSendMessage = async () => {
+    const content = messageContent.trim();
+    if (!content || !activeConversation || !currentUserIdRef.current) {
+      message.warning("请输入消息内容");
+      return;
+    }
+
+    setSendingLoading(true);
     const tempMsg = {
       id: `temp-${Date.now()}`,
-      senderId: currentUserId,
+      senderId: currentUserIdRef.current,
       content,
       time: new Date().toISOString(),
-      status: 'sending',
-      senderAvatar: currentUserAvatar, // 确保与接口返回的我方头像一致
+      status: "sending",
+      senderAvatar: currentUserAvatar,
     };
-    console.log('发送临时消息（头像）:', tempMsg.senderAvatar);
-    setMessages(prev => [...prev, tempMsg]);
+    setMessages((prev) => [...prev, tempMsg]);
 
     try {
       const res = await authApi.sendMessage({
         content,
-        fromUserId: currentUserId,
+        fromUserId: currentUserIdRef.current, // 使用 ref 中的用户ID
         toUserId: activeConversation.withUser.id,
-        type: 0
+        type: 0,
       });
 
       if (res.code === 0 && res.data) {
-        // 正式消息优先使用接口返回的senderAvatar，否则用当前用户头像
-        const finalAvatar = res.data.senderAvatar ? getAvatar(res.data.senderAvatar) : currentUserAvatar;
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === tempMsg.id 
+        const finalAvatar = res.data.senderAvatar
+          ? getAvatar(res.data.senderAvatar)
+          : currentUserAvatar;
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempMsg.id
               ? {
                   id: res.data.id.toString(),
-                  senderId: currentUserId,
+                  senderId: currentUserIdRef.current,
                   content: res.data.content,
                   time: res.data.createTime,
-                  status: 'sent',
-                  senderAvatar: finalAvatar, // 与接口返回保持一致
-                  files: res.data.files || []
+                  status: "sent",
+                  senderAvatar: finalAvatar,
+                  files: res.data.files || [],
+                  expireTime: res.data.expireTime,
+                  isExpired: res.data.isExpired === 1,
                 }
               : msg
           )
         );
         updateConversationLastMessage(content, new Date().toISOString());
-        setMessageContent('');
+        setMessageContent("");
         setUploadingFiles([]);
       } else {
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === tempMsg.id ? { ...msg, status: 'failed' } : msg
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempMsg.id ? { ...msg, status: "failed" } : msg
           )
         );
-        message.error(res.message || '发送消息失败');
+        message.error(res.message || "发送消息失败");
       }
     } catch (err) {
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === tempMsg.id ? { ...msg, status: 'failed' } : msg
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempMsg.id ? { ...msg, status: "failed" } : msg
         )
       );
-      console.error('发送消息失败：', err);
-      message.error('网络异常，发送失败');
+      console.error("发送消息失败：", err);
+      message.error("网络异常，发送失败");
     } finally {
       setSendingLoading(false);
     }
   };
 
   const updateConversationLastMessage = (content, time) => {
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.id === activeConversation.id 
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === activeConversation.id
           ? {
               ...conv,
               lastMessage: {
                 content,
                 time,
                 unread: false,
-                id: `last-${Date.now()}`
-              }
+                id: `last-${Date.now()}`,
+              },
             }
           : conv
       )
@@ -453,7 +640,7 @@ const MessageCenterPage = () => {
   };
 
   const handleEmojiSelect = (emojiData) => {
-    setMessageContent(prev => prev + emojiData.emoji);
+    setMessageContent((prev) => prev + emojiData.emoji);
     setEmojiVisible(false);
   };
 
@@ -463,7 +650,7 @@ const MessageCenterPage = () => {
 
   const handleResendMessage = (failedMsg) => {
     setMessageContent(failedMsg.content);
-    document.querySelector('textarea.ant-input')?.focus();
+    document.querySelector("textarea.ant-input")?.focus();
   };
 
   const formatFileSize = (bytes) => {
@@ -473,53 +660,74 @@ const MessageCenterPage = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Navbar />
       {pageLoading && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          background: 'rgba(255,255,255,0.7)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(255,255,255,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
           <Spin indicator={loadingIcon} tip="加载中..." />
         </div>
       )}
 
-      <div style={{ padding: '24px', background: '#f7f8fa', flex: 1, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', height: '100%' }}>
-          <div style={{ width: 300, borderRight: '1px solid #f0f0f0', overflowY: 'auto' }}>
+      <div
+        style={{
+          padding: "24px",
+          background: "#f7f8fa",
+          flex: 1,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex", height: "100%" }}>
+          <div
+            style={{
+              width: 300,
+              borderRight: "1px solid #f0f0f0",
+              overflowY: "auto",
+            }}
+          >
             <List
               dataSource={conversations}
               renderItem={(conversation) => {
                 const roleConfig = getRoleConfig(conversation.withUser.role);
                 return (
                   <List.Item
-                    style={{ 
-                      cursor: 'pointer',
-                      backgroundColor: activeConversation?.id === conversation.id ? '#f0f7ff' : 'inherit',
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #f5f5f5'
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor:
+                        activeConversation?.id === conversation.id
+                          ? "#f0f7ff"
+                          : "inherit",
+                      padding: "12px 16px",
+                      borderBottom: "1px solid #f5f5f5",
                     }}
                     onClick={() => handleConversationChange(conversation)}
                   >
                     <List.Item.Meta
                       avatar={
                         <Badge dot={conversation.lastMessage.unread}>
-                          <Avatar src={conversation.withUser.avatar} size={40} />
+                          <Avatar
+                            src={conversation.withUser.avatar}
+                            size={40}
+                          />
                         </Badge>
                       }
                       title={
-                        <div style={{ fontWeight: '500', fontSize: 14 }}>
+                        <div style={{ fontWeight: "500", fontSize: 14 }}>
                           {conversation.withUser.name}
-                          <Tag 
-                            size="small" 
+                          <Tag
+                            size="small"
                             color={roleConfig.color}
                             style={{ marginLeft: 8 }}
                           >
@@ -528,59 +736,87 @@ const MessageCenterPage = () => {
                         </div>
                       }
                       description={
-                        <span style={{ 
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'inline-block',
-                          width: '100%',
-                          fontSize: 12,
-                          color: '#666'
-                        }}>
+                        <span
+                          style={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "inline-block",
+                            width: "100%",
+                            fontSize: 12,
+                            color: "#666",
+                          }}
+                        >
                           {conversation.lastMessage.content}
                         </span>
                       }
                     />
-                    <div style={{ fontSize: 11, color: '#999' }}>
-                      {new Date(conversation.lastMessage.time).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
+                    <div style={{ fontSize: 11, color: "#999" }}>
+                      {new Date(
+                        conversation.lastMessage.time
+                      ).toLocaleDateString()}
+                      <br />
+                      {new Date(
+                        conversation.lastMessage.time
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
                       })}
                     </div>
                   </List.Item>
                 );
               }}
-              locale={{ emptyText: <div style={{ padding: '20px 0', textAlign: 'center' }}>暂无会话</div> }}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: "20px 0", textAlign: "center" }}>
+                    暂无会话
+                  </div>
+                ),
+              }}
             />
           </div>
-          
+
           {creatingConversation ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fafafa",
+              }}
+            >
               <Spin indicator={loadingIcon} tip="正在创建会话..." />
             </div>
           ) : activeConversation ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ 
-                padding: '16px 24px', 
-                borderBottom: '1px solid #f0f0f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: '#fff'
-              }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  padding: "16px 24px",
+                  borderBottom: "1px solid #f0f0f0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#fff",
+                }}
+              >
                 <Space>
                   <Avatar src={activeConversation.withUser.avatar} size={40} />
                   <div>
-                    <div style={{ fontWeight: 'bold', fontSize: 15 }}>{activeConversation.withUser.name}</div>
-                    <Tag 
-                      size="small" 
-                      color={getRoleConfig(activeConversation.withUser.role).color}
+                    <div style={{ fontWeight: "bold", fontSize: 15 }}>
+                      {activeConversation.withUser.name}
+                    </div>
+                    <Tag
+                      size="small"
+                      color={
+                        getRoleConfig(activeConversation.withUser.role).color
+                      }
                     >
                       {getRoleConfig(activeConversation.withUser.role).text}
                     </Tag>
                   </div>
                 </Space>
-                <Space>
+                {/* <Space>
                   <Tooltip title="静音会话">
                     <Button 
                       type="text" 
@@ -589,190 +825,320 @@ const MessageCenterPage = () => {
                     />
                   </Tooltip>
                   <Button type="text" icon={<CloseOutlined />} size="small" />
-                </Space>
+                </Space> */}
               </div>
-              
-              <div style={{ 
-                flex: 1, 
-                overflowY: 'auto', 
-                padding: '24px',
-                background: '#fafafa'
-              }}>
+
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "24px",
+                  background: "#fafafa",
+                }}
+              >
                 <List
                   dataSource={messages}
                   renderItem={(msg) => {
                     const isCurrentUser = msg.senderId === currentUserId;
-                    // 打印渲染时的头像信息，确认是否正确
-                    console.log(`渲染消息ID: ${msg.id}, 是否我方: ${isCurrentUser}, 头像: ${msg.senderAvatar}`);
-                    
                     return (
                       <List.Item
                         style={{
-                          display: 'flex',
-                          margin: '12px 0',
+                          display: "flex",
+                          margin: "12px 0",
                           padding: 0,
-                          border: 'none',
-                          alignItems: 'flex-start'
+                          border: "none",
+                          alignItems: "flex-start",
                         }}
                       >
                         {!isCurrentUser ? (
-                          // 对方的消息：使用接口返回的senderAvatar
-                          <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
-                            <Avatar 
-                              src={msg.senderAvatar} 
-                              size={36} 
-                              style={{ marginRight: 12, flexShrink: 0 }} 
+                          <div
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              justifyContent: "flex-start",
+                            }}
+                          >
+                            <Avatar
+                              src={msg.senderAvatar}
+                              size={36}
+                              style={{ marginRight: 12, flexShrink: 0 }}
                             />
                             <div
-                              style={{ 
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'flex-start',
-                                maxWidth: '70%'
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                maxWidth: "70%",
                               }}
                             >
-                              <div style={{ 
-                                fontWeight: 500, 
-                                marginBottom: 4,
-                                fontSize: 12,
-                                color: '#666'
-                              }}>
+                              <div
+                                style={{
+                                  fontWeight: 500,
+                                  marginBottom: 4,
+                                  fontSize: 12,
+                                  color: "#666",
+                                }}
+                              >
                                 {activeConversation.withUser.name}
                               </div>
                               <div
-                                style={{ 
-                                  display: 'inline-block',
-                                  padding: '10px 14px',
-                                  borderRadius: '0 10px 10px 10px',
-                                  background: '#e9f7fe',
-                                  color: '#333',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                style={{
+                                  display: "inline-block",
+                                  padding: "10px 14px",
+                                  borderRadius: "0 10px 10px 10px",
+                                  background: "#e9f7fe",
+                                  color: "#333",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                                 }}
                               >
                                 {msg.content && <div>{msg.content}</div>}
                                 {msg.files && msg.files.length > 0 && (
                                   <div style={{ marginTop: 8 }}>
                                     {msg.files.map((file, index) => (
-                                      <div key={index} style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center',
-                                        marginBottom: 4,
-                                        color: '#1890ff'
-                                      }}>
-                                        <FileTextOutlined style={{ marginRight: 6 }} />
-                                        <a 
-                                          href={file.url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
+                                      <div
+                                        key={index}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          marginBottom: 4,
+                                          color: msg.isExpired
+                                            ? "#999"
+                                            : "#1890ff",
+                                        }}
+                                      >
+                                        <FileTextOutlined
+                                          style={{ marginRight: 6 }}
+                                        />
+                                        <a
+                                          href={
+                                            !msg.isExpired
+                                              ? file.url
+                                              : "javascript:void(0)"
+                                          }
+                                          target={
+                                            !msg.isExpired
+                                              ? "_blank"
+                                              : undefined
+                                          }
+                                          rel={
+                                            !msg.isExpired
+                                              ? "noopener noreferrer"
+                                              : undefined
+                                          }
+                                          onClick={
+                                            msg.isExpired
+                                              ? (e) => {
+                                                  e.preventDefault();
+                                                  message.warning(
+                                                    "文件已过期，无法下载"
+                                                  );
+                                                }
+                                              : undefined
+                                          }
                                         >
                                           {file.name}
+                                          {msg.isExpired && (
+                                            <span style={{ marginLeft: 8 }}>
+                                              （已过期）
+                                            </span>
+                                          )}
                                         </a>
-                                        <span style={{ marginLeft: 6, fontSize: 12 }}>
+                                        <span
+                                          style={{
+                                            marginLeft: 6,
+                                            fontSize: 12,
+                                          }}
+                                        >
                                           {formatFileSize(file.size)}
                                         </span>
+                                        {!msg.isExpired && msg.expireTime && (
+                                          <span
+                                            style={{
+                                              marginLeft: 8,
+                                              fontSize: 12,
+                                              color: "#ff7d00",
+                                            }}
+                                          >
+                                            有效期至{" "}
+                                            {new Date(
+                                              msg.expireTime
+                                            ).toLocaleDateString()}
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
                                 )}
-                                <div style={{ 
-                                  fontSize: '0.8em', 
-                                  color: '#999', 
-                                  textAlign: 'right',
-                                  marginTop: '4px'
-                                }}>
-                                  {new Date(msg.time).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
+                                <div
+                                  style={{
+                                    fontSize: "0.8em",
+                                    color: "#999",
+                                    textAlign: "right",
+                                    marginTop: "4px",
+                                  }}
+                                >
+                                  {new Date(msg.time).toLocaleDateString()}{" "}
+                                  {new Date(msg.time).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
                                   })}
                                 </div>
                               </div>
                             </div>
                           </div>
                         ) : (
-                          // 我方的消息：使用接口返回的senderAvatar（或currentUserAvatar）
-                          <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                          <div
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              justifyContent: "flex-end",
+                            }}
+                          >
                             <div
-                              style={{ 
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'flex-end',
-                                maxWidth: '70%'
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-end",
+                                maxWidth: "70%",
                               }}
                             >
-                              <div style={{ 
-                                fontWeight: 500, 
-                                marginBottom: 4,
-                                fontSize: 12,
-                                color: '#666'
-                              }}>
+                              <div
+                                style={{
+                                  fontWeight: 500,
+                                  marginBottom: 4,
+                                  fontSize: 12,
+                                  color: "#666",
+                                }}
+                              >
                                 我
                               </div>
                               <div
-                                style={{ 
-                                  display: 'inline-block',
-                                  padding: '10px 14px',
-                                  borderRadius: '10px 0 10px 10px',
-                                  background: '#1890ff',
-                                  color: '#fff',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                style={{
+                                  display: "inline-block",
+                                  padding: "10px 14px",
+                                  borderRadius: "10px 0 10px 10px",
+                                  background: "#1890ff",
+                                  color: "#fff",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
                                 }}
                               >
                                 {msg.content && <div>{msg.content}</div>}
                                 {msg.files && msg.files.length > 0 && (
                                   <div style={{ marginTop: 8 }}>
                                     {msg.files.map((file, index) => (
-                                      <div key={index} style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center',
-                                        marginBottom: 4,
-                                        color: 'rgba(255,255,255,0.9)'
-                                      }}>
-                                        <FileTextOutlined style={{ marginRight: 6 }} />
-                                        <a 
-                                          href={file.url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
+                                      <div
+                                        key={index}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          marginBottom: 4,
+                                          color: msg.isExpired
+                                            ? "#ccc"
+                                            : "rgba(255,255,255,0.9)",
+                                        }}
+                                      >
+                                        <FileTextOutlined
+                                          style={{ marginRight: 6 }}
+                                        />
+                                        <a
+                                          href={
+                                            !msg.isExpired
+                                              ? file.url
+                                              : "javascript:void(0)"
+                                          }
+                                          target={
+                                            !msg.isExpired
+                                              ? "_blank"
+                                              : undefined
+                                          }
+                                          rel={
+                                            !msg.isExpired
+                                              ? "noopener noreferrer"
+                                              : undefined
+                                          }
+                                          onClick={
+                                            msg.isExpired
+                                              ? (e) => {
+                                                  e.preventDefault();
+                                                  message.warning(
+                                                    "文件已过期，无法下载"
+                                                  );
+                                                }
+                                              : undefined
+                                          }
                                         >
                                           {file.name}
+                                          {msg.isExpired && (
+                                            <span style={{ marginLeft: 8 }}>
+                                              （已过期）
+                                            </span>
+                                          )}
                                         </a>
-                                        <span style={{ marginLeft: 6, fontSize: 12 }}>
+                                        <span
+                                          style={{
+                                            marginLeft: 6,
+                                            fontSize: 12,
+                                          }}
+                                        >
                                           {formatFileSize(file.size)}
                                         </span>
+                                        {!msg.isExpired && msg.expireTime && (
+                                          <span
+                                            style={{
+                                              marginLeft: 8,
+                                              fontSize: 12,
+                                              color: "#ffd700",
+                                            }}
+                                          >
+                                            有效期至{" "}
+                                            {new Date(
+                                              msg.expireTime
+                                            ).toLocaleDateString()}
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
                                 )}
-                                <div style={{ 
-                                  fontSize: '0.8em', 
-                                  color: 'rgba(255,255,255,0.8)', 
-                                  textAlign: 'right',
-                                  marginTop: '4px',
-                                  display: 'flex',
-                                  justifyContent: 'flex-end',
-                                  alignItems: 'center'
-                                }}>
-                                  {new Date(msg.time).toLocaleTimeString([], { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit' 
+                                <div
+                                  style={{
+                                    fontSize: "0.8em",
+                                    color: "rgba(255,255,255,0.8)",
+                                    textAlign: "right",
+                                    marginTop: "4px",
+                                    display: "flex",
+                                    justifyContent: "flex-end",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {new Date(msg.time).toLocaleDateString()}{" "}
+                                  {new Date(msg.time).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
                                   })}
-                                  {msg.status === 'sending' && (
+                                  {msg.status === "sending" && (
                                     <Tooltip title="发送中">
-                                      <span style={{ marginLeft: '4px' }}>🕒</span>
+                                      <span style={{ marginLeft: "4px" }}>
+                                        🕒
+                                      </span>
                                     </Tooltip>
                                   )}
-                                  {msg.status === 'failed' && (
+                                  {msg.status === "failed" && (
                                     <Tooltip title="点击重发">
-                                      <span 
-                                        style={{ marginLeft: '4px', cursor: 'pointer' }}
+                                      <span
+                                        style={{
+                                          marginLeft: "4px",
+                                          cursor: "pointer",
+                                        }}
                                         onClick={() => handleResendMessage(msg)}
                                       >
                                         ✖
                                       </span>
                                     </Tooltip>
                                   )}
-                                  {msg.status === 'read' && (
+                                  {msg.status === "read" && (
                                     <Tooltip title="已读">
-                                      <span style={{ marginLeft: '4px' }}>
+                                      <span style={{ marginLeft: "4px" }}>
                                         <CheckOutlined />
                                       </span>
                                     </Tooltip>
@@ -780,70 +1146,121 @@ const MessageCenterPage = () => {
                                 </div>
                               </div>
                             </div>
-                            {/* 我方头像：使用消息中的senderAvatar */}
-                            <Avatar 
-                              src={msg.senderAvatar} 
-                              size={36} 
-                              style={{ marginLeft: 12, flexShrink: 0, border: '1px solid transparent' }} 
+                            <Avatar
+                              src={msg.senderAvatar}
+                              size={36}
+                              style={{
+                                marginLeft: 12,
+                                flexShrink: 0,
+                                border: "1px solid transparent",
+                              }}
                             />
                           </div>
                         )}
                       </List.Item>
                     );
                   }}
-                  locale={{ emptyText: <div style={{ padding: '50px 0', textAlign: 'center', color: '#999' }}>暂无消息记录</div> }}
+                  locale={{
+                    emptyText: (
+                      <div
+                        style={{
+                          padding: "50px 0",
+                          textAlign: "center",
+                          color: "#999",
+                        }}
+                      >
+                        暂无消息记录
+                      </div>
+                    ),
+                  }}
                 />
                 <div ref={messagesEndRef} />
               </div>
-              
-              <div style={{ 
-                padding: '16px 24px', 
-                borderTop: '1px solid #f0f0f0',
-                background: '#fff'
-              }}>
+
+              <div
+                style={{
+                  padding: "16px 24px",
+                  borderTop: "1px solid #f0f0f0",
+                  background: "#fff",
+                }}
+              >
                 {uploadingFiles.length > 0 && (
-                  <div style={{ 
-                    marginBottom: 12, 
-                    padding: 10, 
-                    background: '#f5f5f5', 
-                    borderRadius: 6,
-                    maxHeight: 120,
-                    overflowY: 'auto'
-                  }}>
-                    {uploadingFiles.map(file => (
-                      <div key={file.id} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        marginBottom: 6,
-                        justifyContent: 'space-between'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <FileTextOutlined style={{ marginRight: 8, color: '#666' }} />
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      padding: 10,
+                      background: "#f5f5f5",
+                      borderRadius: 6,
+                      maxHeight: 120,
+                      overflowY: "auto",
+                    }}
+                  >
+                    {uploadingFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          marginBottom: 6,
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <FileTextOutlined
+                            style={{ marginRight: 8, color: "#666" }}
+                          />
                           <div>
-                            <div style={{ fontSize: 13, wordBreak: 'break-all' }}>{file.name}</div>
-                            <div style={{ 
-                              fontSize: 12, 
-                              color: '#999',
-                              marginTop: 2
-                            }}>
-                              {file.status === 'uploading' ? '上传中...' : 
-                               file.status === 'done' ? `已上传 · ${formatFileSize(file.size)}` : 
-                               '上传失败'}
+                            <div
+                              style={{ fontSize: 13, wordBreak: "break-all" }}
+                            >
+                              {file.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#999",
+                                marginTop: 2,
+                              }}
+                            >
+                              {file.status === "uploading"
+                                ? `上传中... ${file.progress}%`
+                                : file.status === "done"
+                                ? `已上传 · ${formatFileSize(file.size)}`
+                                : "上传失败"}
                             </div>
                           </div>
                         </div>
-                        <Button 
-                          type="text" 
-                          icon={<DeleteOutlined />} 
+                        <Button
+                          type="text"
+                          icon={<DeleteOutlined />}
                           size="small"
                           onClick={() => handleRemoveFile(file.id)}
-                          style={{ color: '#ff4d4f' }}
+                          style={{ color: "#ff4d4f" }}
                         />
                       </div>
                     ))}
+
+                    <div style={{ marginTop: 10 }}>
+                      <span
+                        style={{ fontSize: 13, color: "#666", marginRight: 8 }}
+                      >
+                        文件有效期：
+                      </span>
+                      <Select
+                        value={selectedExpireDays}
+                        onChange={setSelectedExpireDays}
+                        style={{ width: 120 }}
+                        size="small"
+                      >
+                        <Option value={1}>1天</Option>
+                        <Option value={7}>7天</Option>
+                        <Option value={30}>30天</Option>
+                        <Option value={90}>90天</Option>
+                      </Select>
+                    </div>
                   </div>
                 )}
-                
+
                 <TextArea
                   rows={3}
                   value={messageContent}
@@ -854,34 +1271,40 @@ const MessageCenterPage = () => {
                     e.preventDefault();
                     handleSendMessage();
                   }}
-                  style={{ marginBottom: '8px', borderRadius: '8px' }}
+                  style={{ marginBottom: "8px", borderRadius: "8px" }}
                 />
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <Space>
                     <input
                       type="file"
                       ref={fileInputRef}
-                      style={{ display: 'none' }}
+                      style={{ display: "none" }}
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleFileUpload(e.target.files[0]);
-                          e.target.value = '';
+                          e.target.value = "";
                         }
                       }}
                       multiple
                     />
-                    <Button 
-                      type="text" 
+                    <Button
+                      type="text"
                       icon={<PaperClipOutlined />}
                       onClick={() => fileInputRef.current?.click()}
                     >
                       附件
                     </Button>
-                    
+
                     <Popover
                       content={
-                        <EmojiPicker 
+                        <EmojiPicker
                           onEmojiClick={handleEmojiSelect}
                           width={300}
                           height={400}
@@ -892,35 +1315,51 @@ const MessageCenterPage = () => {
                       visible={emojiVisible}
                       onVisibleChange={setEmojiVisible}
                     >
-                      <Button 
-                        type="text" 
-                        icon={<SmileOutlined />}
-                      />
+                      <Button type="text" icon={<SmileOutlined />} />
                     </Popover>
                   </Space>
-                  
-                  <Button 
-                    type="primary" 
-                    onClick={handleSendMessage}
-                    loading={sendingLoading}
-                    disabled={!messageContent.trim() || uploadingFiles.some(f => f.status === 'uploading')}
-                  >
-                    发送
-                  </Button>
+
+                  <Space>
+                    {uploadingFiles.length > 0 ? (
+                      <Button
+                        type="primary"
+                        onClick={handleSendFileMessage}
+                        loading={sendingLoading}
+                        disabled={uploadingFiles.some(
+                          (f) => f.status === "uploading"
+                        )}
+                      >
+                        发送文件
+                      </Button>
+                    ) : (
+                      <Button
+                        type="primary"
+                        onClick={handleSendMessage}
+                        loading={sendingLoading}
+                        disabled={!messageContent.trim()}
+                      >
+                        发送
+                      </Button>
+                    )}
+                  </Space>
                 </div>
               </div>
             </div>
           ) : (
-            <div style={{ 
-              flex: 1, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              background: '#fafafa'
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <MessageOutlined style={{ fontSize: 48, color: '#ccc', marginBottom: 16 }} />
-                <p style={{ color: '#999' }}>请选择一个会话开始聊天</p>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fafafa",
+              }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <MessageOutlined
+                  style={{ fontSize: 48, color: "#ccc", marginBottom: 16 }}
+                />
+                <p style={{ color: "#999" }}>请选择一个会话开始聊天</p>
               </div>
             </div>
           )}
@@ -931,4 +1370,3 @@ const MessageCenterPage = () => {
 };
 
 export default MessageCenterPage;
-    
