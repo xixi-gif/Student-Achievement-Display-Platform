@@ -1,21 +1,76 @@
-import React, { useState, useEffect, useRef, use } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Row,
   Col, Popconfirm, Tabs, Layout, Form, Radio,
   Table, Checkbox, Spin, InputNumber, Progress, Upload } from "antd";
-import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined, 
+import { SearchOutlined, DeleteOutlined, LockOutlined, 
   UserOutlined, TeamOutlined, PlusOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
 import { adminApi, authApi } from "../../service/api";
-import { getAvatarUrl, importTemplateColumns, exportTemplateHelper,handleFileUploadHelper } from "./UserManageHelpers";
-import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
+import { getAvatarUrl, importTemplateColumns, exportTemplateHelper, handleFileUploadHelper } from "./UserManageHelpers";
+import { getTableColumns, getFilteredUsers } from "./UserManageTableUtils";
+
+const exportToExcel = (data, isStudent, isVisitor, successMsg, errorMsg) => {
+  if (!data || data.length === 0) {
+    message.warning("没有数据可导出");
+    return;
+  }
+
+  try {
+    const exportData = data.map(item => {
+      if (isVisitor) {
+        return {
+          "用户名": item.userName || "",
+          "邮箱": item.email || "",
+          "电话": item.phone || "",
+          "状态": item.status === "active" ? "正常" : "禁用",
+          "上次登录": item.lastLogin || "从未登录"
+        };
+      } else if (isStudent) {
+        return {
+          "姓名": item.realName || "",
+          "学号": item.studentId || "",
+          "专业": item.major || "",
+          "年级": item.className || "",
+          "邮箱": item.email || "",
+          "电话": item.phone || "",
+          "状态": item.status === "active" ? "正常" : "禁用",
+          "成果数": item.achievementCount || 0,
+          "上次登录": item.lastLogin || "从未登录"
+        };
+      } else {
+        return {
+          "姓名": item.realName || "",
+          "工号": item.teacherId || "",
+          "学院": item.department || "",
+          "职称": item.title || "",
+          "邮箱": item.email || "",
+          "电话": item.phone || "",
+          "状态": item.status === "active" ? "正常" : "禁用",
+          "上次登录": item.lastLogin || "从未登录"
+        };
+      }
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, isVisitor ? "访客列表" : isStudent ? "学生列表" : "教师列表");
+    
+    const fileName = `${isVisitor ? "访客" : isStudent ? "学生" : "教师"}列表_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    successMsg("导出成功");
+  } catch (error) {
+    console.error("导出Excel错误:", error);
+    errorMsg("导出失败，请重试");
+  }
+};
 
 const { Search } = Input;
 const { TabPane } = Tabs;
 const { Header, Content, Footer } = Layout;
 
-const UserManage = () => {
-  const [users, setUsers] = useState({ students: [], teachers: [] });
+const UserManagePage = () => {
+  const [users, setUsers] = useState({ students: [], teachers: [], visitors: [] });
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -57,33 +112,41 @@ const UserManage = () => {
   const fetchUserList = async () => {
     setLoading(true);
     try {
+      const roleMap = {
+        students: "student",
+        teachers: "teacher",
+        visitors: "visitor"
+      };
       const params = {
         current: currentPage,
         pageSize: pageSize,
-        role: activeTab === "students" ? "student" : "teacher",
+        role: roleMap[activeTab],
         keyword: searchKeyword || undefined,
         status: columnFilters.status.length > 0 ? columnFilters.status.join(",") : undefined,
-        isDeleted: 0,
-        ...(activeTab === "students" && columnFilters.major.length > 0 
-          ? { major: columnFilters.major.join(",") } 
-          : {}),
-        ...(activeTab === "teachers" && columnFilters.department.length > 0 
-          ? { department: columnFilters.department.join(",") } 
-          : {})
+        isDeleted: 0
       };
+      
+      if (activeTab === "students" && columnFilters.major.length > 0) {
+        params.major = columnFilters.major.join(",");
+      }
+      
+      if (activeTab === "teachers" && columnFilters.department.length > 0) {
+        params.department = columnFilters.department.join(",");
+      }
+
       const response = await adminApi.getUserList(params);
       if (response.code === 0) {
         const { records, total: totalCount } = response.data;
         const formattedUsers = records.map(user => ({
           id: user.id,
-          realName: user.realname || user.name || '未知姓名',
+          realName: user.username || user.name || '未知姓名',
           name: user.name || '',
-          userName: user.userAccount || '',
+          userName: user.username || '',
           password: user.userPassword,
-          avatar: getAvatarUrl(user.avatar, user.name),
+          avatar: getAvatarUrl(user.avatar, user.username || user.name),
           email: user.email || '',
           phone: user.phone || '',
-          role: user.userRole || (activeTab === "students" ? "student" : "teacher"),
+          role: user.role || roleMap[activeTab],
           status: user.status === "正常" ? 'active' : 'inactive',
           studentId: user.studentId || "",
           className: user.className || "",
@@ -147,6 +210,10 @@ const UserManage = () => {
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
+      return;
+    }
+    if (activeTab === "visitors") {
+      message.warning("访客不支持批量状态修改");
       return;
     }
 
@@ -254,6 +321,10 @@ const UserManage = () => {
 
   const handleEditSubmit = async () => {
     if (!selectedUser) return;
+    if (selectedUser.role === "visitor") {
+      message.warning("访客不支持编辑操作");
+      return;
+    }
     
     try {
       const values = await editForm.validateFields();
@@ -295,14 +366,11 @@ const UserManage = () => {
     }
   };
 
-
-
   const handleAddUser = async () => {
     setAdding(true);
     try {
       const values = await newUserForm.validateFields();
       const userData = {
-        // userAccount: newUserType === "student" ? values.email : values.email,
         userAccount: values.email,
         realName: values.realname,
         userRole: newUserType,
@@ -324,7 +392,9 @@ const UserManage = () => {
 
       const response = await adminApi.createUser(userData);
       if (response.code === 0) {
-        message.success(`成功添加${newUserType === "student" ? "学生" : "教师"}`);
+        message.success(`成功添加${
+          newUserType === "student" ? "学生" : "教师"
+        }`);
         setAddModalVisible(false);
         newUserForm.resetFields();
         fetchUserList();
@@ -341,39 +411,36 @@ const UserManage = () => {
     }
   };
 
-
-const handleDelete = async (record) => {
-  Modal.confirm({
-    title: `确定删除用户"${record.realName}"吗？`,
-    content: "此操作不可撤销，请谨慎操作！",
-    okText: "确认删除",
-    okType: "danger",
-    cancelText: "取消",
-    onOk: async () => {
-      try {
-        const response = await adminApi.deleteUser({ id: record.id });
-        console.log("删除接口响应：", response);
-
-        if (response.code === 0) {
-          message.success("用户已删除");
-          fetchUserList(); 
-          setSelectedIds(prev => prev.filter(item => item !== record.id)); 
-        } else {
-          message.error(`删除失败: ${response.message || '未知错误'}`);
+  const handleDelete = async (record) => {
+    Modal.confirm({
+      title: `确定删除用户"${record.realName}"吗？`,
+      content: "此操作不可撤销，请谨慎操作！",
+      okText: "确认删除",
+      okType: "danger",
+      cancelText: "取消",
+      onOk: async () => {
+        try {
+          const response = await adminApi.deleteUser({ id: record.id });
+          if (response.code === 0) {
+            message.success("用户已删除");
+            fetchUserList();
+            setSelectedIds(prev => prev.filter(item => item !== record.id));
+          } else {
+            message.error(`删除失败: ${response.message || '未知错误'}`);
+          }
+        } catch (error) {
+          console.error("删除请求错误：", error);
+          message.error(`删除失败: ${error.response?.data?.message || '网络错误'}`);
         }
-      } catch (error) {
-        console.error("删除请求错误：", error);
-        message.error(`删除失败: ${error.response?.data?.message || '网络错误'}`);
-      }
-    },
-  });
-};
-   const handleFileUpload = (file) => {
+      },
+    });
+  };
+
+  const handleFileUpload = (file) => {
     return handleFileUploadHelper(file, importType, users, setImportData);
   };
 
-
-   const handleImport = async () => {
+  const handleImport = async () => {
     const validData = importData.filter(item => item._valid);
     if (validData.length === 0) {
       message.warning("没有有效数据可导入");
@@ -385,15 +452,14 @@ const handleDelete = async (record) => {
       let successCount = 0;
       for (const item of validData) {
         const userData = {
-          // userAccount: item[importType === "student" ? "学号" : "工号"],
-          userAccount:item.邮箱,
+          userAccount: item.邮箱,
           realName: item.姓名,
           userRole: importType,
           email: item.邮箱,
           phone: item.电话 || "",
           password: item.登录密码 || "123456789",
           status: 0, 
-  
+
           ...(importType === "student" && {
             studentId: item.学号, 
             grade: item.年级, 
@@ -420,8 +486,6 @@ const handleDelete = async (record) => {
     }
   };
 
-
-
   const handleResetPassword = (user) => {
     setSelectedUser(user);
     setResetPwdModalVisible(true);
@@ -430,6 +494,10 @@ const handleDelete = async (record) => {
   const handleEdit = (user) => {
     if (!user) {
       message.warning("未找到用户数据");
+      return;
+    }
+    if (user.role === "visitor") {
+      message.warning("访客不支持编辑操作");
       return;
     }
     
@@ -462,6 +530,8 @@ const handleDelete = async (record) => {
       message.error("网络错误，重置密码失败");
     }
   };
+
+  const phoneRegExp = /^1[3-9]\d{9}$/;
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
@@ -555,6 +625,10 @@ const handleDelete = async (record) => {
       message.warning("未选择用户");
       return;
     }
+    if (selectedUser.role === "visitor") {
+      message.warning("访客不支持修改头像");
+      return;
+    }
     
     const file = fileDataRef.current;
     if (!file) {
@@ -634,7 +708,7 @@ const handleDelete = async (record) => {
         type="primary" 
         icon={<UploadOutlined />}
         onClick={triggerFileSelect}
-        disabled={avatarUploading}
+        disabled={avatarUploading || selectedUser?.role === "visitor"}
         style={{ display: 'block', margin: '0 auto' }}
       >
         选择头像
@@ -697,6 +771,7 @@ const handleDelete = async (record) => {
 
   const currentTableData = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
   const isStudentTab = activeTab === "students";
+  const isVisitorTab = activeTab === "visitors";
 
   useEffect(() => {
     return () => {
@@ -726,28 +801,37 @@ const handleDelete = async (record) => {
                   enterButton={<SearchOutlined />}
                   style={{ width: 300 }}
                   onSearch={handleSearch}
-                  value={searchKeyword}  // 绑定 value
-                  onChange={(e) => setSearchKeyword(e.target.value)}  // 处理输入变化
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
                 />
-                <Button
-                  type="primary"
-                  icon={<UploadOutlined />}
-                  onClick={() => {
-                    setImportModalVisible(true);
-                    setImportType(activeTab === "students" ? "student" : "teacher");
-                  }}
-                >
-                  一键导入
-                </Button>
+                {!isVisitorTab && (
+                  <Button
+                    type="primary"
+                    icon={<UploadOutlined />}
+                    onClick={() => {
+                      setImportModalVisible(true);
+                      setImportType(activeTab === "students" ? "student" : "teacher");
+                    }}
+                  >
+                    一键导入
+                  </Button>
+                )}
                 <Button
                   type="primary"
                   icon={<DownloadOutlined />}
-                  onClick={() => exportToExcel(
-                    currentTableData,
-                    isStudentTab,
-                    (msg) => message.success(msg),
-                    (msg) => message.error(msg)
-                  )}
+                  onClick={() => {
+                    if (activeTab === "visitors") {
+                      exportToExcel(users.visitors, false, true, 
+                        (msg) => message.success(msg), 
+                        (msg) => message.error(msg)
+                      );
+                    } else {
+                      exportToExcel(currentTableData, isStudentTab, false, 
+                        (msg) => message.success(msg), 
+                        (msg) => message.error(msg)
+                      );
+                    }
+                  }}
                   loading={exporting}
                 >
                   导出Excel
@@ -800,6 +884,24 @@ const handleDelete = async (record) => {
                 >
                   重置密码
                 </Button>
+                {!isVisitorTab && (
+                  <>
+                    <Button
+                      type="text"
+                      onClick={() => handleBatchToggleStatus(true)}
+                      loading={batchActionLoading}
+                    >
+                      批量启用
+                    </Button>
+                    <Button
+                      type="text"
+                      onClick={() => handleBatchToggleStatus(false)}
+                      loading={batchActionLoading}
+                    >
+                      批量禁用
+                    </Button>
+                  </>
+                )}
                 <Popconfirm
                   title={`确定删除选中的 ${selectedIds.length} 个用户吗？`}
                   onConfirm={handleBatchDelete}
@@ -883,8 +985,8 @@ const handleDelete = async (record) => {
                         icon={<FilterOutlined />}
                         onClick={() =>{
                           setColumnFilters({ status: [], major: [], department: [] }),
-                          setSearchKeyword("");  // 重置搜索框内容
-                          setCurrentPage(1);     // 重置到第一页
+                          setSearchKeyword("");
+                          setCurrentPage(1);
                         }}
                       >
                         清除所有筛选
@@ -941,8 +1043,122 @@ const handleDelete = async (record) => {
                         icon={<FilterOutlined />}
                         onClick={() => {
                           setColumnFilters({ status: [], major: [], department: [] }),
-                          setSearchKeyword("");  // 重置搜索框内容
-                          setCurrentPage(1);     // 重置到第一页
+                          setSearchKeyword("");
+                          setCurrentPage(1);
+                        }}
+                      >
+                        清除所有筛选
+                      </Button>
+                    </div>
+                  )}
+                />
+              </TabPane>
+
+              <TabPane
+                tab={
+                  <span>
+                    <UserOutlined />
+                    访客管理
+                  </span>
+                }
+                key="visitors"
+              >
+                <Table
+                  columns={[
+                    {
+                      title: '头像',
+                      dataIndex: 'avatar',
+                      key: 'avatar',
+                      render: (avatar) => (
+                        <Avatar src={avatar} alt="用户头像" />
+                      ),
+                    },
+                    {
+                      title: '用户名',
+                      dataIndex: 'userName',
+                      key: 'userName',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '邮箱',
+                      dataIndex: 'email',
+                      key: 'email',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '状态',
+                      dataIndex: 'status',
+                      key: 'status',
+                      filters: [
+                        { text: '正常', value: 'active' },
+                        { text: '禁用', value: 'inactive' },
+                      ],
+                      render: (status) => (
+                        <Tag color={status === 'active' ? 'green' : 'red'}>
+                          {status === 'active' ? '正常' : '禁用'}
+                        </Tag>
+                      ),
+                      onFilter: (value, record) => record.status === value,
+                    },
+                    {
+                      title: '上次登录',
+                      dataIndex: 'lastLogin',
+                      key: 'lastLogin',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      render: (_, record) => (
+                        <Space size="middle">
+                          <Button
+                            icon={<LockOutlined />}
+                            size="small"
+                            onClick={() => handleResetPassword(record)}
+                          >
+                            重置密码
+                          </Button>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            size="small"
+                            onClick={() => handleDelete(record)}
+                          >
+                            删除
+                          </Button>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                  dataSource={users.visitors}
+                  rowKey="id"
+                  rowSelection={rowSelection}
+                  loading={loading}
+                  pagination={{
+                    current: currentPage,
+                    pageSize: pageSize,
+                    total: total,
+                    showSizeChanger: true,
+                    showTotal: (total) => `共 ${total} 条记录`,
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_, ps) => {
+                      setPageSize(ps);
+                      setCurrentPage(1);
+                    }
+                  }}
+                  scroll={{ x: 800 }}
+                  bordered
+                  size="middle"
+                  title={() => (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>访客列表</span>
+                      <Button 
+                        type="link" 
+                        icon={<FilterOutlined />}
+                        onClick={() => {
+                          setColumnFilters({ status: [], major: [], department: [] }),
+                          setSearchKeyword("");
+                          setCurrentPage(1);
                         }}
                       >
                         清除所有筛选
@@ -1055,7 +1271,9 @@ const handleDelete = async (record) => {
           </Modal>
 
           <Modal
-            title={`添加${newUserType === "student" ? "学生" : "教师"}`}
+            title={`添加${
+              newUserType === "student" ? "学生" : "教师"
+            }`}
             visible={addModalVisible}
             width={700}
             onOk={handleAddUser}
@@ -1092,7 +1310,7 @@ const handleDelete = async (record) => {
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                    <Form.Item
+                      <Form.Item
                         name="studentId"
                         label="学号"
                         rules={[
@@ -1115,15 +1333,15 @@ const handleDelete = async (record) => {
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                    <Form.Item
-                      name="grade"
-                      label="年级"
-                      rules={[
-                        { required: true, message: "请输入年级" } 
-                      ]}
-                    >
-                      <Input placeholder="如：2022级" />
-                    </Form.Item>
+                      <Form.Item
+                        name="grade"
+                        label="年级"
+                        rules={[
+                          { required: true, message: "请输入年级" } 
+                        ]}
+                      >
+                        <Input placeholder="如：2022级" />
+                      </Form.Item>
                     </Col>
                   </Row>
 
@@ -1145,10 +1363,7 @@ const handleDelete = async (record) => {
                         label="电话"
                         rules={[
                           { required: true, message: "请输入学生电话" },
-                          {
-                            pattern: /^1[3-9]\d{9}$/,
-                            message: "请输入11位有效手机号",
-                          },
+                          { pattern: phoneRegExp, message: "请输入11位有效手机号" },
                         ]}
                       >
                         <Input placeholder="如：13800138000" />
@@ -1232,10 +1447,7 @@ const handleDelete = async (record) => {
                         label="电话"
                         rules={[
                           { required: true, message: "请输入电话" },
-                          {
-                            pattern: /^1[3-9]\d{9}$/,
-                            message: "请输入11位有效手机号",
-                          },
+                          { pattern: phoneRegExp, message: "请输入11位有效手机号" },
                         ]}
                       >
                         <Input placeholder="如：13800138000" />
@@ -1267,8 +1479,9 @@ const handleDelete = async (record) => {
           >
             <p>
               确定要重置用户 <strong>{selectedUser?.realName}</strong> (
-              {selectedUser?.role === "student" ? "学号" : "工号"}:{" "}
-              {selectedUser?.studentId || selectedUser?.teacherId}) 的密码吗？
+              {selectedUser?.role === "student" ? "学号" : 
+               selectedUser?.role === "teacher" ? "工号" : "用户"}:{" "}
+              {selectedUser?.studentId || selectedUser?.teacherId || selectedUser?.userName}) 的密码吗？
             </p>
             <p>重置后密码将变为123456789，请提醒用户及时修改。</p>
           </Modal>
@@ -1335,114 +1548,113 @@ const handleDelete = async (record) => {
                         >
                           <Input />
                         </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        name="className"
-                        label="年级"
-                        rules={[{ required: true, message: "请输入年级" }]}
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </>
-              ) : (
-                <>
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item
-                        name="department"
-                        label="学院"
-                        rules={[{ required: true, message: "请输入学院" }]}
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        name="title"
-                        label="职称"
-                        rules={[{ required: true, message: "请输入职称" }]}
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </>
-              )}
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name="className"
+                          label="年级"
+                          rules={[{ required: true, message: "请输入年级" }]}
+                        >
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </>
+                ) : (
+                  <>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item
+                          name="department"
+                          label="学院"
+                          rules={[{ required: true, message: "请输入学院" }]}
+                        >
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name="title"
+                          label="职称"
+                          rules={[{ required: true, message: "请输入职称" }]}
+                        >
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </>
+                )}
 
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    name="email"
-                    label="邮箱"
-                    rules={[
-                      { required: true, message: "请输入邮箱" },
-                      { type: "email", message: "请输入有效的邮箱地址" },
-                    ]}
-                  >
-                    <Input />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="phone"
-                    label="手机号"
-                    rules={[
-                      { required: true, message: "请输入手机号" },
-                      { pattern: /^1[3-9]\d{9}$/, message: "请输入有效的手机号" },
-                    ]}
-                  >
-                    <Input />
-                  </Form.Item>
-                </Col>
-              </Row>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      name="email"
+                      label="邮箱"
+                      rules={[
+                        { required: true, message: "请输入邮箱" },
+                        { type: "email", message: "请输入有效的邮箱地址" },
+                      ]}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      name="phone"
+                      label="手机号"
+                      rules={[
+                        { required: true, message: "请输入手机号" },
+                        { pattern: phoneRegExp, message: "请输入有效的手机号" },
+                      ]}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-
-              <Form.Item
-                label="状态"
-                name="status"
-                rules={[{ required: true, message: "请选择状态" }]}
-              >
-                <Radio.Group>
-                  <Radio value="active">正常</Radio>
-                  <Radio value="inactive">禁用</Radio>
-                </Radio.Group>
-              </Form.Item>
-
-              {selectedUser.role === "student" && (
                 <Form.Item
-                  label="成果数"
-                  name="achievementCount"
-                  initialValue={selectedUser.achievementCount}
+                  label="状态"
+                  name="status"
+                  rules={[{ required: true, message: "请选择状态" }]}
                 >
-                  <InputNumber min={0} style={{ width: "100%" }} />
+                  <Radio.Group>
+                    <Radio value="active">正常</Radio>
+                    <Radio value="inactive">禁用</Radio>
+                  </Radio.Group>
                 </Form.Item>
-              )}
-            </Form>
-          )}
-        </Modal>
 
-        <Modal
-          title="批量操作进行中"
-          visible={batchActionLoading}
-          footer={null}
-          closable={false}
-        >
-          <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <Spin size="large" />
-            <p style={{ marginTop: 16 }}>正在处理批量操作，请稍候...</p>
-          </div>
-        </Modal>
-      </div>
-    </Content>
-    
-    <Footer style={{ textAlign: "center", padding: "16px 0" }}>
-      学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
-    </Footer>
-  </Layout>
+                {selectedUser.role === "student" && (
+                  <Form.Item
+                    label="成果数"
+                    name="achievementCount"
+                    initialValue={selectedUser.achievementCount}
+                  >
+                    <InputNumber min={0} style={{ width: "100%" }} />
+                  </Form.Item>
+                )}
+              </Form>
+            )}
+          </Modal>
+
+          <Modal
+            title="批量操作进行中"
+            visible={batchActionLoading}
+            footer={null}
+            closable={false}
+          >
+            <div style={{ textAlign: "center", padding: "24px 0" }}>
+              <Spin size="large" />
+              <p style={{ marginTop: 16 }}>正在处理批量操作，请稍候...</p>
+            </div>
+          </Modal>
+        </div>
+      </Content>
+      
+      <Footer style={{ textAlign: "center", padding: "16px 0" }}>
+        学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+      </Footer>
+    </Layout>
   );
 };
 
-export default UserManage;
+export default UserManagePage;
