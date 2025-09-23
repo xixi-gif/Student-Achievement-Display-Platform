@@ -17,18 +17,18 @@ import {
 } from 'antd';
 import { 
   SearchOutlined, 
-  CalendarOutlined, 
   EyeOutlined, 
   DeleteOutlined,
-  ExclamationCircleOutlined 
+  ExclamationCircleOutlined,
+  PushpinFilled
 } from '@ant-design/icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import dayjs from 'dayjs'; // 替换 moment.js
+import dayjs from 'dayjs';
 import Navbar from '../Navbar/Navbar'; 
 import { announcementApi } from '../../service/api';
 
 const { Content, Footer } = Layout;
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
 
 // React 19 兼容性包装器
@@ -36,7 +36,6 @@ const CompatibleModal = {
   confirm: (config) => {
     return Modal.confirm({
       ...config,
-      // 确保不使用已弃用的属性
       okButtonProps: config.okType ? { danger: config.okType === 'danger' } : undefined
     });
   }
@@ -50,7 +49,8 @@ const AnnouncementList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
-  const [modalApi, modalContextHolder] = Modal.useModal(); // 使用新的Modal API
+  const [pinLoading, setPinLoading] = useState({});
+  const [modalApi, modalContextHolder] = Modal.useModal();
   const pageSize = 10;
   
   const navigate = useNavigate();
@@ -88,8 +88,16 @@ const AnnouncementList = () => {
           content: item.content,
           createTime: item.createTime,
           viewCount: item.viewCount,
-          author: item.author || '管理员'
+          author: item.author || '管理员',
+          isPinned: item.isPinned || false
         }));
+
+        // 置顶公告排在前面，按创建时间倒序
+        formattedData.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return dayjs(b.createTime).valueOf() - dayjs(a.createTime).valueOf();
+        });
 
         setAnnouncements(formattedData);
         setTotalCount(response.data.total);
@@ -110,13 +118,37 @@ const AnnouncementList = () => {
     fetchAnnouncements(value.trim() || null);
   };
 
-  // 统一的删除函数（支持单条和批量）- React 19 兼容版本
+  // 处理置顶/取消置顶操作
+  const handlePin = async (id, isPinned, title) => {
+    try {
+      setPinLoading(prev => ({ ...prev, [id]: true }));
+      
+      const response = await announcementApi.pinAnnouncement({
+        id,
+        isPinned: !isPinned
+      });
+      
+      if (response.code === 0) {
+        const action = !isPinned ? '置顶' : '取消置顶';
+        message.success(`公告"${title}"${action}成功`);
+        fetchAnnouncements(searchKeyword);
+      } else {
+        message.error(response.message || '操作失败');
+      }
+    } catch (error) {
+      console.error('置顶操作失败:', error);
+      message.error('操作失败: ' + (error.message || '网络错误'));
+    } finally {
+      setPinLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // 统一的删除函数
   const handleDelete = async (ids, title = '') => {
     try {
       const isSingleDelete = !Array.isArray(ids);
       const idList = Array.isArray(ids) ? ids : [ids];
       
-      // 使用新的Modal API
       modalApi.confirm({
         title: isSingleDelete ? '确认删除' : '确认批量删除',
         icon: <ExclamationCircleOutlined />,
@@ -161,23 +193,57 @@ const AnnouncementList = () => {
     handleDelete(selectedRowKeys);
   };
 
+  // 处理内容截取，显示两行
+  const renderContentPreview = (content) => {
+    // 移除HTML标签（如果有）
+    const plainText = content.replace(/<[^>]*>?/gm, '');
+    // 限制最大长度，大约两行文本（假设每行约40个汉字）
+    if (plainText.length <= 80) {
+      return plainText;
+    }
+    return plainText.substring(0, 80) + '...';
+  };
+
   const columns = [
     {
-      title: '标题',
+      title: '公告内容',
       dataIndex: 'title',
       key: 'title',
       render: (text, record) => (
-        <Link to={`/announcement/detail/${record.id}`}>
-          <Text strong style={{ fontSize: 16, color: '#1890ff' }}>
-            {text}
-          </Text>
-        </Link>
+        <div style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <Link to={`/announcement/detail/${record.id}`}>
+              <Text strong style={{ fontSize: 16, color: '#1890ff' }}>
+                {text}
+              </Text>
+            </Link>
+            {record.isPinned && (
+              <Tag color="red" icon={<PushpinFilled />} style={{ marginLeft: 8 }}>
+                置顶
+              </Tag>
+            )}
+          </div>
+          <Paragraph
+            style={{ 
+              margin: 0, 
+              color: '#555',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.5
+            }}
+          >
+            {renderContentPreview(record.content)}
+          </Paragraph>
+        </div>
       ),
-      align: 'center'
     },
     {
       title: '操作',
       key: 'action',
+      width: 250,
       render: (_, record) => (
         <Space>
           <Button 
@@ -189,17 +255,31 @@ const AnnouncementList = () => {
             查看详情
           </Button>
           {isAdmin && (
-            <Button 
-              type="link" 
-              danger
-              onClick={(e) => {
-                e.stopPropagation(); // 防止事件冒泡
-                handleDelete(record.id, record.title);
-              }}
-              icon={<DeleteOutlined />}
-            >
-              删除
-            </Button>
+            <>
+              <Button 
+                type="link" 
+                style={{ color: record.isPinned ? '#777' : '#1890ff' }}
+                icon={<PushpinFilled />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePin(record.id, record.isPinned, record.title);
+                }}
+                loading={pinLoading[record.id]}
+              >
+                {record.isPinned ? '取消置顶' : '置顶'}
+              </Button>
+              <Button 
+                type="link" 
+                danger
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(record.id, record.title);
+                }}
+                icon={<DeleteOutlined />}
+              >
+                删除
+              </Button>
+            </>
           )}
         </Space>
       ),
@@ -207,7 +287,7 @@ const AnnouncementList = () => {
     },
   ];
 
-  // 行选择配置（仅管理员可见）- 使用新版API
+  // 行选择配置（仅管理员可见）
   const rowSelection = isAdmin ? {
     selectedRowKeys,
     onChange: (selectedKeys) => {
@@ -284,6 +364,11 @@ const AnnouncementList = () => {
                 locale={{
                   emptyText: <Empty description="暂无公告数据" />
                 }}
+                // 调整行高以适应两行内容
+                rowClassName={() => 'custom-row-height'}
+                style={{ 
+                  '--ant-table-row-height': 'auto',
+                }}
               />
             ) : (
               <Empty description="暂无公告数据" />
@@ -296,7 +381,6 @@ const AnnouncementList = () => {
         学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
       </Footer>
 
-      {/* Modal上下文持有器 */}
       {modalContextHolder}
     </Layout>
   );

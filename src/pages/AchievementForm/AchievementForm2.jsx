@@ -55,7 +55,9 @@ const AchievementFormPage = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  // 修改参与者和指导教师为对象数组，包含isTemporary标识
   const [participants, setParticipants] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
   const [attachmentFiles, setAttachmentFiles] = useState([]);
@@ -69,7 +71,6 @@ const AchievementFormPage = () => {
   const [searchingStudents, setSearchingStudents] = useState(false);
   const [searchingTeachers, setSearchingTeachers] = useState(false);
   const [studentSearchKeyword, setStudentSearchKeyword] = useState("");
-  const [instructors, setInstructors] = useState([]);
   const [instructorSearchKeyword, setInstructorSearchKeyword] = useState("");
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -107,13 +108,12 @@ const AchievementFormPage = () => {
         }}
         style={{ width: "100%" }}
         allowClear={false}
-        // 修复日历显示问题
         getPopupContainer={(trigger) => trigger.parentElement}
       />
     );
   };
 
-  //获取分类数据
+  // 获取分类数据
   useEffect(() => {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
@@ -194,34 +194,60 @@ const AchievementFormPage = () => {
               price: achievement.price,
               ...(isAdmin() && { status: achievement.status }),
             });
-            setParticipants(achievement.participants || []);
 
-            // 设置多个指导教师
+            // 处理参与者数据，统一为对象格式
+            if (
+              achievement.participants &&
+              achievement.participants.length > 0
+            ) {
+              setParticipants(
+                achievement.participants.map((participant) =>
+                  typeof participant === "string"
+                    ? { name: participant, isTemporary: true }
+                    : {
+                        name: participant.realName || participant.name,
+                        userId: participant.userId || participant.id,
+                        isTemporary: false,
+                      }
+                )
+              );
+            }
+
+            // 设置多个指导教师，统一为对象格式
             if (achievement.instructors && achievement.instructors.length > 0) {
-              const instructorNames = achievement.instructors
+              const formattedInstructors = achievement.instructors
                 .map((inst) => {
-                  // 尝试多种可能的字段名
-                  if (typeof inst === "string") return inst;
-                  return (
-                    inst.realName || inst.name || inst.username || inst.userId
-                  );
+                  if (typeof inst === "string") {
+                    return { name: inst, isTemporary: true };
+                  }
+                  return {
+                    name: inst.realName || inst.name || inst.username,
+                    userId: inst.userId || inst.id,
+                    isTemporary: false,
+                  };
                 })
-                .filter((name) => name); // 过滤掉undefined/null
+                .filter((item) => item.name); // 过滤掉undefined/null
 
-              setInstructors(instructorNames);
+              setInstructors(formattedInstructors);
             } else if (achievement.instructor) {
               // 处理单个指导教师的多种情况
-              const instructorName =
-                typeof achievement.instructor === "string"
-                  ? achievement.instructor
-                  : achievement.instructor.realName ||
-                    achievement.instructor.name ||
-                    achievement.instructor.username ||
-                    achievement.instructor.userId;
-
-              if (instructorName) {
-                setInstructors([instructorName]);
+              let instructorData;
+              if (typeof achievement.instructor === "string") {
+                instructorData = {
+                  name: achievement.instructor,
+                  isTemporary: true,
+                };
+              } else {
+                instructorData = {
+                  name:
+                    achievement.instructor.realName ||
+                    achievement.instructor.name,
+                  userId:
+                    achievement.instructor.userId || achievement.instructor.id,
+                  isTemporary: false,
+                };
               }
+              setInstructors([instructorData]);
             }
 
             // 保存旧封面图URL
@@ -315,7 +341,14 @@ const AchievementFormPage = () => {
             ...(isAdmin() && { status: 0 }),
           });
           if (!isAdmin()) {
-            setParticipants([userInfo.realName || username]);
+            // 默认添加当前用户作为参与者
+            setParticipants([
+              {
+                name: userInfo.realName || username,
+                userId: userInfo.id,
+                isTemporary: false,
+              },
+            ]);
           } else {
             setParticipants([]);
           }
@@ -469,99 +502,163 @@ const AchievementFormPage = () => {
 
   // 学生搜索函数
   const handleStudentSearch = async () => {
-    if (!studentSearchKeyword.trim()) {
-      setStudentOptions([]);
-      return;
-    }
+    if (!studentSearchKeyword.trim()) return;
 
+    setSearchingStudents(true);
     try {
-      setSearchingStudents(true);
       const response = await achievementApi.searchStudents({
-        keyword: studentSearchKeyword.trim(),
-        // limit: 10,
+        keyword: studentSearchKeyword,
       });
-
       if (response.code === 0) {
-        setStudentOptions(
-          response.data.length > 0
-            ? response.data.map((student) => ({
-                value: student.name,
-                label: `${student.name} (${student.userNo})`,
-                key: student.userId,
-              }))
-            : [{ value: "no-result", label: "无匹配结果", disabled: true }]
-        );
+        const students = response.data;
+        if (students.length === 0) {
+          // 无搜索结果，提示可手动输入
+          message.info("未找到该学生，可手动添加");
+        } else {
+          // 展示搜索结果，选择时标记isTemporary: false
+          setStudentOptions(
+            students.map((student) => ({
+              ...student,
+              label: student.name || student.realName,
+              value: student.id,
+            }))
+          );
+        }
       }
     } catch (error) {
       console.error("搜索学生失败:", error);
-      message.error("搜索学生失败");
-      setStudentOptions([]);
     } finally {
       setSearchingStudents(false);
     }
   };
 
-  // 教师搜索函数
-  const handleTeacherSearch = async () => {
-    if (!instructorSearchKeyword.trim()) {
-      setTeacherOptions([]);
+  // 选择搜索到的学生（非临时）
+  const handleStudentSelect = (student) => {
+    // 检查是否已存在
+    const exists = participants.some(
+      (p) =>
+        (p.userId && p.userId === student.value) ||
+        (p.name === student.label && p.isTemporary)
+    );
+
+    if (exists) {
+      message.warning("该学生已在列表中");
       return;
     }
 
-    try {
-      setSearchingTeachers(true);
-      const response = await achievementApi.searchTeachers({
-        keyword: instructorSearchKeyword.trim(),
-        // limit: 10,
-      });
+    setParticipants((prev) => [
+      ...prev,
+      {
+        name: student.label,
+        isTemporary: false,
+        userId: student.value,
+      },
+    ]);
+    setStudentSearchKeyword("");
+    setStudentOptions([]);
+  };
 
+  // 手动输入学生（无搜索结果时，临时数据）
+  const handleAddManualStudent = () => {
+    const name = studentSearchKeyword.trim();
+    if (!name) return;
+
+    // 检查是否已存在
+    const exists = participants.some((p) => p.name === name);
+
+    if (exists) {
+      message.warning("该学生已在列表中");
+      return;
+    }
+
+    setParticipants((prev) => [...prev, { name, isTemporary: true }]);
+    setStudentSearchKeyword("");
+  };
+
+  // 教师搜索函数
+  const handleTeacherSearch = async () => {
+    if (!instructorSearchKeyword.trim()) return;
+
+    setSearchingTeachers(true);
+    try {
+      const response = await achievementApi.searchTeachers({
+        keyword: instructorSearchKeyword,
+      });
       if (response.code === 0) {
-        setTeacherOptions(
-          response.data.length > 0
-            ? response.data.map((teacher) => ({
-                value: teacher.name,
-                label: `${teacher.name} (${teacher.userNo})`,
-                key: teacher.userId,
-              }))
-            : [{ value: "no-result", label: "无匹配结果", disabled: true }]
-        );
+        const instructors = response.data;
+        if (instructors.length === 0) {
+          // 无搜索结果，提示可手动输入
+          message.info("未找到该教师，可手动添加");
+        } else {
+          // 展示搜索结果，选择时标记isTemporary: false
+          setTeacherOptions(
+            instructors.map((instructor) => ({
+              ...instructor,
+              label:
+                instructor.name || instructor.realName || instructor.username,
+              value: instructor.id,
+            }))
+          );
+        }
       }
     } catch (error) {
-      console.error("搜索老师失败:", error);
-      message.error("搜索老师失败");
-      setTeacherOptions([]);
+      console.error("搜索教师失败:", error);
     } finally {
       setSearchingTeachers(false);
     }
   };
 
-  // 教师选择处理函数
-  const handleInstructorSelect = (teacherName) => {
-    const alreadyExists = instructors.includes(teacherName);
-    if (alreadyExists) {
+  // 选择搜索到的教师（非临时）
+  const handleInstructorSelect = (teacher) => {
+    // 检查是否已存在
+    const exists = instructors.some(
+      (i) =>
+        (i.userId && i.userId === teacher.value) ||
+        (i.name === teacher.label && i.isTemporary)
+    );
+
+    if (exists) {
       message.warning("该教师已在列表中");
       return;
     }
 
-    setInstructors([...instructors, teacherName]);
+    setInstructors((prev) => [
+      ...prev,
+      {
+        name: teacher.label,
+        isTemporary: false,
+        userId: teacher.value,
+      },
+    ]);
+    setInstructorSearchKeyword("");
     setTeacherOptions([]);
+  };
+
+  // 手动输入教师（无搜索结果时，临时数据）
+  const handleAddManualInstructor = () => {
+    const name = instructorSearchKeyword.trim();
+    if (!name) return;
+
+    // 检查是否已存在
+    const exists = instructors.some((i) => i.name === name);
+
+    if (exists) {
+      message.warning("该教师已在列表中");
+      return;
+    }
+
+    setInstructors((prev) => [...prev, { name, isTemporary: true }]);
     setInstructorSearchKeyword("");
   };
 
   // 移除指导教师
-  const handleRemoveInstructor = (nameToRemove) => {
-    setInstructors(instructors.filter((name) => name !== nameToRemove));
+  const handleRemoveInstructor = (index) => {
+    setInstructors(instructors.filter((_, i) => i !== index));
   };
 
   // 移除参与人员
-  const handleRemoveParticipant = (nameToRemove) => {
-    setParticipants(
-      participants.filter((participant) =>
-        typeof participant === "string"
-          ? participant !== nameToRemove
-          : participant.realName !== nameToRemove
-      )
-    );
+  const handleRemoveParticipant = (index) => {
+    setParticipants(participants.filter((_, i) => i !== index));
   };
 
   // 表单提交
@@ -587,14 +684,23 @@ const AchievementFormPage = () => {
         formData.append("status", values.status.toString());
       }
 
-      // 处理参与人员
-      const participantsList = participants.map((participant) =>
-        typeof participant === "string" ? participant : participant.realName
-      );
-      formData.append("participants", JSON.stringify(participantsList));
+      // 处理参与人员 - 包含isTemporary字段
+      participants.forEach((participant, index) => {
+        formData.append(`participants[${index}].name`, participant.name);
+        formData.append(
+          `participants[${index}].isTemporary`,
+          participant.isTemporary
+        );
+      });
 
       // 处理指导教师
-      formData.append("instructors", JSON.stringify(instructors));
+      instructors.forEach((instructor, index) => {
+        formData.append(`instructors[${index}].name`, instructor.name);
+        formData.append(
+          `instructors[${index}].isTemporary`,
+          instructor.isTemporary
+        );
+      });
 
       // 处理关键词
       if (values.keywords) {
@@ -620,13 +726,9 @@ const AchievementFormPage = () => {
         // 传递需要删除的文件ID列表
         console.log("要删除的文件ID:", deleteFiles);
         if (deleteFiles.length > 0) {
-          // 确保使用正确的字段名和格式
-          // 将每个ID单独添加到FormData中
           deleteFiles.forEach((id) => {
             formData.append("deleteFiles", id);
           });
-        } else {
-          console.log("没有需要删除的文件");
         }
       }
 
@@ -652,12 +754,6 @@ const AchievementFormPage = () => {
         }
       });
 
-      // 调试：输出 FormData 内容
-      console.log("FormData 内容:");
-      for (let [key, value] of formData.entries()) {
-        console.log(key, value instanceof File ? value.name : value);
-      }
-
       // 5. 提交请求
       let response;
       const config = {
@@ -666,12 +762,9 @@ const AchievementFormPage = () => {
         },
       };
 
-      // 注意：根据您的API设计，可能需要区分管理员和普通用户的更新接口
       if (isEditMode) {
-        // 使用统一的更新接口，传递deleteFiles参数
         response = await achievementApi.updateAchievement(formData, config);
       } else {
-        // 创建新成果的逻辑保持不变
         if (isAdmin()) {
           response = await adminApi.addAchievement(formData, config);
         } else {
@@ -713,7 +806,7 @@ const AchievementFormPage = () => {
     navigate(-1);
   };
 
-  // 在表单中添加管理员专用的状态选择字段
+  // 管理员专用的状态选择字段
   const renderAdminStatusField = () => {
     if (!isAdmin()) return null;
 
@@ -734,16 +827,16 @@ const AchievementFormPage = () => {
     );
   };
 
-  // 添加一个渲染学生状态选择字段的函数
+  // 学生状态选择字段
   const renderStudentStatusField = () => {
-    if (isAdmin()) return null; // 管理员有自己的状态选择
+    if (isAdmin()) return null;
 
     return (
       <Form.Item
         name="status"
         label="成果状态"
         rules={[{ required: true, message: "请选择成果状态" }]}
-        initialValue={0} // 默认选择草稿
+        initialValue={0}
       >
         <Select placeholder="请选择成果状态">
           {studentStatusOptions.map((option) => (
@@ -958,7 +1051,6 @@ const AchievementFormPage = () => {
                     name="date"
                     label="完成日期"
                     rules={[{ required: true, message: "请选择成果完成日期" }]}
-                    // initialValue={dayjs().format("YYYY-MM-DD HH:mm")} // 设置默认值为当前时间
                   >
                     <CustomDateTimePicker />
                   </Form.Item>
@@ -985,9 +1077,10 @@ const AchievementFormPage = () => {
                     showCount
                   />
                 </Form.Item>
-
+          
                 <Form.Item label="参与人员">
                   <div>
+                    {/* 已选参与人标签 */}
                     <Space size="small" wrap style={{ marginBottom: 12 }}>
                       {participants.map((participant, index) => (
                         <Badge
@@ -997,22 +1090,14 @@ const AchievementFormPage = () => {
                             <span
                               style={{ display: "flex", alignItems: "center" }}
                             >
-                              {typeof participant === "string"
-                                ? participant
-                                : participant.realName}{" "}
+                              {participant.name}
                               <CloseOutlined
                                 style={{
                                   marginLeft: 5,
                                   cursor: "pointer",
                                   fontSize: 12,
                                 }}
-                                onClick={() =>
-                                  handleRemoveParticipant(
-                                    typeof participant === "string"
-                                      ? participant
-                                      : participant.realName
-                                  )
-                                }
+                                onClick={() => handleRemoveParticipant(index)}
                               />
                             </span>
                           }
@@ -1020,6 +1105,7 @@ const AchievementFormPage = () => {
                       ))}
                     </Space>
 
+                    {/* 搜索输入框 */}
                     <Space.Compact style={{ width: "100%" }}>
                       <Input
                         placeholder="输入姓名搜索学生"
@@ -1039,60 +1125,52 @@ const AchievementFormPage = () => {
                       </Button>
                     </Space.Compact>
 
-                    {/* 显示搜索结果 */}
-                    {studentOptions.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          border: "1px solid #d9d9d9",
-                          borderRadius: 4,
-                        }}
-                      >
-                        {studentOptions.map((option) => (
-                          <div
-                            key={option.key}
-                            style={{
-                              padding: "8px 12px",
-                              cursor: "pointer",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                            onClick={() => {
-                              if (option.disabled) return;
-                              // 添加选中的学生
-                              const alreadyExists = participants.some((p) =>
-                                typeof p === "string"
-                                  ? p === option.value
-                                  : p.realName === option.value
-                              );
+                    {/* 搜索结果与手动添加选项 */}
+                    <div style={{ marginTop: 8 }}>
+                      {/* 显示搜索结果（如有） */}
+                      {studentOptions.length > 0 && (
+                        <div
+                          style={{
+                            border: "1px solid #d9d9d9",
+                            borderRadius: 4,
+                            marginBottom: 8, // 与手动添加按钮保持距离
+                          }}
+                        >
+                          {studentOptions.map((option) => (
+                            <div
+                              key={option.value}
+                              style={{
+                                padding: "8px 12px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f0f0f0",
+                              }}
+                              onClick={() => handleStudentSelect(option)}
+                            >
+                              {option.label}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                              if (alreadyExists) {
-                                message.warning("该人员已在列表中");
-                                return;
-                              }
-
-                              setParticipants([
-                                ...participants,
-                                {
-                                  userId: option.key,
-                                  realName: option.value,
-                                  userNo:
-                                    option.label.match(/\((.*?)\)/)?.[1] || "",
-                                },
-                              ]);
-                              setStudentSearchKeyword("");
-                              setStudentOptions([]);
-                            }}
-                          >
-                            {option.label}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      {/* 始终显示手动添加按钮（当有输入时） */}
+                      {studentSearchKeyword.trim() && (
+                        <Button
+                          type="dashed"
+                          onClick={handleAddManualStudent}
+                          style={{ width: "100%" }}
+                        >
+                          {studentOptions.length > 0
+                            ? `添加新参与人: "${studentSearchKeyword}"`
+                            : `未找到 "${studentSearchKeyword}"，手动添加`}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Form.Item>
-
+               
                 <Form.Item label="指导教师" rules={[{ required: false }]}>
                   <div>
+                    {/* 已选指导教师标签 */}
                     <Space size="small" wrap style={{ marginBottom: 12 }}>
                       {instructors.map((instructor, index) => (
                         <Badge
@@ -1102,16 +1180,14 @@ const AchievementFormPage = () => {
                             <span
                               style={{ display: "flex", alignItems: "center" }}
                             >
-                              {instructor}
+                              {instructor.name}
                               <CloseOutlined
                                 style={{
                                   marginLeft: 5,
                                   cursor: "pointer",
                                   fontSize: 12,
                                 }}
-                                onClick={() =>
-                                  handleRemoveInstructor(instructor)
-                                }
+                                onClick={() => handleRemoveInstructor(index)}
                               />
                             </span>
                           }
@@ -1119,6 +1195,7 @@ const AchievementFormPage = () => {
                       ))}
                     </Space>
 
+                    {/* 搜索输入框 */}
                     <Space.Compact style={{ width: "100%" }}>
                       <Input
                         placeholder="输入姓名搜索指导教师"
@@ -1138,49 +1215,57 @@ const AchievementFormPage = () => {
                       </Button>
                     </Space.Compact>
 
-                    {/* 显示搜索结果 */}
-                    {teacherOptions.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          border: "1px solid #d9d9d9",
-                          borderRadius: 4,
-                          maxHeight: 200,
-                          overflowY: "auto",
-                        }}
-                      >
-                        {teacherOptions.map((option) => (
-                          <div
-                            key={option.key}
-                            style={{
-                              padding: "8px 12px",
-                              cursor: "pointer",
-                              borderBottom: "1px solid #f0f0f0",
-                              backgroundColor: "#fff",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!option.disabled) {
-                                e.target.style.backgroundColor = "#f5f5f5";
+                    {/* 搜索结果与手动添加选项 */}
+                    <div style={{ marginTop: 8 }}>
+                      {/* 显示搜索结果（如有） */}
+                      {teacherOptions.length > 0 && (
+                        <div
+                          style={{
+                            border: "1px solid #d9d9d9",
+                            borderRadius: 4,
+                            marginBottom: 8,
+                            maxHeight: 200,
+                            overflowY: "auto",
+                          }}
+                        >
+                          {teacherOptions.map((option) => (
+                            <div
+                              key={option.value}
+                              style={{
+                                padding: "8px 12px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f0f0f0",
+                                backgroundColor: "#fff",
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.target.style.backgroundColor = "#f5f5f5")
                               }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!option.disabled) {
-                                e.target.style.backgroundColor = "#fff";
+                              onMouseLeave={(e) =>
+                                (e.target.style.backgroundColor = "#fff")
                               }
-                            }}
-                            onClick={() => {
-                              if (option.disabled) return;
-                              handleInstructorSelect(option.value);
-                            }}
-                          >
-                            {option.label}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              onClick={() => handleInstructorSelect(option)}
+                            >
+                              {option.label}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 始终显示手动添加按钮（当有输入时） */}
+                      {instructorSearchKeyword.trim() && (
+                        <Button
+                          type="dashed"
+                          onClick={handleAddManualInstructor}
+                          style={{ width: "100%" }}
+                        >
+                          {teacherOptions.length > 0
+                            ? `添加新指导教师: "${instructorSearchKeyword}"`
+                            : `未找到 "${instructorSearchKeyword}"，手动添加`}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Form.Item>
-
                 <Form.Item
                   name="keywords"
                   label="关键词"
@@ -1221,7 +1306,6 @@ const AchievementFormPage = () => {
                     { required: true, message: "请输入价格信息" },
                     {
                       validator: (_, value) => {
-                        // 支持三种格式：具体价格、价格区间、面议
                         const validFormats = [
                           /^\d+(\.\d{1,2})?$/, // 具体价格：50、99.99
                           /^\d+(\.\d{1,2})?-\d+(\.\d{1,2})?$/, // 价格区间：50-100、99.99-199.99

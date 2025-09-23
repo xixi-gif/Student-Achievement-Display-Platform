@@ -43,6 +43,16 @@ const { Content, Sider } = Layout;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
 
+// 头像处理函数
+const getAvatar = (avatarUrl) => {
+  // 检查头像URL是否存在且有效
+  if (avatarUrl && avatarUrl.trim() !== "") {
+    return avatarUrl;
+  }
+  // 返回默认头像或使用UserOutlined图标
+  return `https://picsum.photos/id/237/200/200`;
+};
+
 const categoryColors = {
   软件开发: "blue",
   创新设计: "green",
@@ -731,8 +741,7 @@ const AchievementDetailPage = () => {
                         onClick={() => navigate(`/author/${member.studentNo}`)}
                       >
                         <Avatar
-                          src={member.avatar}
-                          icon={<UserOutlined />}
+                          src={getAvatar(member.avatar)}
                           size={64}
                           style={{
                             margin: "16px auto 12px",
@@ -796,10 +805,7 @@ const AchievementDetailPage = () => {
                                 }}
                               >
                                 <Avatar
-                                  src={
-                                    instructor.avatar || instructor.userAvatar
-                                  }
-                                  icon={<UserOutlined />}
+                                  src={getAvatar(instructor.avatar || instructor.userAvatar)}
                                   size={48}
                                   style={{
                                     marginRight: 12,

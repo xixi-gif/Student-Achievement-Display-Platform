@@ -161,6 +161,7 @@ export const announcementApi = {
     const idList = Array.isArray(ids) ? ids : [ids];
     return service.post("/announcements/batch-delete", { ids: idList });
   },
+  pinAnnouncement: (params) => service.put("/announcements", null,{params}),
 };
 
 export const authorApi = {
