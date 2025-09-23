@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, use } from "react";
 import { Card, Input, Button, Modal, message, Tag, Space, Avatar, Row,
   Col, Popconfirm, Tabs, Layout, Form, Radio,
   Table, Checkbox, Spin, InputNumber, Progress, Upload } from "antd";
 import { SearchOutlined, EditOutlined, DeleteOutlined, LockOutlined, 
-  UserOutlined, TeamOutlined, PlusOutlined, CheckCircleOutlined, 
-  CloseCircleOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
+  UserOutlined, TeamOutlined, PlusOutlined, UploadOutlined, FilterOutlined, DownloadOutlined } from "@ant-design/icons";
 import * as XLSX from "xlsx";
 import Navbar from "../Navbar/Navbar";
-import { adminApi , authApi } from "../../service/api";
-import { getAvatarUrl, importTemplateColumns, handleFileUploadHelper, exportTemplateHelper } from "./UserManageHelpers";
+import { adminApi, authApi } from "../../service/api";
+import { getAvatarUrl, importTemplateColumns, exportTemplateHelper,handleFileUploadHelper } from "./UserManageHelpers";
 import { getTableColumns, getFilteredUsers, exportToExcel } from "./UserManageTableUtils";
 
 const { Search } = Input;
@@ -16,7 +15,6 @@ const { TabPane } = Tabs;
 const { Header, Content, Footer } = Layout;
 
 const UserManage = () => {
-  // 状态管理
   const [users, setUsers] = useState({ students: [], teachers: [] });
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +46,6 @@ const UserManage = () => {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
-  // 头像上传相关状态
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -57,13 +54,12 @@ const UserManage = () => {
   const fileDataRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // 获取用户列表
   const fetchUserList = async () => {
     setLoading(true);
     try {
       const params = {
-        page: currentPage,
-        size: pageSize,
+        current: currentPage,
+        pageSize: pageSize,
         role: activeTab === "students" ? "student" : "teacher",
         keyword: searchKeyword || undefined,
         status: columnFilters.status.length > 0 ? columnFilters.status.join(",") : undefined,
@@ -80,7 +76,7 @@ const UserManage = () => {
         const { records, total: totalCount } = response.data;
         const formattedUsers = records.map(user => ({
           id: user.id,
-          realName: user.realname || '未知姓名',
+          realName: user.realname || user.name || '未知姓名',
           name: user.name || '',
           userName: user.userAccount || '',
           password: user.userPassword,
@@ -113,7 +109,6 @@ const UserManage = () => {
     }
   };
 
-  // 初始化
   useEffect(() => {
     const init = async () => {
       const role = localStorage.getItem("user_role") || "visitor";
@@ -129,21 +124,18 @@ const UserManage = () => {
     init();
   }, [currentPage, pageSize, activeTab, searchKeyword, columnFilters]);
 
-  // 搜索处理
   const handleSearch = (value) => {
     setSearchKeyword(value.toLowerCase());
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
-  // 列筛选处理
   const handleColumnFilter = (columnKey, values) => {
     setColumnFilters(prev => ({ ...prev, [columnKey]: values }));
     setSelectedIds([]);
     setCurrentPage(1);
   };
 
-  // 行选择配置
   const rowSelection = {
     selectedRowKeys: selectedIds,
     onChange: (keys) => setSelectedIds(keys),
@@ -152,7 +144,6 @@ const UserManage = () => {
     },
   };
 
-  // 批量切换状态
   const handleBatchToggleStatus = async (enable) => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -185,8 +176,8 @@ const UserManage = () => {
       setBatchActionLoading(false);
     }
   };
+  
 
-  // 批量删除
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -212,7 +203,6 @@ const UserManage = () => {
           fetchUserList();
         } catch (error) {
           console.error("批量删除错误：", error);
-          // 兼容HTTP状态码异常但业务成功的情况
           const errorResponse = error.response?.data;
           if (errorResponse?.code === 0) {
             message.success("成功删除选中用户");
@@ -228,7 +218,6 @@ const UserManage = () => {
     });
   };
 
-  // 批量重置密码
   const handleBatchResetPassword = async () => {
     if (selectedIds.length === 0) {
       message.warning("请先选择用户");
@@ -290,8 +279,6 @@ const UserManage = () => {
         })
       };
 
-      console.log("最终提交参数：", updateData); 
-
       const response = await adminApi.updateUser(updateData);
       if (response.code === 0) {
         message.success("用户状态已更新");
@@ -308,50 +295,22 @@ const UserManage = () => {
     }
   };
 
-  const handleToggleStatus = async (user) => {
-    // const newStatus = user.status === "active" ? "禁用" : "正常"; 
-    const newStatus = user.status === "active" ? 0 : 1; 
-    try {
-      const updateData = {
-        id: user.id,
-        status: newStatus,
-        userRole: user.role, 
-        userName: user.userName,
-        ...(user.role === "student" && {
-          studentNo: user.studentId 
-        }),
-        ...(user.role === "teacher" && {
-          teacherId: user.teacherId 
-        })
-      };
 
-      const response = await adminApi.updateUser(updateData);
-      if (response.code === 0) {
-        message.success(`已${newStatus === 0 ? "启用" : "禁用"} ${user.realName}`);
-        fetchUserList();
-      } else {
-        message.error(response.message || "状态更新失败");
-      }
-    } catch (error) {
-      console.error("更新状态错误：", error);
-      message.error("网络错误，状态更新失败");
-    }
-  };
 
-  // 添加用户
   const handleAddUser = async () => {
     setAdding(true);
     try {
       const values = await newUserForm.validateFields();
       const userData = {
-        userAccount: newUserType === "student" ? values.studentId : values.teacherId,
+        // userAccount: newUserType === "student" ? values.email : values.email,
+        userAccount: values.email,
         realName: values.realname,
         userRole: newUserType,
         email: values.email,
         phone: values.phone || "",
         ...(newUserType === "student" && {
           studentId: values.studentId,
-          grade: values.className,
+          grade: values.grade,
           major: values.major
         }),
         ...(newUserType === "teacher" && {
@@ -382,120 +341,92 @@ const UserManage = () => {
     }
   };
 
-const handleDelete = async (id) => {
-  try {
 
-    const response = await adminApi.deleteUser({id});
-    console.log("删除接口原始响应：", response);
+const handleDelete = async (record) => {
+  Modal.confirm({
+    title: `确定删除用户"${record.realName}"吗？`,
+    content: "此操作不可撤销，请谨慎操作！",
+    okText: "确认删除",
+    okType: "danger",
+    cancelText: "取消",
+    onOk: async () => {
+      try {
+        const response = await adminApi.deleteUser({ id: record.id });
+        console.log("删除接口响应：", response);
 
-    if (response.code === 0) {
-      message.success("用户已删除");
-      fetchUserList();
-      setSelectedIds(prev => prev.filter(item => item !== id));
-    } else {
-
-      message.error(`删除失败: ${response.message || '未知错误'}`);
-    }
-  } catch (error) {
-    console.error("删除请求错误：", error);
-    
-    const errorData = error?.response?.data || {};
-
-    if (errorData.code === 0) {
-      message.success("用户已删除");
-      fetchUserList();
-      setSelectedIds(prev => prev.filter(item => item !== id));
-    } else {
-      message.error(`删除失败: ${errorData.message || '网络错误'}`);
-    }
-  }
+        if (response.code === 0) {
+          message.success("用户已删除");
+          fetchUserList(); 
+          setSelectedIds(prev => prev.filter(item => item !== record.id)); 
+        } else {
+          message.error(`删除失败: ${response.message || '未知错误'}`);
+        }
+      } catch (error) {
+        console.error("删除请求错误：", error);
+        message.error(`删除失败: ${error.response?.data?.message || '网络错误'}`);
+      }
+    },
+  });
 };
-
-  // 验证学号唯一性
-  const validateStudentId = async (_, value) => {
-    try {
-      const response = await adminApi.checkIdExists({ type: 'student', id: value });
-      if (response.code === 0 && response.data.exists) {
-        return Promise.reject("该学号已存在");
-      }
-      return Promise.resolve();
-    } catch (error) {
-      return Promise.reject("验证失败，请稍后重试");
-    }
-  };
-
-  // 验证工号唯一性
-  const validateTeacherId = async (_, value) => {
-    try {
-      const response = await adminApi.checkIdExists({ type: 'teacher', id: value });
-      if (response.code === 0 && response.data.exists) {
-        return Promise.reject("该工号已存在");
-      }
-      return Promise.resolve();
-    } catch (error) {
-      return Promise.reject("验证失败，请稍后重试");
-    }
-  };
-
-  // 文件上传处理
-  const handleFileUpload = (file) => {
+   const handleFileUpload = (file) => {
     return handleFileUploadHelper(file, importType, users, setImportData);
   };
 
-  // 导入用户数据
- const handleImport = async () => {
-  const validData = importData.filter(item => item._valid);
-  if (validData.length === 0) {
-    message.warning("没有有效数据可导入");
-    return;
-  }
 
-  setImporting(true);
-  try {
-    let successCount = 0;
-    for (const item of validData) {
-      const userData = {
-        userAccount: item[importType === "student" ? "学号" : "工号"],
-        realName: item.姓名,
-        userRole: importType,
-        email: item.邮箱,
-        phone: item.电话 || "",
-        password: item.登录密码 || "123456789",
-        status: 0, 
-
-        ...(importType === "student" && {
-          studentId: item.学号, 
-          grade: item.年级, 
-          major: item.专业 
-        }),
-        ...(importType === "teacher" && {
-          teacherId: item.工号, 
-          department: item.学院, 
-          title: item.职称 
-        })
-      };
-
-      const response = await adminApi.createUser(userData);
-      if (response.code === 0) successCount++;
+   const handleImport = async () => {
+    const validData = importData.filter(item => item._valid);
+    if (validData.length === 0) {
+      message.warning("没有有效数据可导入");
+      return;
     }
-    message.success(`成功导入 ${successCount}/${validData.length} 条数据`);
-    setImportResult({ total: validData.length, success: successCount, failed: validData.length - successCount });
-    fetchUserList();
-  } catch (error) {
-    console.error("导入用户错误：", error);
-    message.error("网络错误，导入失败");
-  } finally {
-    setImporting(false);
-  }
-};
+  
+    setImporting(true);
+    try {
+      let successCount = 0;
+      for (const item of validData) {
+        const userData = {
+          // userAccount: item[importType === "student" ? "学号" : "工号"],
+          userAccount:item.邮箱,
+          realName: item.姓名,
+          userRole: importType,
+          email: item.邮箱,
+          phone: item.电话 || "",
+          password: item.登录密码 || "123456789",
+          status: 0, 
+  
+          ...(importType === "student" && {
+            studentId: item.学号, 
+            grade: item.年级, 
+            major: item.专业 
+          }),
+          ...(importType === "teacher" && {
+            teacherId: item.工号, 
+            department: item.学院, 
+            title: item.职称 
+          })
+        };
+  
+        const response = await adminApi.createUser(userData);
+        if (response.code === 0) successCount++;
+      }
+      message.success(`成功导入 ${successCount}/${validData.length} 条数据`);
+      setImportResult({ total: validData.length, success: successCount, failed: validData.length - successCount });
+      fetchUserList();
+    } catch (error) {
+      console.error("导入用户错误：", error);
+      message.error("网络错误，导入失败");
+    } finally {
+      setImporting(false);
+    }
+  };
 
-  // 处理重置密码
+
+
   const handleResetPassword = (user) => {
     setSelectedUser(user);
     setResetPwdModalVisible(true);
   };
 
-  // 处理编辑用户
   const handleEdit = (user) => {
     if (!user) {
       message.warning("未找到用户数据");
@@ -503,7 +434,6 @@ const handleDelete = async (id) => {
     }
     
     setSelectedUser(user);
-    // 根据用户角色设置表单字段值
     editForm.setFieldsValue({
       name: user.name,
       [user.role === "student" ? "className" : "title"]: user[user.role === "student" ? "className" : "title"],
@@ -516,7 +446,6 @@ const handleDelete = async (id) => {
     setEditModalVisible(true);
   };
 
-  // 确认重置密码
   const confirmResetPassword = async () => {
     if (!selectedUser) return;
     
@@ -561,7 +490,6 @@ const handleDelete = async (id) => {
     reader.readAsDataURL(file);
   };
 
-  // 触发文件选择
   const triggerFileSelect = () => {
     if (avatarUploading) return;
     if (currentUser?.role !== 'admin') {
@@ -573,7 +501,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 取消上传
   const cancelUpload = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -590,7 +517,6 @@ const handleDelete = async (id) => {
     message.info('已取消上传');
   };
 
-  // 更新头像到用户信息
   const handleAvatarUpdate = async (avatarUrl) => {
     if (!selectedUser) return;
     
@@ -607,7 +533,6 @@ const handleDelete = async (id) => {
       
       const updateResponse = await adminApi.updateUser(updateData);
       if (updateResponse.code === 0) {
-        // 更新本地状态
         setUsers(prev => ({
           ...prev,
           [activeTab]: prev[activeTab].map(user => 
@@ -625,7 +550,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 确认头像上传
   const confirmAvatarUpload = async () => {
     if (!selectedUser) {
       message.warning("未选择用户");
@@ -657,7 +581,6 @@ const handleDelete = async (id) => {
         throw new Error('服务器返回的头像URL无效，请重试');
       }
 
-      // 更新用户头像信息
       await handleAvatarUpdate(avatarUrl);
       
       setUploadProgress(100);
@@ -688,7 +611,6 @@ const handleDelete = async (id) => {
     }
   };
 
-  // 渲染头像上传组件
   const renderAvatarUpload = () => (
     <Form.Item label="头像">
       <Avatar
@@ -773,11 +695,9 @@ const handleDelete = async (id) => {
     </Form.Item>
   );
 
-  // 当前表格数据
   const currentTableData = getFilteredUsers(users, activeTab, searchKeyword, columnFilters);
   const isStudentTab = activeTab === "students";
 
-  // 清理函数
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -806,6 +726,8 @@ const handleDelete = async (id) => {
                   enterButton={<SearchOutlined />}
                   style={{ width: 300 }}
                   onSearch={handleSearch}
+                  value={searchKeyword}  // 绑定 value
+                  onChange={(e) => setSearchKeyword(e.target.value)}  // 处理输入变化
                 />
                 <Button
                   type="primary"
@@ -870,22 +792,6 @@ const handleDelete = async (id) => {
               </div>
 
               <Space>
-                {/* <Button
-                  type="text"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleBatchToggleStatus(true)}
-                  loading={batchActionLoading}
-                >
-                  批量启用
-                </Button>
-                <Button
-                  type="text"
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => handleBatchToggleStatus(false)}
-                  loading={batchActionLoading}
-                >
-                  批量禁用
-                </Button> */}
                 <Button
                   type="text"
                   icon={<LockOutlined />}
@@ -944,7 +850,6 @@ const handleDelete = async (id) => {
                     true,
                     handleEdit,
                     handleResetPassword,
-                    handleToggleStatus,
                     handleDelete,
                     columnFilters,
                     handleColumnFilter,
@@ -961,13 +866,10 @@ const handleDelete = async (id) => {
                     total: total,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条记录`,
-                    onChange: (page, ps) => {
-                      setCurrentPage(page);
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_, ps) => {
                       setPageSize(ps);
-                    },
-                    onShowSizeChange: (page, ps) => {
-                      setCurrentPage(page);
-                      setPageSize(ps);
+                      setCurrentPage(1);
                     }
                   }}
                   scroll={{ x: 1200 }}
@@ -979,7 +881,11 @@ const handleDelete = async (id) => {
                       <Button 
                         type="link" 
                         icon={<FilterOutlined />}
-                        onClick={() => setColumnFilters({ status: [], major: [], department: [] })}
+                        onClick={() =>{
+                          setColumnFilters({ status: [], major: [], department: [] }),
+                          setSearchKeyword("");  // 重置搜索框内容
+                          setCurrentPage(1);     // 重置到第一页
+                        }}
                       >
                         清除所有筛选
                       </Button>
@@ -1002,7 +908,6 @@ const handleDelete = async (id) => {
                     false,
                     handleEdit,
                     handleResetPassword,
-                    handleToggleStatus,
                     handleDelete,
                     columnFilters,
                     handleColumnFilter,
@@ -1019,13 +924,10 @@ const handleDelete = async (id) => {
                     total: total,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条记录`,
-                    onChange: (page, ps) => {
-                      setCurrentPage(page);
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_, ps) => {
                       setPageSize(ps);
-                    },
-                    onShowSizeChange: (page, ps) => {
-                      setCurrentPage(page);
-                      setPageSize(ps);
+                      setCurrentPage(1);
                     }
                   }}
                   scroll={{ x: 1200 }}
@@ -1037,7 +939,11 @@ const handleDelete = async (id) => {
                       <Button 
                         type="link" 
                         icon={<FilterOutlined />}
-                        onClick={() => setColumnFilters({ status: [], major: [], department: [] })}
+                        onClick={() => {
+                          setColumnFilters({ status: [], major: [], department: [] }),
+                          setSearchKeyword("");  // 重置搜索框内容
+                          setCurrentPage(1);     // 重置到第一页
+                        }}
                       >
                         清除所有筛选
                       </Button>
@@ -1048,7 +954,6 @@ const handleDelete = async (id) => {
             </Tabs>
           </Card>
 
-          {/* 批量导入模态框 */}
           <Modal
             title={`批量导入${importType === "student" ? "学生" : "教师"}数据`}
             visible={importModalVisible}
@@ -1149,7 +1054,6 @@ const handleDelete = async (id) => {
             )}
           </Modal>
 
-          {/* 添加用户模态框 */}
           <Modal
             title={`添加${newUserType === "student" ? "学生" : "教师"}`}
             visible={addModalVisible}
@@ -1353,7 +1257,6 @@ const handleDelete = async (id) => {
             </Form>
           </Modal>
 
-          {/* 重置密码模态框 */}
           <Modal
             title="确认重置密码"
             visible={resetPwdModalVisible}
@@ -1370,7 +1273,6 @@ const handleDelete = async (id) => {
             <p>重置后密码将变为123456789，请提醒用户及时修改。</p>
           </Modal>
 
-          {/* 编辑用户模态框 */}
           <Modal
             title={`编辑用户 - ${selectedUser?.realName}`}
             visible={editModalVisible}
@@ -1522,7 +1424,6 @@ const handleDelete = async (id) => {
           )}
         </Modal>
 
-        {/* 批量操作提示框 */}
         <Modal
           title="批量操作进行中"
           visible={batchActionLoading}
