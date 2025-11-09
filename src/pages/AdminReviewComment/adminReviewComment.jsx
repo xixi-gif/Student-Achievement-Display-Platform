@@ -379,7 +379,7 @@ const AdminCommentManagementPage = () => {
           
           <Card style={{ marginBottom: 24 }}>
             <Row gutter={16} align="middle">
-              <Col flex="auto">
+              <Col flex="left">
                 <Space size="middle">
                   {/* 只保留状态筛选 */}
                   <Select

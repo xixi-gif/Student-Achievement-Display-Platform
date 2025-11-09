@@ -8,13 +8,11 @@ import {
   CrownOutlined, StarOutlined, CheckCircleOutlined,
   BarChartOutlined, ReadOutlined, ReconciliationOutlined, 
   NotificationOutlined, MoreOutlined,
-  CommentOutlined,ProjectOutlined
+  CommentOutlined,ProjectOutlined,QuestionCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.png';
-import AnnouncementPublish from '../AnnouncementPublish/AnnouncementPublish';
-import { authApi,achievementApi } from '../../service/api';
-import debounce from 'lodash/debounce';
+import { authApi} from '../../service/api';
 
 const { Header } = Layout;
 const { Search } = Input;
@@ -182,6 +180,10 @@ const Navbar = ({ currentUser }) => {
       <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
         退出登录
       </Menu.Item>
+      <Menu.Item key="help-center" icon={<QuestionCircleOutlined />} onClick={() => navigate('/help')}>
+      帮助中心
+    </Menu.Item>
+
     </Menu>
   );
 

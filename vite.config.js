@@ -7,6 +7,8 @@ export default defineConfig({
       include: '**/*.js' 
     })
   ],
+  // 让 Vite 识别 .md 文件为静态资源
+  assetsInclude: ['**/*.md'],
   server: {
     port: 3000,
     open: true,

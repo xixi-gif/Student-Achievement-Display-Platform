@@ -53,15 +53,16 @@ const AnnouncementPublish = () => {
       
       <Content style={{ padding: '0 50px', maxWidth: 1000, margin: '0 auto', width: '100%' }}>
         <div style={{ background: '#fff', padding: 32, marginTop: 24, borderRadius: 8, marginBottom: 24 }}>
+          <div style={{textAlign: 'left' }}>
           <Button 
             type="link" 
             icon={<ArrowLeftOutlined />} 
             onClick={() => navigate('/announcements')}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 16}}
           >
             返回公告列表
           </Button>
-          
+          </div>
           <Card bordered={false}>
             <Title level={2} style={{ marginBottom: 24 }}>发布新公告</Title>
             

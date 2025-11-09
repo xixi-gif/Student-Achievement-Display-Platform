@@ -33,8 +33,6 @@ import {
   HeartFilled,
   TrophyOutlined,
   MessageOutlined,
-  CheckOutlined,
-  CloseOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
@@ -44,6 +42,16 @@ import moment from "moment";
 const { Content, Sider } = Layout;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
+
+// 头像处理函数
+const getAvatar = (avatarUrl) => {
+  // 检查头像URL是否存在且有效
+  if (avatarUrl && avatarUrl.trim() !== "") {
+    return avatarUrl;
+  }
+  // 返回默认头像或使用UserOutlined图标
+  return `https://picsum.photos/id/237/200/200`;
+};
 
 const categoryColors = {
   软件开发: "blue",
@@ -60,20 +68,6 @@ const levelColors = {
   省级: "orange",
   国家级: "red",
   国际级: "purple",
-};
-
-// 评论状态映射
-const commentStatusMap = {
-  0: "待审核",
-  1: "已通过",
-  2: "已驳回",
-};
-
-// 评论状态颜色
-const commentStatusColors = {
-  0: "orange",
-  1: "green",
-  2: "red",
 };
 
 const AchievementDetailPage = () => {
@@ -109,15 +103,8 @@ const AchievementDetailPage = () => {
     isLiked: false, // 当前用户是否点赞
     loading: false, // 加载状态
   });
-  // 新增状态管理：控制驳回原因模态框
-  const [reviewModal, setReviewModal] = useState({
-    visible: false,
-    commentId: null, // 当前审核的评论ID
-    status: null, // 当前操作的状态（approved/rejected）
-  });
-  const [rejectReason, setRejectReason] = useState("");
 
-  // 获取评论列表 - 只显示已审核通过的评论（管理员可以看到所有状态）
+  // 获取评论列表
   const fetchComments = async () => {
     try {
       const params = {
@@ -125,33 +112,32 @@ const AchievementDetailPage = () => {
         current: commentPagination.current,
         pageSize: commentPagination.pageSize,
         parentId: null,
-        // 管理员可以查看所有评论，其他用户只能查看已审核通过的
-        status: isAdmin() ? null : 1,
       };
 
       const response = await commentApi.getCommentList(params);
 
       if (response.code === 0) {
-        // 过滤掉子评论的独立记录
-        const filteredComments = response.data.records.filter(
-          (comment) =>
-            comment.parentId === null || comment.parentId === undefined
-        );
+        // 过滤掉未审核和审核未通过的评论，只保留审核通过的
+        const filteredComments = response.data.records
+          .filter(
+            (comment) =>
+              (comment.parentId === null || comment.parentId === undefined) &&
+              comment.status === 1 // 假设approved表示审核通过
+          )
+          // 同时过滤子评论，只保留审核通过的
+          .map((comment) => ({
+            ...comment,
+            children: getSafeArray(comment.children).filter(
+              (child) => child.status === 1
+            ),
+          }));
 
         // 计算当前页的实际评论数量（包括子评论）
         let currentPageCommentCount = 0;
         const visibleComments = [];
 
         for (const comment of filteredComments) {
-          // 处理子评论，只显示已审核通过的（非管理员）
-          if (!isAdmin() && comment.children && comment.children.length > 0) {
-            comment.children = comment.children.filter(
-              (child) => child.status === 1
-            );
-          }
-
-          const commentTotal =
-            1 + (comment.children ? comment.children.length : 0);
+          const commentTotal = 1 + comment.children.length;
 
           // 如果加上这个评论会超出页面容量，就停止添加
           if (
@@ -166,9 +152,11 @@ const AchievementDetailPage = () => {
         }
 
         setComments(visibleComments);
+        // 注意：这里显示的总数应该是所有审核通过的评论数
         setCommentPagination({
           ...commentPagination,
-          total: response.data.total,
+          total: response.data.records.filter((c) => c.status === 1)
+            .length,
         });
       }
     } catch (error) {
@@ -213,11 +201,9 @@ const AchievementDetailPage = () => {
         const token = localStorage.getItem("token");
         const role = token ? localStorage.getItem("user_role") : "visitor";
         const username = token ? localStorage.getItem("username") : "访客";
-        const userId = token ? localStorage.getItem("userId") : null;
         setCurrentUser({
           role,
           username,
-          userId,
           avatar: `https://picsum.photos/id/${
             1030 + Math.floor(Math.random() * 10)
           }/200/200`,
@@ -298,7 +284,7 @@ const AchievementDetailPage = () => {
       }));
       message.error(error.message || "操作失败，请重试");
     } finally {
-      setLikeData((prev) => ({ ...prev, loading: false }));
+      setLikeData.loading(false);
     }
   };
 
@@ -326,7 +312,7 @@ const AchievementDetailPage = () => {
     setCommentContent(e.target.value);
   };
 
-  // 评论提交函数 - 提交后处于待审核状态
+  // 评论提交函数
   const handleCommentSubmit = async () => {
     if (currentUser?.role === "") {
       message.info("请登录后再发表评论");
@@ -342,7 +328,6 @@ const AchievementDetailPage = () => {
         achievementId: parseInt(id),
         content: commentContent,
         parentId: null, // 明确设置为null，表示一级评论
-        // status: "pending" // 新增：提交的评论默认为待审核状态(后端默认设为0-待审核，不需要传参)
       };
 
       const response = await commentApi.addComment(commentData);
@@ -350,10 +335,8 @@ const AchievementDetailPage = () => {
       if (response.code === 0) {
         message.success("评论已提交，等待管理员审核");
         setCommentContent("");
-        // 管理员提交后可以立即看到自己的评论，其他用户看不到
-        if (isAdmin()) {
-          await fetchComments();
-        }
+        // 不需要刷新评论列表，新评论需要审核
+        // await fetchComments();
       } else {
         throw new Error(response.message || "评论发表失败");
       }
@@ -363,9 +346,9 @@ const AchievementDetailPage = () => {
     }
   };
 
-  // 回复提交处理函数 - 提交后处于待审核状态
+  // 回复提交处理函数
   const handleReplySubmit = async (parentId) => {
-    if (currentUser?.role === "") {
+    if (currentUser?.role === "visitor") {
       message.info("请登录后再发表回复");
       return;
     }
@@ -380,21 +363,18 @@ const AchievementDetailPage = () => {
         achievementId: parseInt(id),
         content: replyState.replyContent,
         parentId: parentId, // 设置父评论ID
-        // status: "pending" // 新增：提交的回复默认为待审核状态
       };
 
       const response = await commentApi.addComment(commentData);
 
       if (response.code === 0) {
-        message.success("回复已提交，等待管理员审核");
+        message.success("评论回复已提交，等待管理员审核");
         setReplyState({
           replyingTo: null,
           replyContent: "",
         });
-        // 管理员提交后可以立即看到自己的回复，其他用户看不到
-        if (isAdmin()) {
-          await fetchComments();
-        }
+        // 不需要刷新评论列表
+        // await fetchComments();
       } else {
         throw new Error(response.message || "回复失败");
       }
@@ -402,75 +382,6 @@ const AchievementDetailPage = () => {
       console.error("发表回复失败:", error);
       message.error(error.message || "回复失败");
     }
-  };
-
-  // 新增：审核评论/回复
-  const handleReviewComment = async (commentId, status) => {
-    if (!isAdmin()) {
-      message.warning("只有管理员可以审核评论");
-      return;
-    }
-    // 若为驳回操作，先显示模态框收集原因
-    if (status === "rejected") {
-      setReviewModal({
-        visible: true,
-        commentId,
-        status,
-      });
-      return; // 等待用户输入原因后再提交
-    }
-
-    // 审核通过操作：直接提交
-    await submitReview(commentId, status);
-  };
-
-  // 新增：实际提交审核的函数
-  const submitReview = async (commentId, status) => {
-    const statusMap = {
-      approved: 1, // 已通过
-      rejected: 2, // 已拒绝
-    };
-    const numericStatus = statusMap[status];
-
-    try {
-      // 构造请求参数（支持批量操作，即使单个也用数组）
-      const params = {
-        commentIds: [commentId], // 后端要求的数组格式
-        status: numericStatus,
-        // 仅当驳回时传递原因
-        ...(status === "rejected" && { rejectReason: rejectReason.trim() }),
-      };
-
-      // 调用批量更新状态接口（与api.js中定义的接口匹配）
-      const response = await commentApi.batchUpdateStatus(params);
-
-      if (response.code === 0) {
-        message.success(`评论已${status === "approved" ? "通过" : "驳回"}`);
-        await fetchComments(); // 刷新评论列表
-        // 重置模态框状态
-        setReviewModal({ visible: false, commentId: null, status: null });
-        setRejectReason("");
-      } else {
-        throw new Error(response.message || "审核操作失败");
-      }
-    } catch (error) {
-      console.error("审核评论失败:", error);
-      message.error(error.message || "审核评论失败");
-    }
-  };
-
-  // 新增：处理驳回原因模态框确认
-  const handleRejectConfirm = () => {
-    if (!rejectReason.trim()) {
-      message.warning("请填写驳回原因");
-      return;
-    }
-    if (rejectReason.trim().length < 5) {
-      message.warning("驳回原因至少需要5个字符");
-      return;
-    }
-    // 提交驳回操作
-    submitReview(reviewModal.commentId, reviewModal.status);
   };
 
   // 删除评论处理函数
@@ -553,23 +464,16 @@ const AchievementDetailPage = () => {
       });
   };
 
-  // 渲染评论列表项 - 添加审核状态显示和审核操作
+  // 渲染评论列表项
   const renderCommentItem = (comment) => {
     const isCurrentUserComment =
-      comment.user?.id === parseInt(currentUser?.userId || "0");
-    // const showComment = isAdmin() || comment.status === 'approved';
-    const showComment = isAdmin() || comment.status === 1;
-    const isPending = comment.status === 0;
-
-    // 非管理员不显示未通过审核的评论
-    if (!showComment) return null;
+      comment.user?.id === parseInt(localStorage.getItem("userId"));
 
     return (
       <List.Item
         style={{
           padding: "16px 0",
           borderBottom: "1px solid #f0f0f0",
-          opacity: isPending ? 0.7 : 1, // 待审核评论半透明显示
         }}
       >
         <List.Item.Meta
@@ -584,12 +488,6 @@ const AchievementDetailPage = () => {
               <span style={{ color: "#666", fontSize: 12 }}>
                 {moment(comment.createTime).format("YYYY-MM-DD HH:mm")}
               </span>
-              {/* 显示评论状态，管理员可见所有状态，作者可见自己的待审核状态 */}
-              {(isAdmin() || (isCurrentUserComment && isPending)) && (
-                <Tag color={commentStatusColors[comment.status]}>
-                  {commentStatusMap[comment.status]}
-                </Tag>
-              )}
             </Space>
           }
           description={
@@ -620,34 +518,6 @@ const AchievementDetailPage = () => {
                   >
                     删除
                   </Button>
-                )}
-
-                {/* 管理员审核操作按钮 */}
-                {isAdmin() && isPending && (
-                  <Space size="small">
-                    <Button
-                      type="text"
-                      size="small"
-                      style={{ color: "green" }}
-                      icon={<CheckOutlined />}
-                      onClick={() =>
-                        handleReviewComment(comment.id, "approved")
-                      }
-                    >
-                      通过
-                    </Button>
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<CloseOutlined />}
-                      onClick={() =>
-                        handleReviewComment(comment.id, "rejected")
-                      }
-                    >
-                      驳回
-                    </Button>
-                  </Space>
                 )}
               </Space>
 
@@ -871,8 +741,7 @@ const AchievementDetailPage = () => {
                         onClick={() => navigate(`/author/${member.studentNo}`)}
                       >
                         <Avatar
-                          src={member.avatar}
-                          icon={<UserOutlined />}
+                          src={getAvatar(member.avatar)}
                           size={64}
                           style={{
                             margin: "16px auto 12px",
@@ -936,10 +805,7 @@ const AchievementDetailPage = () => {
                                 }}
                               >
                                 <Avatar
-                                  src={
-                                    instructor.avatar || instructor.userAvatar
-                                  }
-                                  icon={<UserOutlined />}
+                                  src={getAvatar(instructor.avatar || instructor.userAvatar)}
                                   size={48}
                                   style={{
                                     marginRight: 12,
@@ -1490,14 +1356,6 @@ const AchievementDetailPage = () => {
                       {commentPagination.total})
                     </h2>
 
-                    {/* 提示信息：评论需审核 */}
-                    <div
-                      style={{ marginBottom: 16, fontSize: 12, color: "#666" }}
-                    >
-                      <MessageOutlined style={{ marginRight: 4 }} />
-                      所有评论和回复需经管理员审核通过后才能显示
-                    </div>
-
                     <div style={{ marginBottom: 24 }}>
                       <TextArea
                         rows={4}
@@ -1545,29 +1403,6 @@ const AchievementDetailPage = () => {
           </Layout>
         </div>
       </Content>
-
-      {/* 新增：驳回原因输入模态框 */}
-      <Modal
-        title="驳回评论"
-        visible={reviewModal.visible}
-        onOk={handleRejectConfirm}
-        onCancel={() => {
-          setReviewModal({ visible: false, commentId: null, status: null });
-          setRejectReason("");
-        }}
-        okText="确认驳回"
-        cancelText="取消"
-      >
-        <p>请填写驳回该评论的原因：</p>
-        <Input.TextArea
-          rows={4}
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-          placeholder="请说明驳回原因（至少5个字符）"
-          showCount
-          maxLength={200}
-        />
-      </Modal>
     </Layout>
   );
 };

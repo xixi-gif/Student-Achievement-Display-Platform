@@ -1,24 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import {Table, Button, Modal, message, Tag, Space, Card, Input, Select,  
-  Divider, Descriptions, Badge, Tooltip, Layout} from 'antd';
-import { 
-  CheckOutlined, 
-  CloseOutlined, 
-  EyeOutlined, 
+import React, { useState, useEffect } from "react";
+import {
+  Layout,
+  Card,
+  Table,
+  Tag,
+  Button,
+  Space,
+  Input,
+  Modal,
+  Descriptions,
+  Divider,
+  Badge,
+  Tooltip,
+  message,
+  Select,
+  Spin,
+  Popover,
+} from "antd";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  EyeOutlined,
+  FilterOutlined,
   SearchOutlined,
-  FilterOutlined 
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../Navbar/Navbar';
-import { achievementApi } from '../../service/api';
+} from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../Navbar/Navbar";
+import { achievementApi, adminApi } from "../../service/api";
 
+const { Content, Footer } = Layout;
 const { Search } = Input;
 const { Option } = Select;
-const { Footer, Content } = Layout;
 
 const AchievementReviewPage = () => {
   const [data, setData] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -27,132 +44,269 @@ const AchievementReviewPage = () => {
   });
   const [selectedItem, setSelectedItem] = useState(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [searchText, setSearchText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [rejectReason, setRejectReason] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all"); // all, pending, approved, rejected
   const navigate = useNavigate();
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [filterCategory, setFilterCategory] = useState("");
 
-  const fetchData = async (params = {}) => {
+  // 状态映射：后端text -> 页面显示文本
+  const statusMap = {
+    pending: "待审核",
+    approved: "教师已审核",
+    rejected: "已驳回",
+    published: "已发布",
+  };
+
+  // 筛选选项映射（value为后端需要的text值）
+  const filterOptions = [
+    { value: "all", label: "全部状态" },
+    { value: "pending", label: "待审核" },
+    { value: "approved", label: "教师已审核" },
+    { value: "rejected", label: "已驳回" },
+    { value: "published", label: "已发布" },
+  ];
+
+  // 从接口获取审核数据
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const queryParams = {
+      const params = {
         current: pagination.current,
         pageSize: pagination.pageSize,
         keyword: searchText,
-        status: filterStatus === 'all' ? null : filterStatus
+        // 转换筛选状态
+        status: filterStatus === "all" ? null : filterStatus,
+        category: filterCategory,
       };
-      
-      const res = await achievementApi.getPendingList(queryParams);
-      setData(res.records);
+
+      // const res = await achievementApi.getPendingList(params);
+      const { data: res } = await achievementApi.getPendingList(params);
+      // 数据解析逻辑
+      const records = res.records || [];
+      const formattedData = records.map((item) => ({
+        ...item,
+        // 若后端返回的是数字状态，需转换为text（根据实际接口返回调整）
+        status:
+          item.status === 1
+            ? "pending"
+            : item.status === 4
+            ? "approved"
+            : item.status === 3
+            ? "rejected"
+            : item.status === 2
+            ? "published"
+            : "pending",
+        studentName: item.userName, // 后端返回userName对应页面studentName
+        createTime: item.createTime || "",
+        // 确保其他必要字段有默认值
+        category: item.category || "",
+        rejectReason: item.rejectReason || "",
+        title: item.title || "",
+      }));
+      setData(formattedData);
+      setFilteredData(formattedData);
       setPagination({
         ...pagination,
-        total: res.total
+        current: res.current || 1,
+        total: res.total || 0,
+        pageSize: res.size || 10,
       });
     } catch (error) {
-      message.error('数据加载失败');
+      console.error("获取审核列表失败:", error);
+      message.error("获取数据失败，请重试");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    const role = localStorage.getItem('user_role') || 'visitor';
-    const username = localStorage.getItem('username') || '访客';
-    setCurrentUser({ role, username, avatar: `https://picsum.photos/id/${1030 + Math.floor(Math.random() * 10)}/200/200` });
-
-    fetchData();
-  }, [pagination.current, filterStatus, searchText]);
-
-  const handleApprove = async (id) => {
+  //获取分类数据
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
     try {
-      await achievementApi.approve(id);
-      message.success('审核通过');
-      fetchData();
+      const response = await adminApi.getCategoryList();
+      if (response.code === 0) {
+        // 后端分类字段为id和name，映射为前端需要的value和label
+        setCategories(
+          response.data.map((item) => ({
+            value: item.name, // 与后端返回的category名称匹配
+            label: item.name,
+          }))
+        );
+      }
     } catch (error) {
-      message.error('操作失败');
+      console.error("获取分类失败:", error);
+      message.error("获取分类数据失败");
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
+  useEffect(() => {
+    // 加载用户信息
+    const role = localStorage.getItem("user_role") || "teacher";
+    const username = localStorage.getItem("username") || "";
+    const avatar = `https://picsum.photos/id/${
+      1030 + Math.floor(Math.random() * 10)
+    }/200/200`;
+    setCurrentUser({ role, username, avatar });
+
+    // 加载审核数据和分类数据
+    const hide = message.loading("正在加载审核成果数据...", 0);
+    Promise.all([fetchData(), fetchCategories()]).finally(hide);
+  }, [
+    pagination.current,
+    pagination.pageSize,
+    filterStatus,
+    searchText,
+    filterCategory,
+  ]);
+
+  // 处理分页变化
+  const handleTableChange = (pag) => {
+    setPagination(pag);
+    // message.loading('加载中...', 0.5); // 0.5秒后自动消失
+  };
+
+  // 审核通过
+  const handleApprove = async (id, title) => {
+    Modal.confirm({
+      title: "确认通过审核",
+      content: `确定要通过成果《${title}》的审核吗？`,
+      okText: "确认通过",
+      cancelText: "取消",
+      onOk: async () => {
+        try {
+          await achievementApi.approve(id);
+          message.success("老师审核通过");
+          fetchData(); // 重新加载数据
+        } catch (error) {
+          console.error("审核通过失败:", error);
+          message.error("操作失败，请重试");
+        }
+      },
+    });
+  };
+
+  // 审核驳回
   const handleReject = async () => {
-    if (!rejectReason) {
-      message.warning('请填写驳回理由');
+    if (!rejectReason.trim()) {
+      message.warning("请填写驳回理由");
+      return;
+    }
+    if (rejectReason.trim().length < 10) {
+      message.warning("驳回理由至少需要10个字");
       return;
     }
     try {
       await achievementApi.reject(selectedItem.id, rejectReason);
-      message.success('已驳回该成果');
+      message.success(`已驳回成果:《${selectedItem.title}》`);
       setReviewModalVisible(false);
-      setRejectReason('');
-      fetchData();
+      setRejectReason("");
+      fetchData(); // 重新加载数据
     } catch (error) {
-      message.error('操作失败');
+      console.error("驳回失败:", error);
+      message.error("操作失败，请重试");
     }
   };
 
+  // 查看成果详情
   const viewDetail = (item) => {
     navigate(`/achievement/detail/${item.id}`);
   };
 
+  // 状态标签渲染
   const statusTag = (status, reason) => {
-    switch(status) {
-      case 2:
-        return <Tag color="success">已通过</Tag>;
-      case 3:
+    switch (status) {
+      case "approved":
+        return <Tag color="success">{statusMap.approved}</Tag>;
+      case "rejected":
         return (
           <Tooltip title={`驳回原因: ${reason}`}>
-            <Tag color="error">已驳回</Tag>
+            <Tag color="error">{statusMap.rejected}</Tag>
           </Tooltip>
         );
+      case "published":
+        return <Tag color="blue">{statusMap.published}</Tag>;
       default:
-        return <Tag color="processing">待审核</Tag>;
+        return <Tag color="processing">{statusMap.pending}</Tag>;
     }
   };
 
   const columns = [
     {
-      title: '成果标题',
-      dataIndex: 'title',
-      key: 'title',
+      title: "成果标题",
+      dataIndex: "title",
+      key: "title",
       render: (text, record) => (
-        <a onClick={() => viewDetail(record)}>
-          {text}
-        </a>
+        <Popover
+          content={
+            <div style={{ width: 300 }}>
+              <p>
+                <strong>学生：</strong>
+                {record.userName}
+              </p>
+              <p>
+                <strong>类型：</strong>
+                {record.category || "未分类"}
+              </p>
+              <p>
+                <strong>关键词：</strong>
+                {typeof record.keyword === "string"
+                  ? record.keyword
+                  : Array.isArray(record.keyword)
+                  ? record.keyword.join(", ")
+                  : "无"}
+              </p>
+              <p>
+                <strong>成果描述：</strong>
+                {record.description}
+              </p>
+            </div>
+          }
+        >
+          <a onClick={() => navigate(`/achievement/detail/${record.id}`)}>
+            {text}
+          </a>
+        </Popover>
       ),
     },
     {
-      title: '学生姓名',
-      dataIndex: 'userName',
-      key: 'userName',
+      title: "学生姓名",
+      dataIndex: "studentName",
+      key: "studentName",
     },
     {
-      title: '成果类型',
-      dataIndex: 'category',
-      key: 'category',
-      render: (category) => <Tag color="blue">{category?.name}</Tag>,
+      title: "成果类型",
+      dataIndex: "category",
+      key: "category",
+      render: (category) => <Tag color="blue">{category}</Tag>,
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
+      title: "状态",
+      dataIndex: "status",
+      key: "status",
       render: (status, record) => statusTag(status, record.rejectReason),
     },
     {
-      title: '提交时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
+      title: "提交时间",
+      dataIndex: "createTime",
+      key: "createTime",
       sorter: (a, b) => new Date(a.createTime) - new Date(b.createTime),
     },
     {
-      title: '操作',
-      key: 'action',
+      title: "操作",
+      key: "action",
       render: (_, record) => (
         <Space size="middle">
-          {record.status === 1 && (
+          {record.status === "pending" && (
             <>
               <Button
                 type="primary"
                 icon={<CheckOutlined />}
-                onClick={() => handleApprove(record.id)}
+                onClick={() => handleApprove(record.id, record.title)}
               >
                 通过
               </Button>
@@ -168,10 +322,7 @@ const AchievementReviewPage = () => {
               </Button>
             </>
           )}
-          <Button
-            icon={<EyeOutlined />}
-            onClick={() => viewDetail(record)}
-          >
+          <Button icon={<EyeOutlined />} onClick={() => viewDetail(record)}>
             详情
           </Button>
         </Space>
@@ -180,22 +331,18 @@ const AchievementReviewPage = () => {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar currentUser={currentUser}/>
-      
-      {}
-      <Content style={{ 
-        padding: '24px', 
-        display: 'block',  
-        background: '#fff' 
-      }}>
-        <Card 
+    <Layout>
+      <Navbar currentUser={currentUser} />
+      <Content style={{ padding: "24px" }}>
+        <Card
           title={
             <Space>
-              <span>成果审核</span>
-              <Badge 
-                count={data.filter(d => d.status === 1).length} 
-                style={{ backgroundColor: '#1890ff' }} 
+              <span>成果待审核</span>
+              <Badge
+                count={
+                  filteredData.filter((d) => d.status === "pending").length
+                }
+                style={{ backgroundColor: "#1890ff" }}
               />
             </Space>
           }
@@ -208,20 +355,36 @@ const AchievementReviewPage = () => {
                 style={{ width: 120 }}
                 suffixIcon={<FilterOutlined />}
               >
-                <Option value="all">全部状态</Option>
-                <Option value="1">待审核</Option>
-                <Option value="2">已通过</Option>
-                <Option value="3">已驳回</Option>
+                {filterOptions.map((option) => (
+                  <Option key={option.value} value={option.value}>
+                    {option.label}
+                  </Option>
+                ))}
+              </Select>
+              <Select
+                placeholder="成果类型"
+                allowClear
+                style={{ width: 120 }}
+                loading={categoriesLoading}
+                value={filterCategory}
+                onChange={(val) => {
+                  setFilterCategory(val);
+                  setPagination({ ...pagination, current: 1 }); // 重置到第一页
+                }}
+              >
+                <Option value={""}>全部类型</Option>
+                {categories.map((c) => (
+                  <Option key={c.value} value={c.value}>
+                    {c.label}
+                  </Option>
+                ))}
               </Select>
               <Search
-                placeholder="搜索成果/学生/关键词"
+                placeholder="搜索成果/关键词/学生"
                 allowClear
                 enterButton={<SearchOutlined />}
                 style={{ width: 250 }}
-                onSearch={(value) => {
-                  setSearchText(value);
-                  setPagination({...pagination, current: 1});
-                }}
+                onSearch={(value) => setSearchText(value)}
               />
             </Space>
           }
@@ -230,29 +393,58 @@ const AchievementReviewPage = () => {
             columns={columns}
             rowKey="id"
             dataSource={data}
-            pagination={pagination}
             loading={loading}
-            onChange={(pag) => {
-              setPagination(pag);
+            locale={{
+              emptyText:
+                searchText || filterStatus !== "all" ? (
+                  <div>
+                    <p>没有找到匹配的成果</p>
+                    <Button
+                      type="link"
+                      onClick={() => {
+                        setSearchText("");
+                        setFilterStatus("all");
+                      }}
+                    >
+                      清除筛选条件
+                    </Button>
+                  </div>
+                ) : (
+                  <p>暂无待审核的成果</p>
+                ),
             }}
+            pagination={{
+              ...pagination,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => `共 ${total} 条成果`,
+              pageSizeOptions: ["10", "15", "20"],
+              position: ["bottomRight"],
+            }}
+            onChange={handleTableChange}
             scroll={{ x: true }}
           />
-          
+
+          {/* 驳回理由弹窗 */}
           <Modal
             title="驳回理由"
             visible={reviewModalVisible}
             onOk={handleReject}
             onCancel={() => {
               setReviewModalVisible(false);
-              setRejectReason('');
+              setRejectReason("");
             }}
             okText="确认驳回"
             cancelText="取消"
             okButtonProps={{ danger: true }}
           >
             <Descriptions column={1} bordered>
-              <Descriptions.Item label="成果标题">{selectedItem?.title}</Descriptions.Item>
-              <Descriptions.Item label="提交学生">{selectedItem?.userName}</Descriptions.Item>
+              <Descriptions.Item label="成果标题">
+                {selectedItem?.title}
+              </Descriptions.Item>
+              <Descriptions.Item label="提交学生">
+                {selectedItem?.studentName}
+              </Descriptions.Item>
             </Descriptions>
             <Divider />
             <p style={{ marginBottom: 8 }}>请填写驳回理由：</p>
@@ -260,20 +452,28 @@ const AchievementReviewPage = () => {
               rows={4}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="请详细说明驳回原因（至少20字）"
+              minLength={10}
+              placeholder="请详细说明驳回原因（至少10字）"
               showCount
-              maxLength={200}
+              onBlur={(e) => {
+                if (
+                  e.target.value.trim().length < 10 &&
+                  e.target.value.length > 0
+                ) {
+                  message.warning("驳回理由至少需要10个字");
+                }
+              }}
+              // maxLength={200}
             />
           </Modal>
         </Card>
       </Content>
-      
-      <Footer style={{ textAlign: 'center' }}>
-        学生成果展示平台 ©{new Date().getFullYear()} 汕头大学数学与计算机学院计算机系
+      <Footer style={{ textAlign: "center" }}>
+        学生成果展示平台 ©{new Date().getFullYear()}{" "}
+        汕头大学数学与计算机学院计算机系
       </Footer>
     </Layout>
   );
 };
 
 export default AchievementReviewPage;
-    

@@ -2,34 +2,34 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/Loginpage/Loginpage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
-import HomePage from './pages/Homepage/Homepage2';
+import HomePage from './pages/Homepage/Homepage';
 import ProfilePage from './pages/ProfilePage/ProfilePage';
-import MyAchievements from './pages/MyAchievements/MyAchievements2';
-import AnnouncementList from './pages/AnnouncementList/AnnouncementList2';
-import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail2';
-import AchievementsPage from './pages/AchievementsPage/AchievementsPage2';
-// import AchievementCreationPage from './pages/AchievementCreationPage/AchievementCreationPage2';创建成果与编辑成果页面合并
-import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage2';
+import MyAchievements from './pages/MyAchievements/MyAchievements';
+import AnnouncementList from './pages/AnnouncementList/AnnouncementList';
+import AnnouncementDetail from './pages/AnnouncementDetail/AnnoucementDetail'; 
+import AchievementsPage from './pages/AchievementsPage/AchievementsPage';
+import AchievementDetailPage from './pages/AchievementDetailPage/AchievementDetailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
-import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage2';
-import AchievementForm from './pages/AchievementForm/AchievementForm2';
+import AchievementReviewPage from './pages/AchievementReviewPage/AchievementReviewPage';
+import AchievementForm from './pages/AchievementForm/AchievementForm';
 import AchievementRecommendPage from './pages/AchievementRecommendPage/AchievementRecommendPage';
 import SystemSettingsPage from './pages/SystemSettingPage/SystemSettingPage';
-import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage2';
-import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage2';
+import DataStatisticsPage from './pages/DataStaticsPage/DataStaticsPage';
+import AdminAchievementManagementPage from './pages/AchievementManagePage/AchievementManagePage';
 import AdminProfilePage from './pages/AdminProfilePage/AdminProfilePage';
-import TeacherProfilePage from './pages/TeacherProfilePage/TeacherProfilePage2';
+import TeacherProfilePage from './pages/TeacherProfilePage/TeacherProfilePage';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import './App.css';
-import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage2';
+import AuthorDetailPage from './pages/AuthorDetailPage/AuthorDetailPage';
 import AnnouncementPublish from './pages/AnnouncementPublish/AnnouncementPublish';
 import AccountSettingsPage from './pages/SettingPage/SettingPage'
 import AboutUs from './pages/AboutUsPage/AboutUsPage';
+import HelpPage from './pages/HelpCenterPage/HelpCenterPage';
 
 // 需求相关页面
 import RequirementPublishPage from './pages/RequirementPublishPage/RequirementPublishPage';
-import RequirementListPage from './pages/RequirementListPage/RequirementList2';
+import RequirementListPage from './pages/RequirementListPage/RequirementListPage';
 import RequirementDetailPage from './pages/RequirementDetailPage/RequirementDetailPage';
 import MessageCenterPage from './pages/RequireMessagePage/RequireMessagePage';
 import RequirementManagePage from './pages/RequirementManagePage/RequirementManagePage';
@@ -43,7 +43,7 @@ import AdminReviewComment from './pages/AdminReviewComment/adminReviewComment'
 // 路由保护
 import AuthRoute from './pages/AuthRoute/AuthRoute';
 import UserManage from './pages/UserManagePage/UserManagePage';
-import MyRequirementsPage from './pages/MyRequirements/MyRequirements2';
+import MyRequirementsPage from './pages/MyRequirements/MyRequirements';
 import MyApplicationsPage from './pages/MyApplicationsPage/MyApplicationPage';
 
 function App() {
@@ -65,6 +65,7 @@ function App() {
             <Route path="/setting" element={<AccountSettingsPage />} />
             <Route path='my-applications' element={<MyApplicationsPage /> } />
             <Route path ='/about' element={<AboutUs /> } />
+            <Route path="/help" element={<HelpPage /> } />
 
             {/* 需要权限验证的路由 */}
             <Route element={<AuthRoute/>}>

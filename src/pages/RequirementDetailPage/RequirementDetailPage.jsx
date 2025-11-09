@@ -269,7 +269,7 @@ const RequirementDetailPage = () => {
             style={{ margin: 0, borderRadius: 4 }}
           >
             <Tabs activeKey={activeTab} onChange={setActiveTab}>
-              <TabPane tab="基本信息" key="detail">
+              <TabPane tab="基本信息" key="detail" style={{textAlign:'left'}}>
                 <Descriptions column={1} bordered>
                   <Descriptions.Item label="需求标题">
                     {requirement.title}
@@ -337,7 +337,7 @@ const RequirementDetailPage = () => {
               </TabPane>
 
               {requirement.applicants.length > 0 && (
-                <TabPane tab={`申请者 (${requirement.applicants.length})`} key="applicants">
+                <TabPane tab={`申请者 (${requirement.applicants.length})`} key="applicants" style={{textAlign:'left'}}>
                   <List
                     dataSource={requirement.applicants}
                     renderItem={(applicant) => (

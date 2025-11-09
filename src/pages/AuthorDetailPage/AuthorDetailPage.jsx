@@ -1,65 +1,71 @@
-import React from 'react';
-import { Layout, Card, Avatar, Badge, Tabs, Table, Tag, Divider, Space, Button } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Layout, Card, Avatar, Badge, Tabs, Table, Tag, Divider, Space, Button, Spin, message } from 'antd';
 import { TrophyOutlined, EyeOutlined, UserOutlined, BookOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
+import { authorApi } from '../../service/api';
 
 const { Content } = Layout;
 const { TabPane } = Tabs;
 
 const AuthorDetailPage = () => {
   const navigate = useNavigate();
-  
-  // 写死的作者数据 - 张明（学生）
-  const author = {
-    id: 1,
-    username: "zhangming",
-    role: "student",
-    realName: "张明",
-    studentId: "2021001234",
-    major: "计算机科学与技术",
-    grade: "大三",
-    email: "zhangming@example.com",
-    phone: "13800138000",
-    bio: "热爱编程与人工智能，参与多项校级科研项目，曾获全国大学生数学建模竞赛一等奖。擅长Python、Java和React等技术，目前专注于深度学习在计算机视觉领域的应用研究。",
-    avatar: "https://picsum.photos/id/1012/200/200",
-    achievements: [
-      {
-        id: 1,
-        title: "基于深度学习的校园垃圾分类系统研究",
-        category: "毕业论文",
-        status: "已展示",
-        date: "2023-10-15",
-        views: 128,
-        isFeatured: true
-      },
-      {
-        id: 3,
-        title: "全国大学生数学建模竞赛一等奖",
-        category: "竞赛作品",
-        status: "已展示",
-        date: "2023-08-12",
-        views: 203,
-        isFeatured: true
+  const { userId } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [author, setAuthor] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setError('用户ID参数缺失');
+      setLoading(false);
+      return;
+    }
+
+    fetchAuthorInfo();
+  }, [userId]);
+
+  const fetchAuthorInfo = async () => {
+    try {
+      setLoading(true);
+      const response = await authorApi.getUserPublicInfo(userId);
+      
+      console.log('接口响应:', response);
+      
+      if (response._isError) {
+        throw new Error(response.message || '获取用户信息失败');
       }
-    ]
+      
+      if (response.code === 0) {
+        setAuthor(response.data || null);
+        setError(null);
+      } else {
+        throw new Error(response.message || '获取用户信息失败');
+      }
+      
+    } catch (err) {
+      setError(err.message);
+      message.error(`获取用户信息失败: ${err.message}`);
+      console.error('获取用户信息错误:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getCategoryColor = (category) => {
     const colorMap = {
-      '毕业论文': '#1890ff',
-      '一级项目': '#52c41a',
-      '竞赛作品': '#faad14',
-      '技术专利': '#f5222d',
-      '期刊论文': '#722ed1',
-      '课程作业': '#13c2c2',
+      '软件开发': '#1890ff',
+      '学术论文': '#52c41a',
+      '竞赛成果': '#faad14',
+      '创新设计': '#f5222d',
+      '科研项目': '#722ed1',
+      '一级项目': '#13c2c2',
       '教学成果': '#ff7a45'
     };
     return colorMap[category] || '#666';
   };
 
-  // 过滤出已审核的成果
-  const approvedAchievements = author.achievements.filter(achievement => achievement.status === '已展示');
+  const approvedAchievements = author?.achievementList?.filter(achievement => achievement.status === 2) || [];
 
   const achievementColumns = [
     {
@@ -67,7 +73,7 @@ const AuthorDetailPage = () => {
       dataIndex: 'title',
       key: 'title',
       render: (text, record) => (
-        <Link to={`/achievement/${record.id}`}>{text}</Link>
+        <Link to={`/achievement/detail/${record.id}`}>{text}</Link>
       )
     },
     {
@@ -82,14 +88,9 @@ const AuthorDetailPage = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
-        <Badge status="success" text={status} />
-      )
-    },
-    {
-      title: '发布日期',
-      dataIndex: 'date',
-      key: 'date'
+      render: () => {
+        return <Badge status='success' text={'已发布'} />;
+      }
     },
     {
       title: '浏览量',
@@ -104,13 +105,51 @@ const AuthorDetailPage = () => {
         <Button 
           type="primary" 
           size="small"
-          onClick={() => navigate(`/achievement/detail`)}
+          onClick={() => navigate(`/achievement/detail/${record.id}`)}
         >
           详情
         </Button>
       )
     }
   ];
+
+  if (loading) {
+    return (
+      <Layout style={{ minHeight: '100vh' }}>
+        <Navbar />
+        <Content style={{ background: '#f0f2f5', padding: '24px 5%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Spin size="large" tip="加载中..." />
+        </Content>
+      </Layout>
+    );
+  }
+
+  if (error || !author) {
+    return (
+      <Layout style={{ minHeight: '100vh' }}>
+        <Navbar />
+        <Content style={{ background: '#f0f2f5', padding: '24px 5%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Card>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <p style={{ color: '#ff4d4f', fontSize: '16px', marginBottom: '20px' }}>
+                {error || '用户信息获取失败'}
+              </p>
+              <Button type="primary" onClick={() => navigate(-1)}>
+                返回上一页
+              </Button>
+            </div>
+          </Card>
+        </Content>
+      </Layout>
+    );
+  }
+
+  // 构建完整的头像URL
+  const getAvatarUrl = (avatarPath) => {
+    if (!avatarPath) return undefined;
+    if (avatarPath.startsWith('http')) return avatarPath;
+    return `http://localhost:8090/${avatarPath}`;
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -131,19 +170,20 @@ const AuthorDetailPage = () => {
               <div style={{ marginRight: 40, marginBottom: 24, minWidth: 200, textAlign: 'center' }}>
                 <Avatar
                   size={180}
-                  src={author.avatar}
+                  src={getAvatarUrl(author.userAvatar)}
                   icon={<UserOutlined />}
                   style={{ marginBottom: 20 }}
                 />
                 
                 <h1 style={{ margin: '0 0 12px', fontSize: 24 }}>{author.realName}</h1>
-                <Badge status="success" text="学生" />
+                <Badge status="success" text={author.userRole || "用户"} />
                 
                 <Button 
                   type="primary" 
                   style={{ marginTop: 20 }}
                   size="small"
-                  onClick={() => navigate(`/chat`)}
+                  // onClick={() => navigate(`/chat?userId=${author.userId}`)}
+                  onClick={() => navigate(`/messages?toUserId=${author.userId}&toUserName=${encodeURIComponent(author.realName || author.name || '用户')}`)}
                 >
                   联系作者
                 </Button>
@@ -154,41 +194,42 @@ const AuthorDetailPage = () => {
                 
                 <div style={{ marginBottom: 32 }}>
                   <p style={{ lineHeight: 1.8, fontSize: 16 }}>
-                    {author.bio}
+                    {author.bio || '暂无个人简介'}
                   </p>
                 </div>
                 
                 <Divider orientation="left">基本信息</Divider>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 20, marginTop: 20 }}>
-                  <div>
-                    <p style={{ color: '#666', margin: '0 0 6px' }}>学号</p>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{author.studentId}</p>
-                  </div>
+                  {author.studentNo && (
+                    <div>
+                      <p style={{ color: '#666', margin: '0 0 6px' }}>学号</p>
+                      <p style={{ margin: 0, fontWeight: 500 }}>{author.studentNo}</p>
+                    </div>
+                  )}
                   
-                  <div>
-                    <p style={{ color: '#666', margin: '0 0 6px' }}>年级</p>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{author.grade}</p>
-                  </div>
+                  {author.grade && (
+                    <div>
+                      <p style={{ color: '#666', margin: '0 0 6px' }}>年级</p>
+                      <p style={{ margin: 0, fontWeight: 500 }}>{author.grade}</p>
+                    </div>
+                  )}
                   
-                  <div>
-                    <p style={{ color: '#666', margin: '0 0 6px' }}>专业</p>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{author.major}</p>
-                  </div>
+                  {author.major && (
+                    <div>
+                      <p style={{ color: '#666', margin: '0 0 6px' }}>专业</p>
+                      <p style={{ margin: 0, fontWeight: 500 }}>{author.major}</p>
+                    </div>
+                  )}
                   
-                  <div>
-                    <p style={{ color: '#666', margin: '0 0 6px' }}>
-                      <MailOutlined style={{ marginRight: 4 }} />邮箱
-                    </p>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{author.email}</p>
-                  </div>
-                  
-                  <div>
-                    <p style={{ color: '#666', margin: '0 0 6px' }}>
-                      <PhoneOutlined style={{ marginRight: 4 }} />电话
-                    </p>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{author.phone}</p>
-                  </div>
+                  {author.email && (
+                    <div>
+                      <p style={{ color: '#666', margin: '0 0 6px' }}>
+                        <MailOutlined style={{ marginRight: 4 }} />邮箱
+                      </p>
+                      <p style={{ margin: 0, fontWeight: 500 }}>{author.email}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -200,6 +241,9 @@ const AuthorDetailPage = () => {
                 <Space>
                   <TrophyOutlined />
                   <span>发表成果</span>
+                  {approvedAchievements.length > 0 && (
+                    <Badge count={approvedAchievements.length} />
+                  )}
                 </Space>
               } 
               key="achievements"
@@ -210,7 +254,7 @@ const AuthorDetailPage = () => {
                   dataSource={approvedAchievements}
                   rowKey="id"
                   pagination={{ pageSize: 6 }}
-                  locale={{ emptyText: '该作者暂无已审核成果展示' }}
+                  locale={{ emptyText: '该作者暂无已展示成果' }}
                 />
               </Card>
             </TabPane>

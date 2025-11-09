@@ -178,7 +178,7 @@ const AboutUsPage = () => {
               </Col>
               <Col xs={24} md={12}>
                 <Title level={3}>我们的使命</Title>
-                <Paragraph>
+                <Paragraph style={{textAlign:'left'}}>
                   学生成果展示平台旨在解决学生作品展示渠道有限、
                   校园内优秀成果难以被发现的问题。我们相信每个学生都有独特的才华，
                   值得被看见和认可。
@@ -259,7 +259,7 @@ const AboutUsPage = () => {
                     <MailOutlined style={{ fontSize: 28, color: '#1890ff' }} />
                   </div>
                   <Title level={5} style={{ marginBottom: 8 }}>电子邮件</Title>
-                  <Text>contact@student-showcase.edu</Text>
+                  <Text>dzjiang@stu.edu.cn</Text>
                 </Col>
                 
                 {/* 联系电话 */}
@@ -278,7 +278,7 @@ const AboutUsPage = () => {
                     <PhoneOutlined style={{ fontSize: 28, color: '#1890ff' }} />
                   </div>
                   <Title level={5} style={{ marginBottom: 8 }}>联系电话</Title>
-                  <Text>+86 123 4567 8910</Text>
+                  <Text>8650 3400</Text>
                 </Col>
                 
                 {/* 办公地址 */}
@@ -297,7 +297,7 @@ const AboutUsPage = () => {
                     <EnvironmentOutlined style={{ fontSize: 28, color: '#1890ff' }} />
                   </div>
                   <Title level={5} style={{ marginBottom: 8 }}>办公地址</Title>
-                  <Text>XX大学计算机学院3楼305室</Text>
+                  <Text>计算机学院4楼办公室</Text>
                 </Col>
               </Row>
             </Space>
